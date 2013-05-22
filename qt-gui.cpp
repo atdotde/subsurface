@@ -39,7 +39,7 @@ public:
 	~Translator() {}
 
 	virtual QString	translate(const char *context, const char *sourceText,
-	                          const char *disambiguation = NULL) const;
+				  const char *disambiguation = NULL) const;
 };
 
 Translator::Translator(QObject *parent):
@@ -48,7 +48,7 @@ Translator::Translator(QObject *parent):
 }
 
 QString Translator::translate(const char *context, const char *sourceText,
-                              const char *disambiguation) const
+			      const char *disambiguation) const
 {
 	return gettext(sourceText);
 }
@@ -58,10 +58,11 @@ static QApplication *application = NULL;
 int        error_count;
 const char *existing_filename;
 
-void init_qt_ui(int *argcp, char ***argvp)
+void init_qt_ui(int *argcp, char ***argvp, char *errormessage)
 {
 	application->installTranslator(new Translator(application));
 	MainWindow *window = new MainWindow();
+	window->showError(errormessage);
 	window->show();
 }
 
@@ -77,8 +78,11 @@ void init_ui(int *argcp, char ***argvp)
 	// [http://www.iana.org/assignments/character-sets/character-sets.xml]
 	QTextCodec::setCodecForCStrings(QTextCodec::codecForMib(106));
 #endif
+	QCoreApplication::setOrganizationName("Subsurface");
+	QCoreApplication::setOrganizationDomain("subsurface.hohndel.org");
+	QCoreApplication::setApplicationName("Subsurface");
 
-	QSettings settings("hohndel.org","subsurface");
+	QSettings settings;
 	settings.beginGroup("GeneralSettings");
 	v = settings.value(QString("default_filename"));
 	if (v.isValid()) {
@@ -88,9 +92,6 @@ void init_ui(int *argcp, char ***argvp)
 	settings.endGroup();
 
 #if 0
-	subsurface_open_conf();
-
-	load_preferences();
 
 	/* these still need to be handled in QSettings */
 	default_dive_computer_vendor = subsurface_get_conf("dive_computer_vendor");
@@ -108,9 +109,6 @@ void run_ui(void)
 void exit_ui(void)
 {
 	delete application;
-#if 0
-	subsurface_close_conf();
-#endif
 	if (existing_filename)
 		free((void *)existing_filename);
 // 	if (default_dive_computer_device)

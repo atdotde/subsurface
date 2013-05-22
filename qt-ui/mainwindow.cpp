@@ -37,14 +37,15 @@ MainWindow* mainWindow()
 MainWindow::MainWindow() : ui(new Ui::MainWindow())
 {
 	ui->setupUi(this);
-	readSettings();
 	setWindowIcon(QIcon(":subsurface-icon"));
 	connect(ui->ListWidget, SIGNAL(currentDiveChanged(int)), this, SLOT(current_dive_changed(int)));
 	ui->globeMessage->hide();
+	ui->mainErrorMessage->hide();
 	ui->globe->setMessageWidget(ui->globeMessage);
 	ui->globeMessage->setCloseButtonVisible(false);
 	ui->ProfileWidget->setFocusProxy(ui->ListWidget);
 	ui->ListWidget->reload();
+	readSettings();
 	ui->ListWidget->setFocus();
 	ui->globe->reload();
 	instance = this;
@@ -79,14 +80,13 @@ void MainWindow::on_actionOpen_triggered()
 
 	on_actionClose_triggered();
 
-	GError *error = NULL;
+	char *error = NULL;
 	parse_file(fileNamePtr.data(), &error);
 	set_filename(fileNamePtr.data(), TRUE);
 
 	if (error != NULL) {
-		QMessageBox::warning(this, "Error", error->message);
-		g_error_free(error);
-		error = NULL;
+		showError(error);
+		free(error);
 	}
 	process_dives(FALSE, FALSE);
 
@@ -323,7 +323,7 @@ void MainWindow::readSettings()
 {
 	int i;
 	QVariant v;
-	QSettings settings("hohndel.org","subsurface");
+	QSettings settings;
 
 	settings.beginGroup("MainWindow");
 	QSize sz = settings.value("size").value<QSize>();
@@ -344,6 +344,7 @@ void MainWindow::readSettings()
 			ui->ListWidget->resizeColumnToContents(i);
 	}
 	ui->ListWidget->collapseAll();
+	ui->ListWidget->expand(ui->ListWidget->model()->index(0,0));
 	ui->ListWidget->scrollTo(ui->ListWidget->model()->index(0,0), QAbstractItemView::PositionAtCenter);
 
 	settings.endGroup();
@@ -416,7 +417,7 @@ void MainWindow::readSettings()
 void MainWindow::writeSettings()
 {
 	int i;
-	QSettings settings("hohndel.org","subsurface");
+	QSettings settings;
 
 	settings.beginGroup("MainWindow");
 	settings.setValue("size",size());
@@ -531,4 +532,14 @@ void MainWindow::file_save(void)
 	}
 	save_dives(existing_filename);
 	mark_divelist_changed(FALSE);
+}
+
+void MainWindow::showError(QString message)
+{
+	if (message.isEmpty())
+		return;
+	ui->mainErrorMessage->setText(message);
+	ui->mainErrorMessage->setCloseButtonVisible(true);
+	ui->mainErrorMessage->setMessageType(KMessageWidget::Error);
+	ui->mainErrorMessage->animatedShow();
 }

@@ -155,10 +155,11 @@ typedef struct {
 	const char *description;	/* "integrated", "belt", "ankle" */
 } weightsystem_t;
 
-extern gboolean cylinder_nodata(cylinder_t *cyl);
-extern gboolean cylinder_none(void *_data);
-extern gboolean no_weightsystems(weightsystem_t *ws);
-extern gboolean weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
+extern bool cylinder_nodata(cylinder_t *cyl);
+extern bool cylinder_none(void *_data);
+extern bool weightsystem_none(void *_data);
+extern bool no_weightsystems(weightsystem_t *ws);
+extern bool weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
 
 extern int get_pressure_units(unsigned int mb, const char **units);
 extern double get_depth_units(unsigned int mm, int *frac, const char **units);
@@ -377,7 +378,7 @@ struct dive {
 	pressure_t surface_pressure;
 	duration_t duration;
 	int salinity; // kg per 10000 l
-        int dive_tags;
+	int dive_tags;
 
 	struct divecomputer dc;
 };
@@ -583,13 +584,13 @@ struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset);
 extern int match_one_dc(struct divecomputer *a, struct divecomputer *b);
 
 extern void parse_xml_init(void);
-extern void parse_xml_buffer(const char *url, const char *buf, int size, struct dive_table *table, GError **error);
+extern void parse_xml_buffer(const char *url, const char *buf, int size, struct dive_table *table, char **error);
 extern void parse_xml_exit(void);
 extern void set_filename(const char *filename, gboolean force);
 
-extern int parse_dm4_buffer(const char *url, const char *buf, int size, struct dive_table *table, GError **error);
+extern int parse_dm4_buffer(const char *url, const char *buf, int size, struct dive_table *table, char **error);
 
-extern void parse_file(const char *filename, GError **error);
+extern void parse_file(const char *filename, char **error);
 
 extern void show_dive_info(struct dive *);
 
@@ -633,7 +634,7 @@ extern void add_event(struct divecomputer *dc, int time, int type, int flags, in
 /* UI related protopypes */
 
 extern void init_ui(int *argcp, char ***argvp);
-extern void init_qt_ui(int *argcp, char ***argvp);
+extern void init_qt_ui(int *argcp, char ***argvp, char *errormessage);
 
 extern void run_ui(void);
 extern void exit_ui(void);
@@ -741,11 +742,6 @@ struct tank_info {
 	const char *name;
 	int cuft, ml, psi, bar;
 };
-
-#ifdef DEBUGFILE
-extern char *debugfilename;
-extern FILE *debugfile;
-#endif
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@
  *
  */
 #include "models.h"
+#include "../helpers.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QColor>
@@ -13,7 +14,7 @@
 
 extern struct tank_info tank_info[100];
 
-CylindersModel::CylindersModel(QObject* parent): QAbstractTableModel(parent)
+CylindersModel::CylindersModel(QObject* parent): QAbstractTableModel(parent), current(0), rows(0)
 {
 }
 
@@ -62,30 +63,42 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	if (!index.isValid() || index.row() >= MAX_CYLINDERS)
 		return ret;
 
-	cylinder_t& cyl = current_dive->cylinder[index.row()];
+	cylinder_t *cyl = &current->cylinder[index.row()];
 
 	if (role == Qt::DisplayRole) {
 		switch(index.column()) {
 		case TYPE:
-			ret = QString(cyl.type.description);
+			ret = QString(cyl->type.description);
 			break;
 		case SIZE:
-			ret = cyl.type.size.mliter;
+			// we can't use get_volume_string because the idiotic imperial tank
+			// sizes take working pressure into account...
+			if (cyl->type.size.mliter) {
+				if (prefs.units.volume == prefs.units.CUFT) {
+					int cuft = ml_to_cuft(gas_volume(cyl, cyl->type.workingpressure));
+					ret = QString("%1cuft").arg(cuft);
+				} else {
+					ret = QString("%1l").arg(cyl->type.size.mliter / 1000.0, 0, 'f', 1);
+				}
+			}
 			break;
 		case MAXPRESS:
-			ret = cyl.type.workingpressure.mbar;
+			if (cyl->type.workingpressure.mbar)
+				ret = get_pressure_string(cyl->type.workingpressure, TRUE);
 			break;
 		case START:
-			ret = cyl.start.mbar;
+			if (cyl->start.mbar)
+				ret = get_pressure_string(cyl->start, TRUE);
 			break;
 		case END:
-			ret = cyl.end.mbar;
+			if (cyl->end.mbar)
+				ret = get_pressure_string(cyl->end, TRUE	);
 			break;
 		case O2:
-			ret = cyl.gasmix.o2.permille;
+			ret = QString("%1%").arg((cyl->gasmix.o2.permille + 5) / 10);
 			break;
 		case HE:
-			ret = cyl.gasmix.he.permille;
+			ret = QString("%1%").arg((cyl->gasmix.he.permille + 5) / 10);
 			break;
 		}
 	}
@@ -94,54 +107,67 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 
 int CylindersModel::rowCount(const QModelIndex& parent) const
 {
-	return 	usedRows[current_dive];
+	return 	rows;
 }
 
 void CylindersModel::add(cylinder_t* cyl)
 {
-	if (usedRows[current_dive] >= MAX_CYLINDERS) {
-		free(cyl);
+	if (rows >= MAX_CYLINDERS) {
 		return;
 	}
 
-	int row = usedRows[current_dive];
+	int row = rows;
 
-	cylinder_t& cylinder = current_dive->cylinder[row];
+	cylinder_t& cylinder = current->cylinder[row];
 
 	cylinder.end.mbar = cyl->end.mbar;
 	cylinder.start.mbar = cyl->start.mbar;
+	cylinder.type.description = strdup(cyl->type.description);
+	cylinder.type.size = cyl->type.size;
+	cylinder.type.workingpressure = cyl->type.workingpressure;
 
 	beginInsertRows(QModelIndex(), row, row);
-	usedRows[current_dive]++;
+	rows++;
 	endInsertRows();
 }
 
 void CylindersModel::update()
 {
-	if (usedRows[current_dive] > 0) {
-		beginRemoveRows(QModelIndex(), 0, usedRows[current_dive]-1);
-		endRemoveRows();
-	}
-	if (usedRows[current_dive] > 0) {
-		beginInsertRows(QModelIndex(), 0, usedRows[current_dive]-1);
-		endInsertRows();
-	}
+	setDive(current);
 }
 
 void CylindersModel::clear()
 {
-	if (usedRows[current_dive] > 0) {
-		beginRemoveRows(QModelIndex(), 0, usedRows[current_dive]-1);
-		usedRows[current_dive] = 0;
+	if (rows > 0) {
+		beginRemoveRows(QModelIndex(), 0, rows-1);
 		endRemoveRows();
 	}
 }
 
+void CylindersModel::setDive(dive* d)
+{
+	if (current)
+		clear();
+
+	int amount = MAX_CYLINDERS;
+	for(int i = 0; i < MAX_CYLINDERS; i++){
+		cylinder_t *cylinder = &d->cylinder[i];
+		if (cylinder_none(cylinder)) {
+			amount = i;
+			break;
+		}
+	}
+
+	beginInsertRows(QModelIndex(), 0, amount-1);
+	rows = amount;
+	current = d;
+	endInsertRows();
+}
+
 void WeightModel::clear()
 {
-	if (usedRows[current_dive] > 0) {
-		beginRemoveRows(QModelIndex(), 0, usedRows[current_dive]-1);
-		usedRows[current_dive] = 0;
+	if (rows > 0) {
+		beginRemoveRows(QModelIndex(), 0, rows-1);
 		endRemoveRows();
 	}
 }
@@ -165,13 +191,7 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 			ret = QString(ws->description);
 			break;
 		case WEIGHT:
-			if (get_units()->weight == units::KG) {
-				int gr = ws->weight.grams % 1000;
-				int kg = ws->weight.grams / 1000;
-				ret = QString("%1.%2").arg(kg).arg((unsigned) gr / 100);
-			} else {
-				ret = QString("%1").arg((unsigned)(grams_to_lbs(ws->weight.grams)));
-			}
+			ret = get_weight_string(ws->weight, TRUE);
 			break;
 		}
 	}
@@ -180,7 +200,7 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 
 int WeightModel::rowCount(const QModelIndex& parent) const
 {
-	return usedRows[current_dive];
+	return rows;
 }
 
 QVariant WeightModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -204,25 +224,44 @@ QVariant WeightModel::headerData(int section, Qt::Orientation orientation, int r
 
 void WeightModel::add(weightsystem_t* weight)
 {
-	if (usedRows[current_dive] >= MAX_WEIGHTSYSTEMS) {
-		free(weight);
+	if (rows >= MAX_WEIGHTSYSTEMS)
 		return;
-	}
 
-	int row = usedRows[current_dive];
+	int row = rows;
 
-	weightsystem_t *ws = &current_dive->weightsystem[row];
+	weightsystem_t *ws = &current->weightsystem[row];
 
 	ws->description = weight->description;
 	ws->weight.grams = weight->weight.grams;
 
 	beginInsertRows(QModelIndex(), row, row);
-	usedRows[current_dive]++;
+	rows++;
 	endInsertRows();
 }
 
 void WeightModel::update()
 {
+	setDive(current);
+}
+
+void WeightModel::setDive(dive* d)
+{
+	if (current)
+		clear();
+
+	int amount = MAX_WEIGHTSYSTEMS;
+	for(int i = 0; i < MAX_WEIGHTSYSTEMS; i++) {
+		weightsystem_t *weightsystem = &d->weightsystem[i];
+		if (weightsystem_none(weightsystem)) {
+			amount = i;
+			break;
+		}
+	}
+
+	beginInsertRows(QModelIndex(), 0, amount-1);
+	rows = amount;
+	current = d;
+	endInsertRows();
 }
 
 void TankInfoModel::add(const QString& description)
@@ -495,13 +534,11 @@ QVariant DiveItem::data(int column, int role) const
 		break;
 	}
 
-	if(role == STAR_ROLE){
+	if (role == STAR_ROLE)
 		retVal = dive->rating;
-	}
 
-	if(role == DIVE_ROLE){
+	if (role == DIVE_ROLE)
 		retVal = QVariant::fromValue<void*>(dive);
-	}
 
 	return retVal;
 }
@@ -630,7 +667,7 @@ Qt::ItemFlags DiveTripModel::flags(const QModelIndex& index) const
 }
 
 QVariant DiveTripModel::headerData(int section, Qt::Orientation orientation,
-                                   int role) const
+				   int role) const
 {
 	if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
 		return rootItem->data(section, role);

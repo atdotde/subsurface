@@ -202,6 +202,8 @@ void MainTab::updateDiveInfo(int dive)
 		ui->averageTimeAllText->setText(get_time_string(seconds, 0));
 		ui->longestAllText->setText(get_time_string(stats_selection.longest_time.seconds, 0));
 		ui->shortestAllText->setText(get_time_string(stats_selection.shortest_time.seconds, 0));
+		cylindersModel->setDive(d);
+		weightModel->setDive(d);
 	} else {
 		/* make the fields read-only */
 		ui->location->setReadOnly(true);
@@ -226,6 +228,8 @@ void MainTab::updateDiveInfo(int dive)
 		ui->airTemperatureText->clear();
 		ui->gasUsedText->clear();
 		ui->airPressureText->clear();
+		cylindersModel->clear();
+		weightModel->clear();
 	}
 	/* statisticsTab*/
 	/* we can access the stats_selection struct, but how do we ensure the relevant dives are selected
@@ -242,17 +246,17 @@ void MainTab::on_addCylinder_clicked()
 		return;
 
 	AddCylinderDialog dialog(this);
-	cylinder_t *newCylinder = (cylinder_t*) malloc(sizeof(cylinder_t));
-	newCylinder->type.description = "";
+	cylinder_t newCylinder;
+	newCylinder.type.description = "";
 
-	dialog.setCylinder(newCylinder);
+	dialog.setCylinder(&newCylinder);
 	int result = dialog.exec();
 	if (result == QDialog::Rejected) {
 		return;
 	}
 
 	dialog.updateCylinder();
-	cylindersModel->add(newCylinder);
+	cylindersModel->add(&newCylinder);
 }
 
 void MainTab::on_editCylinder_clicked()
@@ -292,7 +296,6 @@ void MainTab::on_delWeight_clicked()
 
 void MainTab::reload()
 {
-	cylindersModel->update();
 }
 
 void MainTab::on_editAccept_clicked(bool edit)
