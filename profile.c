@@ -11,6 +11,8 @@
 #endif
 #include "divelist.h"
 
+extern double tolerated_by_tissue[];
+
 #include "profile.h"
 #include "libdivecomputer/parser.h"
 #include "libdivecomputer/version.h"
@@ -971,7 +973,7 @@ static void calculate_deco_information(struct dive *dive, struct divecomputer *d
 	double surface_pressure = (dc->surface_pressure.mbar ? dc->surface_pressure.mbar : get_surface_pressure_in_mbar(dive, TRUE)) / 1000.0;
 
 	for (i = 1; i < pi->nr; i++) {
-		int fo2, fhe, j, t0, t1;
+	  int fo2, fhe, j, k, t0, t1;
 		double tissue_tolerance;
 		struct plot_data *entry = pi->entry + i;
 		int cylinderindex = entry->cylinderindex;
@@ -1038,6 +1040,8 @@ static void calculate_deco_information(struct dive *dive, struct divecomputer *d
 			entry->ceiling = (entry - 1)->ceiling;
 		else
 			entry->ceiling = deco_allowed_depth(tissue_tolerance, surface_pressure, dive, !prefs.calc_ceiling_3m_incr);
+		for(k=0;k<16;k++)
+		  (entry->ceilings)[k] = deco_allowed_depth(tolerated_by_tissue[k],surface_pressure, dive, 1);
 	}
 
 #if DECO_CALC_DEBUG & 1
