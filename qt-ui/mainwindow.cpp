@@ -26,6 +26,7 @@
 #include "modeldelegates.h"
 #include "models.h"
 #include "downloadfromdivecomputer.h"
+#include "preferences.h"
 
 static MainWindow* instance = 0;
 
@@ -39,16 +40,24 @@ MainWindow::MainWindow() : ui(new Ui::MainWindow())
 	ui->setupUi(this);
 	setWindowIcon(QIcon(":subsurface-icon"));
 	connect(ui->ListWidget, SIGNAL(currentDiveChanged(int)), this, SLOT(current_dive_changed(int)));
-	ui->globeMessage->hide();
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(readSettings()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui->ProfileWidget, SLOT(refresh()));
 	ui->mainErrorMessage->hide();
-	ui->globe->setMessageWidget(ui->globeMessage);
-	ui->globeMessage->setCloseButtonVisible(false);
 	ui->ProfileWidget->setFocusProxy(ui->ListWidget);
 	ui->ListWidget->reload();
 	readSettings();
+	ui->ListWidget->reloadHeaderActions();
 	ui->ListWidget->setFocus();
 	ui->globe->reload();
 	instance = this;
+}
+
+// this gets called after we download dives from a divecomputer
+void MainWindow::refreshDisplay()
+{
+	if (!selected_dive)
+		current_dive_changed(dive_table.nr - 1);
+	ui->ListWidget->reload();
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -148,7 +157,7 @@ void MainWindow::on_actionPrint_triggered()
 
 void MainWindow::on_actionPreferences_triggered()
 {
-	qDebug("actionPreferences");
+	PreferencesDialog::instance()->show();
 }
 
 void MainWindow::on_actionQuit_triggered()
@@ -161,8 +170,8 @@ void MainWindow::on_actionQuit_triggered()
 
 void MainWindow::on_actionDownloadDC_triggered()
 {
-	DownloadFromDCWidget* downloadWidget = new DownloadFromDCWidget();
-	downloadWidget->show();
+	DownloadFromDCWidget* downloadWidget = DownloadFromDCWidget::instance();
+	downloadWidget->runDialog();
 }
 
 void MainWindow::on_actionDownloadWeb_triggered()
@@ -289,19 +298,26 @@ QString MainWindow::filter()
 bool MainWindow::askSaveChanges()
 {
 	QString message;
-	QMessageBox::StandardButton response;
+	QMessageBox response;
 
 	if (existing_filename)
-		message = tr("You have unsaved changes to file: %1\nDo you really want to close the file without saving?").arg(existing_filename);
+		message = tr("Do you want to save the changes you made in the file %1?").arg(existing_filename);
 	else
-		message = tr("You have unsaved changes\nDo you really want to close the datafile without saving?");
+		message = tr("Do you want to save the changes you made in the datafile?");
 
-	response = QMessageBox::question(this, tr("Save Changes?"), message,
-					QMessageBox::Save | QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Save);
-	if (response == QMessageBox::Save) {
+	response.setStandardButtons(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+	response.setDefaultButton(QMessageBox::Save);
+	response.setText(message);
+	response.setWindowTitle(tr("Save Changes?")); // Not displayed on MacOSX as described in Qt API
+	response.setInformativeText(tr("Changes will be lost if you don't save them."));
+	response.setIcon(QMessageBox::Warning);
+	int ret = response.exec();
+
+	switch (ret) {
+	case QMessageBox::Save:
 		file_save();
 		return true;
-	} else if (response == QMessageBox::Ok) {
+	case QMessageBox::Discard:
 		return true;
 	}
 	return false;
@@ -349,11 +365,11 @@ void MainWindow::readSettings()
 
 	settings.endGroup();
 	settings.beginGroup("Units");
-	GET_UNIT(v, "feet", length, units::METERS, units::FEET);
-	GET_UNIT(v, "psi", pressure, units::BAR, units::PSI);
-	GET_UNIT(v, "cuft", volume, units::LITER, units::CUFT);
-	GET_UNIT(v, "fahrenheit", temperature, units::CELSIUS, units::FAHRENHEIT);
-	GET_UNIT(v, "lbs", weight, units::KG, units::LBS);
+	GET_UNIT(v, "length", length, units::FEET, units::METERS);
+	GET_UNIT(v, "pressure", pressure, units::PSI, units::BAR);
+	GET_UNIT(v, "volume", volume, units::CUFT, units::LITER);
+	GET_UNIT(v, "temperature", temperature, units::FAHRENHEIT, units::CELSIUS);
+	GET_UNIT(v, "weight", weight, units::LBS, units::KG);
 	settings.endGroup();
 	settings.beginGroup("DisplayListColumns");
 	GET_BOOL(v, "CYLINDER", prefs.visible_cols.cylinder);
@@ -364,11 +380,11 @@ void MainWindow::readSettings()
 	GET_BOOL(v, "OTU", prefs.visible_cols.otu);
 	GET_BOOL(v, "MAXCNS", prefs.visible_cols.maxcns);
 	GET_BOOL(v, "SAC", prefs.visible_cols.sac);
+	settings.endGroup();
+	settings.beginGroup("TecDetails");
 	GET_BOOL(v, "po2graph", prefs.pp_graphs.po2);
 	GET_BOOL(v, "pn2graph", prefs.pp_graphs.pn2);
 	GET_BOOL(v, "phegraph", prefs.pp_graphs.phe);
-	settings.endGroup();
-	settings.beginGroup("TecDetails");
 	v = settings.value(QString("po2threshold"));
 	if (v.isValid())
 		prefs.pp_graphs.po2_threshold = v.toDouble();
@@ -384,14 +400,15 @@ void MainWindow::readSettings()
 		prefs.mod_ppO2 = v.toDouble();
 	GET_BOOL(v, "ead", prefs.ead);
 	GET_BOOL(v, "redceiling", prefs.profile_red_ceiling);
+	GET_BOOL(v, "dcceiling", prefs.profile_dc_ceiling);
 	GET_BOOL(v, "calcceiling", prefs.profile_calc_ceiling);
 	GET_BOOL(v, "calcceiling3m", prefs.calc_ceiling_3m_incr);
 	v = settings.value(QString("gflow"));
 	if (v.isValid())
-		prefs.gflow = v.toInt() / 100.0;
+		prefs.gflow = v.toInt();
 	v = settings.value(QString("gfhigh"));
 	if (v.isValid())
-		prefs.gfhigh = v.toInt() / 100.0;
+		prefs.gfhigh = v.toInt();
 	set_gf(prefs.gflow, prefs.gfhigh);
 	settings.endGroup();
 
@@ -405,14 +422,16 @@ void MainWindow::readSettings()
 
 #if ONCE_WE_HAVE_MAPS
 	v = settings.value(QString_int("map_provider"));
-	if(v.isValid())
+	if (v.isValid())
 		prefs.map_provider = v.toInt();
 #endif
 }
 
 #define SAVE_VALUE(name, field)				\
 	if (prefs.field != default_prefs.field)		\
-		settings.setValue(name, prefs.field)
+		settings.setValue(name, prefs.field);	\
+	else						\
+		settings.remove(name)
 
 void MainWindow::writeSettings()
 {
@@ -427,14 +446,15 @@ void MainWindow::writeSettings()
 
 	settings.beginGroup("ListWidget");
 	for (i = TreeItemDT::NR; i < TreeItemDT::COLUMNS; i++)
-		settings.setValue(QString("colwidth%1").arg(i), ui->ListWidget->columnWidth(i));
+		if (!ui->ListWidget->isColumnHidden(i))
+			settings.setValue(QString("colwidth%1").arg(i), ui->ListWidget->columnWidth(i));
 	settings.endGroup();
 	settings.beginGroup("Units");
-	SAVE_VALUE("feet", units.length);
-	SAVE_VALUE("psi", units.pressure);
-	SAVE_VALUE("cuft", units.volume);
-	SAVE_VALUE("fahrenheit", units.temperature);
-	SAVE_VALUE("lbs", units.weight);
+	SAVE_VALUE("length", units.length);
+	SAVE_VALUE("pressure", units.pressure);
+	SAVE_VALUE("volume", units.volume);
+	SAVE_VALUE("temperature", units.temperature);
+	SAVE_VALUE("weight", units.weight);
 	settings.endGroup();
 	settings.beginGroup("DisplayListColumns");
 	SAVE_VALUE("TEMPERATURE", visible_cols.temperature);
@@ -459,6 +479,7 @@ void MainWindow::writeSettings()
 	SAVE_VALUE("redceiling", profile_red_ceiling);
 	SAVE_VALUE("calcceiling", profile_calc_ceiling);
 	SAVE_VALUE("calcceiling3m", calc_ceiling_3m_incr);
+	SAVE_VALUE("dcceiling", profile_dc_ceiling);
 	SAVE_VALUE("gflow", gflow);
 	SAVE_VALUE("gfhigh", gfhigh);
 	settings.endGroup();

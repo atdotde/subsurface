@@ -70,6 +70,10 @@ install: all
 		$(INSTALL) -d -m 755 $(XSLTDIR); \
 		$(INSTALL) -m 644 $(XSLTFILES) $(XSLTDIR); \
 	fi
+	@-if test ! -z "$(MARBLEDIR)"; then \
+		$(INSTALL) -d -m 755 $(DATADIR)/$(NAME)/$(MARBLEDIR); \
+		$(TAR) cf - $(MARBLEDIR) | ( cd $(DATADIR)/$(NAME); $(TAR) xf - ); \
+	fi
 	for LOC in $(wildcard share/locale/*/LC_MESSAGES); do \
 		$(INSTALL) -d $(prefix)/$$LOC; \
 		$(INSTALL) -m 644 $$LOC/$(NAME).mo $(prefix)/$$LOC/$(NAME).mo; \
@@ -85,6 +89,10 @@ install-macosx: all
 	$(INSTALL) $(MACOSXFILES)/Info.plist $(MACOSXINSTALL)/Contents/
 	$(INSTALL) $(ICONFILE) $(MACOSXINSTALL)/Contents/Resources/
 	$(INSTALL) $(MACOSXFILES)/$(CAPITALIZED_NAME).icns $(MACOSXINSTALL)/Contents/Resources/
+	@-if test ! -z "$(MARBLEDIR)"; then \
+		$(INSTALL) -d -m 755 $(MACOSXINSTALL)/Contents/Resources/share/$(MARBLEDIR); \
+		$(TAR) cf - $(MARBLEDIR) | ( cd $(MACOSXINSTALL)/Contents/Resources/share; $(TAR) xf - ); \
+	fi
 	for LOC in $(wildcard share/locale/*/LC_MESSAGES); do \
 		$(INSTALL) -d -m 755 $(MACOSXINSTALL)/Contents/Resources/$$LOC; \
 		$(INSTALL) $$LOC/$(NAME).mo $(MACOSXINSTALL)/Contents/Resources/$$LOC/$(NAME).mo; \
@@ -233,7 +241,8 @@ release:
 .PHONY: creator-files
 creator-files: $(CREATOR_FILES)
 $(NAME).files: Makefile $(CONFIGFILE)
-	echo $(wildcard *.h) $(HEADERS) $(SOURCES) | tr ' ' '\n' | sort | uniq > $(NAME).files
+	echo $(wildcard *.h qt-ui/*.h qt-ui/*.ui) $(HEADERS) $(SOURCES) | tr ' ' '\n' | sort | uniq > $(NAME).files
+	{ echo Makefile; echo Rules.mk; echo Configure.mk; } >> $(NAME).files
 $(NAME).config: Makefile $(CONFIGFILE)
 	echo $(patsubst -D%,%,$(filter -D%, $(CXXFLAGS) $(CFLAGS) $(EXTRA_FLAGS))) | tr ' ' '\n' | sort | uniq > $(NAME).config
 $(NAME).includes: Makefile $(CONFIGFILE)

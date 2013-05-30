@@ -2,6 +2,10 @@
 #include "ui_downloadfromdivecomputer.h"
 
 #include "../libdivecomputer.h"
+#include "../helpers.h"
+#include "../display.h"
+#include "../divelist.h"
+#include "mainwindow.h"
 #include <cstdlib>
 #include <QThread>
 #include <QDebug>
@@ -30,6 +34,12 @@ namespace DownloadFromDcGlobal{
 	const char *err_string;
 };
 
+DownloadFromDCWidget *DownloadFromDCWidget::instance()
+{
+	static DownloadFromDCWidget *dialog = new DownloadFromDCWidget();
+	return dialog;
+}
+
 DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 	QDialog(parent, f), ui(new Ui::DownloadFromDiveComputer), thread(0), downloading(false)
 {
@@ -41,7 +51,26 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 
 	vendorModel = new QStringListModel(vendorList);
 	ui->vendor->setModel(vendorModel);
-	ui->product->setModel(0);
+	if (default_dive_computer_vendor) {
+		ui->vendor->setCurrentIndex(ui->vendor->findText(default_dive_computer_vendor));
+		productModel = new QStringListModel(productList[default_dive_computer_vendor]);
+		ui->product->setModel(productModel);
+		if (default_dive_computer_product)
+			ui->product->setCurrentIndex(ui->product->findText(default_dive_computer_product));
+	}
+	if (default_dive_computer_device)
+		ui->device->setText(default_dive_computer_device);
+}
+
+void DownloadFromDCWidget::runDialog()
+{
+	ui->progressBar->hide();
+	show();
+}
+
+void DownloadFromDCWidget::stoppedDownloading()
+{
+	downloading = false;
 }
 
 void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString& vendor)
@@ -69,11 +98,11 @@ void DownloadFromDCWidget::fill_computer_list()
 		const char *vendor = dc_descriptor_get_vendor(descriptor);
 		const char *product = dc_descriptor_get_product(descriptor);
 
-		if (!vendorList.contains( vendor ))
-			vendorList.append( vendor );
+		if (!vendorList.contains(vendor))
+			vendorList.append(vendor);
 
-		if( !productList[vendor].contains( product ))
-			productList[vendor].push_back( product );
+		if (!productList[vendor].contains(product))
+			productList[vendor].push_back(product);
 
 		descriptorLookup[QString(vendor) + QString(product)] = descriptor;
 	}
@@ -91,11 +120,11 @@ void DownloadFromDCWidget::fill_computer_list()
 	mydescriptor->type = DC_FAMILY_NULL;
 	mydescriptor->model = 0;
 
-	if(!vendorList.contains( "Uemis"))
+	if (!vendorList.contains("Uemis"))
 		vendorList.append("Uemis");
 
-	if( !productList["Uemis"].contains( "Zurich" ))
-		productList["Uemis"].push_back( "Zurich" );
+	if (!productList["Uemis"].contains("Zurich"))
+		productList["Uemis"].push_back("Zurich");
 
 	descriptorLookup[QString("UemisZurich")] = (dc_descriptor_t *)mydescriptor;
 }
@@ -103,7 +132,7 @@ void DownloadFromDCWidget::fill_computer_list()
 void DownloadFromDCWidget::on_cancel_clicked()
 {
 	import_thread_cancelled = true;
-	if(thread){
+	if (thread) {
 		thread->wait();
 		thread->deleteLater();
 		thread = 0;
@@ -119,7 +148,7 @@ void DownloadFromDCWidget::on_ok_clicked()
 	ui->progressBar->setValue(0);
 	ui->progressBar->show();
 
-	if(thread){
+	if (thread) {
 		thread->deleteLater();
 	}
 
@@ -128,8 +157,8 @@ void DownloadFromDCWidget::on_ok_clicked()
 	data.product = strdup(ui->product->currentText().toUtf8().data());
 	data.descriptor = descriptorLookup[ui->vendor->currentText() + ui->product->currentText()];
 	data.force_download = ui->forceDownload->isChecked();
-	// still needs to be implemented
-	// set_default_dive_computer(data.vendor, data.product);
+	set_default_dive_computer(data.vendor, data.product);
+	set_default_dive_computer_device(data.devname);
 
 	thread = new InterfaceThread(this, &data);
 	connect(thread, SIGNAL(updateInterface(int)),
@@ -141,13 +170,21 @@ void DownloadFromDCWidget::on_ok_clicked()
 	downloading = true;
 }
 
+bool DownloadFromDCWidget::preferDownloaded()
+{
+	return ui->preferDownloaded->isChecked();
+}
+
 DownloadThread::DownloadThread(device_data_t* data): data(data)
 {
 }
 
 void DownloadThread::run()
 {
+	DownloadFromDCWidget *dfdcw = DownloadFromDCWidget::instance();
 	do_libdivecomputer_import(data);
+	process_dives(TRUE, dfdcw->preferDownloaded());
+	dfdcw->stoppedDownloading();
 }
 
 InterfaceThread::InterfaceThread(QObject* parent, device_data_t* data): QThread(parent), data(data)
@@ -157,9 +194,10 @@ InterfaceThread::InterfaceThread(QObject* parent, device_data_t* data): QThread(
 void InterfaceThread::run()
 {
 	DownloadThread *download = new DownloadThread(data);
-
+	MainWindow *w = mainWindow();
+	connect(download, SIGNAL(finished()), w, SLOT(refreshDisplay()));
 	download->start();
-	while(download->isRunning()){
+	while (download->isRunning()) {
 		msleep(200);
 		updateInterface(progress_bar_fraction *100);
 	}

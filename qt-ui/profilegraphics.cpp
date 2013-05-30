@@ -114,7 +114,7 @@ extern struct ev_select *ev_namelist;
 extern int evn_allocated;
 extern int evn_used;
 
-ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , dive(0)
+ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , dive(0), diveDC(0)
 {
 	gc.printer = false;
 	setScene(new QGraphicsScene());
@@ -130,8 +130,8 @@ ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent
 	defaultPen.setWidth(2);
 	defaultPen.setCosmetic(true);
 
-	setHorizontalScrollBarPolicy ( Qt::ScrollBarAlwaysOff );
-	setVerticalScrollBarPolicy ( Qt::ScrollBarAlwaysOff );
+	setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
+	setVerticalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
 
 	fill_profile_color();
 }
@@ -141,20 +141,20 @@ void ProfileGraphicsView::wheelEvent(QWheelEvent* event)
 	if (!toolTip)
 		return;
 
-    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 
-    // Scale the view / do the zoom
+	// Scale the view / do the zoom
 	QPoint toolTipPos = mapFromScene(toolTip->pos());
-    double scaleFactor = 1.15;
-    if(event->delta() > 0 && zoomLevel <= 10) {
-        scale(scaleFactor, scaleFactor);
+	double scaleFactor = 1.15;
+	if (event->delta() > 0 && zoomLevel <= 10) {
+		scale(scaleFactor, scaleFactor);
 		zoomLevel++;
-    } else if (zoomLevel >= 0) {
-        // Zooming out
-        scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+	} else if (zoomLevel >= 0) {
+		// Zooming out
+		scale(1.0 / scaleFactor, 1.0 / scaleFactor);
 		zoomLevel--;
-    }
-    toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
+	}
+	toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
 }
 
 void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
@@ -206,7 +206,7 @@ void ProfileGraphicsView::showEvent(QShowEvent* event)
 	// but the dive was not ploted.
 	// force a replot by modifying the dive
 	// hold by the view, and issuing a plot.
-	if (dive){
+	if (dive) {
 		dive = 0;
 		plot(get_dive(selected_dive));
 	}
@@ -220,15 +220,26 @@ void ProfileGraphicsView::clear()
 	toolTip = 0;
 }
 
-void ProfileGraphicsView::plot(struct dive *d)
+void ProfileGraphicsView::refresh()
 {
-	if (dive == d)
+	plot(current_dive, TRUE);
+}
+
+void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
+{
+	struct divecomputer *dc;
+
+	if (d)
+		dc = select_dc(&d->dc);
+
+	if (!forceRedraw && dive == d && (d && dc == diveDC))
 		return;
 
 	clear();
 	dive = d;
+	diveDC = d ? dc : NULL;
 
-	if(!isVisible() || !dive){
+	if (!isVisible() || !dive) {
 		return;
 	}
 
@@ -243,9 +254,6 @@ void ProfileGraphicsView::plot(struct dive *d)
 	toolTip->setPos(toolTipPos);
 
 	scene()->addItem(toolTip);
-
-	struct divecomputer *dc = &dive->dc;
-
 
 	// Fix this for printing / screen later.
 	// plot_set_scale(scale_mode_t);
@@ -282,8 +290,6 @@ void ProfileGraphicsView::plot(struct dive *d)
 	QRectF profile_grid_area = scene()->sceneRect();
 	gc.maxx = (profile_grid_area.width() - 2 * profile_grid_area.x());
 	gc.maxy = (profile_grid_area.height() - 2 * profile_grid_area.y());
-
-	dc = select_dc(dc);
 
 	/* This is per-dive-computer. Right now we just do the first one */
 	gc.pi = *create_plot_info(dive, dc, &gc);
@@ -326,7 +332,7 @@ void ProfileGraphicsView::plot(struct dive *d)
 	gc.leftx = 0; gc.rightx = 1.0;
 	gc.topy = 0; gc.bottomy = 1.0;
 
-	text_render_options_t computer = {DC_TEXT_SIZE, TIME_TEXT, LEFT, MIDDLE};
+	text_render_options_t computer = {DC_TEXT_SIZE, TIME_TEXT, LEFT, TOP};
 	diveComputer = plot_text(&computer, QPointF(gc.leftx, gc.bottomy), nick);
 	// The Time ruler should be right after the DiveComputer:
 	timeMarkers->setPos(0, diveComputer->y());
@@ -357,7 +363,7 @@ void ProfileGraphicsView::plot(struct dive *d)
 
 	QRectF r = scene()->itemsBoundingRect();
 	scene()->setSceneRect(r.x() - 15, r.y() -15, r.width() + 30, r.height() + 30);
-	if(zoomLevel == 0){
+	if (zoomLevel == 0) {
 		fitInView(sceneRect());
 	}
 }
@@ -423,13 +429,13 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 	setup_pp_limits(&gc);
 	QColor c;
 	QPointF from, to;
-	//if (prefs.pp_graphs.pn2) {
+	if (prefs.pp_graphs.pn2) {
 		c = profile_color[PN2].first();
 		entry = pi->entry;
 		from = QPointF(SCALEGC(entry->sec, entry->pn2));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->pn2 < prefs.pp_graphs.pn2_threshold){
+			if (entry->pn2 < prefs.pp_graphs.pn2_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->pn2));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				QPen pen(defaultPen);
@@ -437,8 +443,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 				item->setPen(pen);
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->pn2));
 			}
 		}
@@ -448,7 +453,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 		from = QPointF(SCALEGC(entry->sec, entry->pn2));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->pn2 >= prefs.pp_graphs.pn2_threshold){
+			if (entry->pn2 >= prefs.pp_graphs.pn2_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->pn2));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				QPen pen(defaultPen);
@@ -456,21 +461,20 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 				item->setPen(pen);
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->pn2));
 			}
 		}
-	//}
+	}
 
-	//if (prefs.pp_graphs.phe) {
+	if (prefs.pp_graphs.phe) {
 		c = profile_color[PHE].first();
 		entry = pi->entry;
 
 		from = QPointF(SCALEGC(entry->sec, entry->phe));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->phe < prefs.pp_graphs.phe_threshold){
+			if (entry->phe < prefs.pp_graphs.phe_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->phe));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				QPen pen(defaultPen);
@@ -478,8 +482,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 				item->setPen(pen);
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->phe));
 			}
 		}
@@ -489,7 +492,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 		from = QPointF(SCALEGC(entry->sec, entry->phe));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->phe >= prefs.pp_graphs.phe_threshold){
+			if (entry->phe >= prefs.pp_graphs.phe_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->phe));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				QPen pen(defaultPen);
@@ -497,19 +500,18 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 				item->setPen(pen);
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->phe));
 			}
 		}
-	//}
-	//if (prefs.pp_graphs.po2) {
+	}
+	if (prefs.pp_graphs.po2) {
 		c = profile_color[PO2].first();
 		entry = pi->entry;
 		from = QPointF(SCALEGC(entry->sec, entry->po2));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->po2 < prefs.pp_graphs.po2_threshold){
+			if (entry->po2 < prefs.pp_graphs.po2_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->po2));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				QPen pen(defaultPen);
@@ -517,8 +519,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 				item->setPen(pen);
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->po2));
 			}
 		}
@@ -528,18 +529,17 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 		from = QPointF(SCALEGC(entry->sec, entry->po2));
 		for (i = 1; i < pi->nr; i++) {
 			entry++;
-			if (entry->po2 >= prefs.pp_graphs.po2_threshold){
+			if (entry->po2 >= prefs.pp_graphs.po2_threshold) {
 				to = QPointF(SCALEGC(entry->sec, entry->po2));
 				QGraphicsLineItem *item = new QGraphicsLineItem(from.x(), from.y(), to.x(), to.y());
 				item->setPen(QPen(c));
 				scene()->addItem(item);
 				from = to;
-			}
-			else{
+			} else {
 				from = QPointF(SCALEGC(entry->sec, entry->po2));
 			}
 		}
-	//}
+	}
 }
 
 void ProfileGraphicsView::plot_deco_text()
@@ -549,7 +549,7 @@ void ProfileGraphicsView::plot_deco_text()
 		float y = gc.topy = 1.0;
 		static text_render_options_t tro = {PRESSURE_TEXT_SIZE, PRESSURE_TEXT, CENTER, -0.2};
 		gc.bottomy = 0.0;
-		plot_text(&tro, QPointF(x, y), QString("GF %1/%2").arg(prefs.gflow * 100).arg(prefs.gfhigh * 100));
+		plot_text(&tro, QPointF(x, y), QString("GF %1/%2").arg(prefs.gflow).arg(prefs.gfhigh));
 	}
 }
 
@@ -805,7 +805,7 @@ void ProfileGraphicsView::plot_events(struct divecomputer *dc)
 {
 	struct event *event = dc->events;
 
-// 	if (gc->printer){
+// 	if (gc->printer) {
 // 		return;
 // 	}
 
@@ -926,7 +926,7 @@ void ProfileGraphicsView::plot_depth_profile()
 
 	timeMarkers = new QGraphicsRectItem();
 	/* now the text on the time markers */
-	struct text_render_options tro = {DEPTH_TEXT_SIZE, TIME_TEXT, CENTER, TOP};
+	struct text_render_options tro = {DEPTH_TEXT_SIZE, TIME_TEXT, CENTER, LINE_DOWN};
 	if (maxtime < 600) {
 		/* Be a bit more verbose with shorter dives */
 		for (i = incr; i < maxtime; i += incr)
@@ -1000,14 +1000,16 @@ void ProfileGraphicsView::plot_depth_profile()
 		p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
 
 	/* Show any ceiling we may have encountered */
-	for (i = gc.pi.nr - 1; i >= 0; i--, entry--) {
-		if (entry->ndl) {
-			/* non-zero NDL implies this is a safety stop, no ceiling */
-			p.append(QPointF(SCALEGC(entry->sec, 0)));
-		} else if (entry->stopdepth < entry->depth) {
-			p.append(QPointF(SCALEGC(entry->sec, entry->stopdepth)));
-		} else {
-			p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
+	if (prefs.profile_dc_ceiling) {
+		for (i = gc.pi.nr - 1; i >= 0; i--, entry--) {
+			if (entry->ndl) {
+				/* non-zero NDL implies this is a safety stop, no ceiling */
+				p.append(QPointF(SCALEGC(entry->sec, 0)));
+			} else if (entry->stopdepth < entry->depth) {
+				p.append(QPointF(SCALEGC(entry->sec, entry->stopdepth)));
+			} else {
+				p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
+			}
 		}
 	}
 	pat.setColorAt(1, profile_color[DEPTH_BOTTOM].first());
@@ -1023,9 +1025,7 @@ void ProfileGraphicsView::plot_depth_profile()
 	/* if the user wants the deco ceiling more visible, do that here (this
 	 * basically draws over the background that we had allowed to shine
 	 * through so far) */
-	// TODO: port the prefs.profile_red_ceiling to QSettings
-
-	//if (prefs.profile_red_ceiling) {
+	if (prefs.profile_dc_ceiling && prefs.profile_red_ceiling) {
 		p.clear();
 		pat.setColorAt(0, profile_color[CEILING_SHALLOW].first());
 		pat.setColorAt(1, profile_color[CEILING_DEEP].first());
@@ -1049,12 +1049,10 @@ void ProfileGraphicsView::plot_depth_profile()
 		neatFill->setPolygon(p);
 		neatFill->setPen(QPen(QBrush(Qt::NoBrush),0));
 		scene()->addItem(neatFill);
-	//}
+	}
 
 	/* finally, plot the calculated ceiling over all this */
-	// TODO: Port the profile_calc_ceiling to QSettings
-	// if (prefs.profile_calc_ceiling) {
-
+	if (prefs.profile_calc_ceiling) {
 		pat.setColorAt(0, profile_color[CALC_CEILING_SHALLOW].first());
 		pat.setColorAt(1, profile_color[CALC_CEILING_DEEP].first());
 
@@ -1073,25 +1071,26 @@ void ProfileGraphicsView::plot_depth_profile()
 		neatFill->setPen(QPen(QBrush(Qt::NoBrush),0));
 		neatFill->setBrush(pat);
 		scene()->addItem(neatFill);
-	//}
+	}
 	/* next show where we have been bad and crossed the dc's ceiling */
-	pat.setColorAt(0, profile_color[CEILING_SHALLOW].first());
-	pat.setColorAt(1, profile_color[CEILING_DEEP].first());
+	if (prefs.profile_dc_ceiling) {
+		pat.setColorAt(0, profile_color[CEILING_SHALLOW].first());
+		pat.setColorAt(1, profile_color[CEILING_DEEP].first());
 
-	entry = gc.pi.entry;
-	p.clear();
-	p.append(QPointF(SCALEGC(0, 0)));
-	for (i = 0; i < gc.pi.nr; i++, entry++)
-		p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
-
-	for (i = gc.pi.nr - 1; i >= 0; i--, entry--) {
-		if (entry->ndl == 0 && entry->stopdepth > entry->depth) {
-			p.append(QPointF(SCALEGC(entry->sec, entry->stopdepth)));
-		} else {
+		entry = gc.pi.entry;
+		p.clear();
+		p.append(QPointF(SCALEGC(0, 0)));
+		for (i = 0; i < gc.pi.nr; i++, entry++)
 			p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
+
+		for (i = gc.pi.nr - 1; i >= 0; i--, entry--) {
+			if (entry->ndl == 0 && entry->stopdepth > entry->depth) {
+				p.append(QPointF(SCALEGC(entry->sec, entry->stopdepth)));
+			} else {
+				p.append(QPointF(SCALEGC(entry->sec, entry->depth)));
+			}
 		}
 	}
-
 	neatFill = new QGraphicsPolygonItem();
 	neatFill->setPolygon(p);
 	neatFill->setPen(QPen(QBrush(Qt::NoBrush),0));
@@ -1129,14 +1128,14 @@ QGraphicsSimpleTextItem *ProfileGraphicsView::plot_text(text_render_options_t *t
 	item->setBrush(QBrush(profile_color[tro->color].first()));
 	item->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 
-	if(!parent)
+	if (!parent)
 		scene()->addItem(item);
 	return item;
 }
 
 void ProfileGraphicsView::resizeEvent(QResizeEvent *event)
 {
-	plot(dive);
+	fitInView(sceneRect());
 }
 
 void ProfileGraphicsView::plot_temperature_profile()
@@ -1167,8 +1166,7 @@ void ProfileGraphicsView::plot_temperature_profile()
 			item->setPen(pen);
 			scene()->addItem(item);
 			from = to;
-		}
-		else{
+		} else {
 			from = QPointF(SCALEGC(sec, mkelvin));
 		}
 		last = mkelvin;
@@ -1291,7 +1289,7 @@ void ToolTipItem::collapse()
 void ToolTipItem::expand()
 {
 
-	if (!title){
+	if (!title) {
 		return;
 	}
 
@@ -1308,7 +1306,7 @@ void ToolTipItem::expand()
 	if (width < title->boundingRect().width() + SPACING*2)
 		width = title->boundingRect().width() + SPACING*2;
 
-	if(height < ICON_SMALL)
+	if (height < ICON_SMALL)
 		height = ICON_SMALL;
 
 	nextRectangle.setWidth(width);

@@ -909,15 +909,13 @@ bad_tank_info:
 		fprintf(stderr, "Bad tank info for '%s'\n", info->name);
 	}
 }
+#endif /* USE_GTK_UI */
 
 /*
  * We hardcode the most common weight system types
  * This is a bit odd as the weight system types don't usually encode weight
  */
-static struct ws_info {
-	const char *name;
-	int grams;
-} ws_info[100] = {
+struct ws_info ws_info[100] = {
 	{ N_("integrated"), 0 },
 	{ N_("belt"), 0 },
 	{ N_("ankle"), 0 },
@@ -925,6 +923,7 @@ static struct ws_info {
 	{ N_("clip-on"), 0 },
 };
 
+#if USE_GTK_UI
 static void fill_ws_list(GtkListStore *store)
 {
 	GtkTreeIter iter;
@@ -1267,7 +1266,26 @@ static void add_cb(GtkWidget *w, int w_idx)
 	cylinder_list[w_idx].max_index++;
 	gtk_widget_set_sensitive(cylinder_list[w_idx].add, cylinder_list[w_idx].max_index < MAX_CYLINDERS);
 }
+#endif /* USE_GTK_UI */
 
+void remove_cylinder(struct dive *dive, int idx)
+{
+	cylinder_t *cyl = dive->cylinder + idx;
+	int nr = MAX_CYLINDERS - idx - 1;
+	memmove(cyl, cyl + 1, nr * sizeof(*cyl));
+	memset(cyl + nr, 0, sizeof(*cyl));
+}
+
+void remove_weightsystem(struct dive *dive, int idx)
+{
+	weightsystem_t *ws = dive->weightsystem + idx;
+	int nr = MAX_WEIGHTSYSTEMS - idx - 1;
+	memmove(ws, ws + 1, nr * sizeof(*ws));
+	memset(ws + nr, 0, sizeof(*ws));
+}
+
+
+#if USE_GTK_UI
 static void del_cb(GtkButton *button, int w_idx)
 {
 	int index, nr;

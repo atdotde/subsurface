@@ -15,6 +15,7 @@
 */
 
 #include <QTreeView>
+#include "models.h"
 
 class DiveListView : public QTreeView
 {
@@ -23,20 +24,19 @@ public:
 	DiveListView(QWidget *parent = 0);
 	void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
 	void currentChanged(const QModelIndex& current, const QModelIndex& previous);
-	void mousePressEvent(QMouseEvent* event);
-	void mouseReleaseEvent(QMouseEvent* event);
-	void keyPressEvent(QKeyEvent* event);
-	void keyReleaseEvent(QKeyEvent*);
-	void setSelection(const QRect& rect, QItemSelectionModel::SelectionFlags command);
-	void reload();
+	void reload(DiveTripModel::Layout layout = DiveTripModel::TREE, bool forceSort = true);
 
 public slots:
-	void hideColumnByIndex();
+	void toggleColumnVisibilityByIndex();
+	void reloadHeaderActions();
+	void headerClicked(int);
 
 Q_SIGNALS:
 	void currentDiveChanged(int divenr);
 private:
 	bool mouseClickSelection;
+	int currentHeaderClicked;
+	DiveTripModel::Layout currentLayout;
 };
 
 #endif // DIVELISTVIEW_H

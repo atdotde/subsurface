@@ -62,15 +62,18 @@ class ProfileGraphicsView : public QGraphicsView
 Q_OBJECT
 public:
 	ProfileGraphicsView(QWidget* parent = 0);
-	void plot(struct dive *d);
+	void plot(struct dive *d, bool forceRedraw = FALSE);
 	bool eventFilter(QObject* obj, QEvent* event);
 	void clear();
 
 protected:
 	void resizeEvent(QResizeEvent *event);
-    void mouseMoveEvent(QMouseEvent* event);
-    void wheelEvent(QWheelEvent* event);
-    void showEvent(QShowEvent* event);
+	void mouseMoveEvent(QMouseEvent* event);
+	void wheelEvent(QWheelEvent* event);
+	void showEvent(QShowEvent* event);
+
+public Q_SLOTS:
+	void refresh();
 
 private:
 	void plot_depth_profile();
@@ -98,6 +101,7 @@ private:
 	ToolTipItem *toolTip;
 	graphics_context gc;
 	struct dive *dive;
+	struct divecomputer *diveDC;
 	int zoomLevel;
 
 	// Top Level Items.

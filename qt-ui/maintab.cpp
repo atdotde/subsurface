@@ -6,12 +6,11 @@
  */
 #include "maintab.h"
 #include "ui_maintab.h"
-#include "addcylinderdialog.h"
-#include "addweightsystemdialog.h"
 #include "mainwindow.h"
 #include "../helpers.h"
 #include "../statistics.h"
 #include "divelistview.h"
+#include "modeldelegates.h"
 
 #include <QLabel>
 #include <QDebug>
@@ -37,6 +36,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	ui->notes->setReadOnly(true);
 	ui->rating->setReadOnly(true);
 	ui->visibility->setReadOnly(true);
+
 	ui->editAccept->hide();
 	ui->editReset->hide();
 
@@ -61,11 +61,56 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 		if (label)
 			label->setAlignment(Qt::AlignHCenter);
 	}
+
+	/*Thid couldn't be done on the ui file because element
+	is floating, instead of being fixed on the layout. */
+	QIcon plusIcon(":plus");
+	addCylinder = new QPushButton(plusIcon, QString(), ui->cylindersGroup);
+	addCylinder->setFlat(true);
+	addCylinder->setToolTip(tr("Add Cylinder"));
+	connect(addCylinder, SIGNAL(clicked(bool)), this, SLOT(addCylinder_clicked()));
+	addCylinder->setEnabled(false);
+	addWeight = new QPushButton(plusIcon, QString(), ui->weightGroup);
+	addWeight->setFlat(true);
+	addWeight->setToolTip(tr("Add Weight System"));
+	connect(addWeight, SIGNAL(clicked(bool)), this, SLOT(addWeight_clicked()));
+	addWeight->setEnabled(false);
+
+	connect(ui->cylinders, SIGNAL(clicked(QModelIndex)), ui->cylinders->model(), SLOT(remove(QModelIndex)));
+	connect(ui->weights, SIGNAL(clicked(QModelIndex)), ui->weights->model(), SLOT(remove(QModelIndex)));
+
+	ui->cylinders->setColumnWidth(CylindersModel::REMOVE, 24);
+	ui->cylinders->horizontalHeader()->setResizeMode(QHeaderView::ResizeToContents);
+	ui->cylinders->horizontalHeader()->setResizeMode(CylindersModel::REMOVE, QHeaderView::Fixed);
+	ui->cylinders->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate());
+	ui->weights->setColumnWidth(WeightModel::REMOVE, 24);
+	ui->weights->horizontalHeader()->setResizeMode (WeightModel::REMOVE , QHeaderView::Fixed);
+	ui->weights->setItemDelegateForColumn(WeightModel::TYPE, new WSInfoDelegate());
 }
+
+// We need to manually position the 'plus' on cylinder and weight.
+void MainTab::resizeEvent(QResizeEvent* event)
+{
+	if (ui->cylindersGroup->isVisible())
+		addCylinder->setGeometry(ui->cylindersGroup->contentsRect().width() - 30, 2, 24,24);
+
+	if (ui->weightGroup->isVisible())
+		addWeight->setGeometry(ui->weightGroup->contentsRect().width() - 30, 2, 24,24);
+
+	QTabWidget::resizeEvent(event);
+}
+
+void MainTab::showEvent(QShowEvent* event)
+{
+	QTabWidget::showEvent(event);
+	addCylinder->setGeometry(ui->cylindersGroup->contentsRect().width() - 30, 2, 24,24);
+	addWeight->setGeometry(ui->weightGroup->contentsRect().width() - 30, 2, 24,24);
+}
+
 
 bool MainTab::eventFilter(QObject* object, QEvent* event)
 {
-	if (event->type() == QEvent::FocusIn) {
+	if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonPress) {
 		if (ui->editAccept->isVisible() || !currentDive)
 			return false;
 
@@ -204,6 +249,8 @@ void MainTab::updateDiveInfo(int dive)
 		ui->shortestAllText->setText(get_time_string(stats_selection.shortest_time.seconds, 0));
 		cylindersModel->setDive(d);
 		weightModel->setDive(d);
+		addCylinder->setEnabled(true);
+		addWeight->setEnabled(true);
 	} else {
 		/* make the fields read-only */
 		ui->location->setReadOnly(true);
@@ -230,6 +277,8 @@ void MainTab::updateDiveInfo(int dive)
 		ui->airPressureText->clear();
 		cylindersModel->clear();
 		weightModel->clear();
+		addCylinder->setEnabled(false);
+		addWeight->setEnabled(false);
 	}
 	/* statisticsTab*/
 	/* we can access the stats_selection struct, but how do we ensure the relevant dives are selected
@@ -240,58 +289,14 @@ void MainTab::updateDiveInfo(int dive)
 // 	qDebug("min temp %u",stats_selection.min_temp);
 }
 
-void MainTab::on_addCylinder_clicked()
+void MainTab::addCylinder_clicked()
 {
-	if (cylindersModel->rowCount() >= MAX_CYLINDERS)
-		return;
-
-	AddCylinderDialog dialog(this);
-	cylinder_t newCylinder;
-	newCylinder.type.description = "";
-
-	dialog.setCylinder(&newCylinder);
-	int result = dialog.exec();
-	if (result == QDialog::Rejected) {
-		return;
-	}
-
-	dialog.updateCylinder();
-	cylindersModel->add(&newCylinder);
+	cylindersModel->add();
 }
 
-void MainTab::on_editCylinder_clicked()
+void MainTab::addWeight_clicked()
 {
-}
-
-void MainTab::on_delCylinder_clicked()
-{
-}
-
-void MainTab::on_addWeight_clicked()
-{
-	if (weightModel->rowCount() >= MAX_WEIGHTSYSTEMS)
-		return;
-
-	AddWeightsystemDialog dialog(this);
-	weightsystem_t newWeightsystem;
-	newWeightsystem.description = "";
-	newWeightsystem.weight.grams = 0;
-
-	dialog.setWeightsystem(&newWeightsystem);
-	int result = dialog.exec();
-	if (result == QDialog::Rejected)
-		return;
-
-	dialog.updateWeightsystem();
-	weightModel->add(&newWeightsystem);
-}
-
-void MainTab::on_editWeight_clicked()
-{
-}
-
-void MainTab::on_delWeight_clicked()
-{
+	weightModel->add();
 }
 
 void MainTab::reload()
@@ -311,7 +316,7 @@ void MainTab::on_editAccept_clicked(bool edit)
 	mainWindow()->dive_list()->setEnabled(!edit);
 
 	if (edit) {
-		ui->diveNotesMessage->setText(tr("This dive is being edited. click on finish / reset when ready."));
+		ui->diveNotesMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
 		ui->diveNotesMessage->animatedShow();
 		notesBackup.buddy = ui->buddy->text();
 		notesBackup.suit = ui->suit->text();

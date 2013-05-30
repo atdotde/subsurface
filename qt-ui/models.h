@@ -9,6 +9,7 @@
 
 #include <QAbstractTableModel>
 #include <QCoreApplication>
+#include <QStringList>
 
 #include "../dive.h"
 #include "../divelist.h"
@@ -18,19 +19,43 @@
 class TankInfoModel : public QAbstractTableModel {
 Q_OBJECT
 public:
-	enum Column { DESCRIPTION, ML, BAR};
+	static TankInfoModel* instance();
+
+	enum Column {DESCRIPTION, ML, BAR};
 	TankInfoModel();
 
 	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
-
-	void add(const QString& description);
+	/*reimp*/ bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex());
+	/*reimp*/ bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 	void clear();
 	void update();
 private:
 	int rows;
+};
+
+/* Encapsulate ws_info */
+class WSInfoModel : public QAbstractTableModel {
+Q_OBJECT
+public:
+	static WSInfoModel* instance();
+
+	enum Column {DESCRIPTION, GR};
+	WSInfoModel();
+
+	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
+	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
+	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
+	/*reimp*/ bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex());
+	/*reimp*/ bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+	void clear();
+	void update();
+private:
+	int rows;
+
 };
 
 /* Encapsulation of the Cylinder Model, that presents the
@@ -38,18 +63,23 @@ private:
 class CylindersModel : public QAbstractTableModel {
 Q_OBJECT
 public:
-	enum Column {TYPE, SIZE, MAXPRESS, START, END, O2, HE};
+	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, COLUMNS};
 
 	explicit CylindersModel(QObject* parent = 0);
 	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
+	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;
+	/*reimp*/ bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 
-	void add(cylinder_t *cyl);
+	void passInData(const QModelIndex& index, const QVariant& value);
+	void add();
 	void clear();
 	void update();
 	void setDive(struct dive *d);
+public slots:
+	void remove(const QModelIndex& index);
 
 private:
 	struct dive *current;
@@ -61,16 +91,23 @@ private:
 class WeightModel : public QAbstractTableModel {
 Q_OBJECT
 public:
-	enum Column {TYPE, WEIGHT};
+	enum Column {REMOVE, TYPE, WEIGHT, COLUMNS};
+
+	explicit WeightModel(QObject *parent = 0);
 	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
+	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;
+	/*reimp*/ bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 
-	void add(weightsystem_t *weight);
+	void passInData(const QModelIndex& index, const QVariant& value);
+	void add();
 	void clear();
 	void update();
 	void setDive(struct dive *d);
+public slots:
+	void remove(const QModelIndex& index);
 
 private:
 	struct dive *current;
@@ -82,19 +119,19 @@ private:
 */
 
 struct TreeItemDT {
-	Q_DECLARE_TR_FUNCTIONS ( TreeItemDT );
+	Q_DECLARE_TR_FUNCTIONS (TreeItemDT);
 public:
 	enum Column {NR, DATE, RATING, DEPTH, DURATION, TEMPERATURE, TOTALWEIGHT,
-				SUIT, CYLINDER, NITROX, SAC, OTU, MAXCNS, LOCATION, DIVE, COLUMNS };
+				SUIT, CYLINDER, NITROX, SAC, OTU, MAXCNS, LOCATION, COLUMNS };
 
-	enum ExtraRoles{STAR_ROLE = Qt::UserRole + 1, DIVE_ROLE};
+	enum ExtraRoles{STAR_ROLE = Qt::UserRole + 1, DIVE_ROLE, SORT_ROLE};
 
 	virtual ~TreeItemDT();
 	int columnCount() const {
 		return COLUMNS;
 	};
 
-	virtual QVariant data ( int column, int role ) const;
+	virtual QVariant data (int column, int role) const;
 	int row() const;
 	QList<TreeItemDT *> children;
 	TreeItemDT *parent;
@@ -107,6 +144,8 @@ class DiveTripModel : public QAbstractItemModel
 	Q_OBJECT
 
 public:
+	enum Layout{TREE, LIST};
+
 	DiveTripModel(QObject *parent = 0);
 	~DiveTripModel();
 
@@ -118,11 +157,14 @@ public:
 	/*reimp*/ QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
 	/*reimp*/ QModelIndex parent(const QModelIndex &child) const;
 
+	Layout layout() const;
+	void setLayout(Layout layout);
 private:
 	void setupModelData();
 
 	TreeItemDT *rootItem;
 	QMap<dive_trip_t*, TripItem*> trips;
+	Layout currentLayout;
 };
 
 #endif

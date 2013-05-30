@@ -155,12 +155,6 @@ typedef struct {
 	const char *description;	/* "integrated", "belt", "ankle" */
 } weightsystem_t;
 
-extern bool cylinder_nodata(cylinder_t *cyl);
-extern bool cylinder_none(void *_data);
-extern bool weightsystem_none(void *_data);
-extern bool no_weightsystems(weightsystem_t *ws);
-extern bool weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
-
 extern int get_pressure_units(unsigned int mb, const char **units);
 extern double get_depth_units(unsigned int mm, int *frac, const char **units);
 extern double get_volume_units(unsigned int ml, int *frac, const char **units);
@@ -227,7 +221,7 @@ static inline double psi_to_bar(double psi)
 	return psi / 14.5037738;
 }
 
-static inline unsigned long psi_to_mbar(double psi)
+static inline long psi_to_mbar(double psi)
 {
 	return psi_to_bar(psi)*1000 + 0.5;
 }
@@ -244,6 +238,7 @@ static inline double bar_to_atm(double bar)
 
 /* Volume in mliter of a cylinder at pressure 'p' */
 extern int gas_volume(cylinder_t *cyl, pressure_t p);
+extern int wet_volume(double cuft, pressure_t p);
 
 static inline int mbar_to_PSI(int mbar)
 {
@@ -699,7 +694,7 @@ extern double add_segment(double pressure, const struct gasmix *gasmix, int peri
 extern void clear_deco(double surface_pressure);
 extern void dump_tissues(void);
 extern unsigned int deco_allowed_depth(double tissues_tolerance, double surface_pressure, struct dive *dive, gboolean smooth);
-extern void set_gf(double gflow, double gfhigh);
+extern void set_gf(short gflow, short gfhigh);
 extern void cache_deco_state(double, char **datap);
 extern double restore_deco_state(char *data);
 
@@ -731,9 +726,9 @@ void get_gas_string(int o2, int he, char *buf, int len);
 struct event *get_next_event(struct event *event, char *name);
 
 
-/* this struct holds the information that
- * describes the cylinders of air.
- * it is a global variable initialized in equipment.c
+/* these structs holds the information that
+ * describes the cylinders / weight systems.
+ * they are global variables initialized in equipment.c
  * used to fill the combobox in the add/edit cylinder
  * dialog
  */
@@ -742,6 +737,21 @@ struct tank_info {
 	const char *name;
 	int cuft, ml, psi, bar;
 };
+extern struct tank_info tank_info[100];
+
+struct ws_info {
+	const char *name;
+	int grams;
+};
+extern struct ws_info ws_info[100];
+
+extern bool cylinder_nodata(cylinder_t *cyl);
+extern bool cylinder_none(void *_data);
+extern bool weightsystem_none(void *_data);
+extern bool no_weightsystems(weightsystem_t *ws);
+extern bool weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
+extern void remove_cylinder(struct dive *dive, int idx);
+extern void remove_weightsystem(struct dive *dive, int idx);
 
 #ifdef __cplusplus
 }

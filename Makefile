@@ -21,6 +21,7 @@ ICONPATH = $(DATADIR)/icons/hicolor
 ICONDIR = $(ICONPATH)/scalable/apps
 MANDIR = $(DATADIR)/man/man1
 XSLTDIR = $(DATADIR)/$(NAME)/xslt
+MARBLEDIR = marbledata/maps/earth/googlesat
 gtk_update_icon_cache = gtk-update-icon-cache -f -t $(ICONPATH)
 
 ICONFILE = $(NAME)-icon.svg
@@ -33,8 +34,6 @@ EXTRA_FLAGS =  $(QTCXXFLAGS) $(GTKCFLAGS) $(GLIB2CFLAGS) $(XML2CFLAGS) \
 	       $(LIBSOUPCFLAGS) $(GCONF2CFLAGS)
 
 HEADERS = \
-	qt-ui/addcylinderdialog.h \
-	qt-ui/addweightsystemdialog.h \
 	qt-ui/divelistview.h \
 	qt-ui/maintab.h \
 	qt-ui/mainwindow.h \
@@ -46,6 +45,7 @@ HEADERS = \
 	qt-ui/globe.h \
 	qt-ui/kmessagewidget.h \
 	qt-ui/downloadfromdivecomputer.h \
+	qt-ui/preferences.h \
 
 
 SOURCES = \
@@ -58,7 +58,6 @@ SOURCES = \
 	info.c \
 	main.c \
 	parse-xml.c \
-	prefs.c \
 	profile.c \
 	save-xml.c \
 	sha1.c \
@@ -66,8 +65,6 @@ SOURCES = \
 	time.c \
 	libdivecomputer.c \
 	qt-gui.cpp \
-	qt-ui/addcylinderdialog.cpp \
-	qt-ui/addweightsystemdialog.cpp \
 	qt-ui/divelistview.cpp \
 	qt-ui/maintab.cpp \
 	qt-ui/mainwindow.cpp \
@@ -79,6 +76,7 @@ SOURCES = \
 	qt-ui/globe.cpp \
 	qt-ui/kmessagewidget.cpp \
 	qt-ui/downloadfromdivecomputer.cpp \
+	qt-ui/preferences.cpp \
 	$(RESFILE)
 
 
