@@ -11,9 +11,8 @@
 #endif
 #include "divelist.h"
 
-extern double tolerated_by_tissue[];
-
 #include "profile.h"
+#include "deco.h"
 #include "libdivecomputer/parser.h"
 #include "libdivecomputer/version.h"
 
@@ -1141,6 +1140,16 @@ static void plot_string(struct plot_data *entry, char *buf, int bufsize,
 		depthvalue = get_depth_units(entry->ceiling, NULL, &depth_unit);
 		memcpy(buf2, buf, bufsize);
 		snprintf(buf, bufsize, _("%s\nCalculated ceiling %.0f %s"), buf2, depthvalue, depth_unit);
+		if(prefs.calc_all_tissues){
+		  int k;
+		  for(k=0;k<16;k++){
+		    if(entry->ceilings[k]){
+		      depthvalue = get_depth_units(entry->ceilings[k], NULL, &depth_unit);
+		      memcpy(buf2, buf, bufsize);
+		      snprintf(buf, bufsize, _("%s\nTissue %.0fmin %.0f %s"), buf2, buehlmann_N2_t_halflife[k], depthvalue, depth_unit);
+		    }
+		  }
+		}
 	}
 	if (entry->stopdepth) {
 		depthvalue = get_depth_units(entry->stopdepth, NULL, &depth_unit);
@@ -1148,7 +1157,7 @@ static void plot_string(struct plot_data *entry, char *buf, int bufsize,
 		if (entry->ndl) {
 			/* this is a safety stop as we still have ndl */
 			if (entry->stoptime)
-				snprintf(buf, bufsize, _("%s\nSafetystop:%umin @ %.0f %s"), buf2, entry->stoptime / 60,
+				snprintf(buf, bufsize, _("%s\nSafetystop:%umin: @ %.0f %s"), buf2, entry->stoptime / 60,
 					depthvalue, depth_unit);
 			else
 				snprintf(buf, bufsize, _("%s\nSafetystop:unkn time @ %.0f %s"), buf2,
