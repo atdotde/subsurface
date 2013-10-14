@@ -17,9 +17,22 @@
 
 QFont defaultModelFont();
 
+// Encapsulates Boilerplate.
+class CleanerTableModel : public QAbstractTableModel{
+	Q_OBJECT
+public:
+	CleanerTableModel();
+    virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
+    virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+protected:
+	void setHeaderDataStrings(const QStringList& headers);
+private:
+	QStringList headers;
+};
+
 /* Encapsulates the tank_info global variable
  * to show on Qt's Model View System.*/
-class TankInfoModel : public QAbstractTableModel {
+class TankInfoModel : public CleanerTableModel {
 Q_OBJECT
 public:
 	static TankInfoModel* instance();
@@ -27,8 +40,6 @@ public:
 	enum Column {DESCRIPTION, ML, BAR};
 	TankInfoModel();
 
-	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex());
@@ -42,7 +53,7 @@ private:
 };
 
 /* Encapsulate ws_info */
-class WSInfoModel : public QAbstractTableModel {
+class WSInfoModel : public CleanerTableModel {
 Q_OBJECT
 public:
 	static WSInfoModel* instance();
@@ -50,8 +61,6 @@ public:
 	enum Column {DESCRIPTION, GR};
 	WSInfoModel();
 
-	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex());
@@ -67,14 +76,12 @@ private:
 
 /* Encapsulation of the Cylinder Model, that presents the
  * Current cylinders that are used on a dive. */
-class CylindersModel : public QAbstractTableModel {
+class CylindersModel : public CleanerTableModel {
 Q_OBJECT
 public:
-	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, COLUMNS};
+	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE};
 
 	explicit CylindersModel(QObject* parent = 0);
-	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;
@@ -98,14 +105,12 @@ private:
 
 /* Encapsulation of the Weight Model, that represents
  * the current weights on a dive. */
-class WeightModel : public QAbstractTableModel {
+class WeightModel : public CleanerTableModel {
 Q_OBJECT
 public:
-	enum Column {REMOVE, TYPE, WEIGHT, COLUMNS};
+	enum Column {REMOVE, TYPE, WEIGHT};
 
 	explicit WeightModel(QObject *parent = 0);
-	/*reimp*/ QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-	/*reimp*/ int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;
@@ -200,14 +205,12 @@ private:
 	Layout currentLayout;
 };
 
-class DiveComputerModel : public QAbstractTableModel
+class DiveComputerModel : public CleanerTableModel
 {
 	Q_OBJECT
 public:
-	enum {REMOVE, MODEL, ID, NICKNAME, COLUMNS};
+	enum {REMOVE, MODEL, ID, NICKNAME};
 	DiveComputerModel(QMultiMap<QString, DiveComputerNode> &dcMap, QObject *parent = 0);
-	virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-	virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	virtual Qt::ItemFlags flags(const QModelIndex& index) const;

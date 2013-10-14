@@ -2,6 +2,7 @@ marbledir.files = $$MARBLEDIR
 xslt.files = $$XSLT_FILES
 doc.files = $$DOC_FILES
 translation.files = $$replace(TRANSLATIONS, .ts, .qm)
+qttranslation.files = $$join(QTTRANSLATIONS," "$$[QT_INSTALL_TRANSLATIONS]/,$$[QT_INSTALL_TRANSLATIONS]/)
 
 nltab = $$escape_expand(\\n\\t)
 
@@ -22,8 +23,9 @@ mac {
     xslt.path = $$datadir
     doc.path = $$datadir/doc
     translation.path = Contents/Resources/translations
+    qttranslation.path = Contents/Resources/translations
     doc.files = $$files($$doc.files)
-    QMAKE_BUNDLE_DATA += marbledir xslt doc translation
+    QMAKE_BUNDLE_DATA += marbledir xslt doc translation qttranslation
 
     mac_deploy.target = mac-deploy
     mac_deploy.commands += $$[QT_INSTALL_BINS]/macdeployqt $${TARGET}.app
@@ -53,18 +55,21 @@ mac {
     install.depends += qt_conf
 
     !win32-msvc* {
-        #!equals($$QMAKE_HOST.os, "Windows"): dlls.commands += OBJDUMP=`$(CC) -dumpmachine`-objdump
-        dlls.commands += PATH=\$\$PATH:`$(CC) -print-search-dirs | $(SED) -nE \'/^libraries: =/{s///;s,/lib/?(:|\\\$\$),/bin\\1,g;p;q;}\'`
-        dlls.commands += perl $$PWD/scripts/win-ldd.pl $(DESTDIR_TARGET)
+        #!equals($$QMAKE_HOST.os, "Windows"): dlls.commands += OBJDUMP=`$$QMAKE_CC -dumpmachine`-objdump
+        dlls.commands += PATH=\$\$PATH:`$$QMAKE_CC -print-search-dirs | sed -nE \'/^libraries: =/{s///;s,/lib/?(:|\$\$),/bin\\1,g;p;q;}\'`
+        dlls.commands += perl $$PWD/scripts/win-ldd.pl
+        equals(QMAKE_HOST.os, "Windows"): EXE_SUFFIX = .exe
+        CONFIG(debug, debug|release): dlls.commands += $$PWD/debug/subsurface$$EXE_SUFFIX
+        else: dlls.commands += $$PWD/release/$$TARGET$$EXE_SUFFIX
 
         for(plugin, $$list($$DEPLOYMENT_PLUGIN)) {
-            CONFIG(debug, debug|release): dlls.commands += $$[QT_INSTALL_PLUGINS]/$${plugin}d4.dll
-            else: dlls.commands += $$[QT_INSTALL_PLUGINS]/$${plugin}4.dll
+            CONFIG(debug, debug|release): dlls.depends += $$[QT_INSTALL_PLUGINS]/$${plugin}d4.dll
+            else: dlls.depends += $$[QT_INSTALL_PLUGINS]/$${plugin}4.dll
         }
 
         dlls.commands += $$LIBS
         dlls.commands += | while read name; do $(INSTALL_FILE) \$\$name $$PWD/$$WINDOWSSTAGING; done
-        dlls.depends = $(DESTDIR_TARGET)
+        dlls.depends += $(DESTDIR_TARGET)
         install.depends += dlls
     }
 } else {
@@ -119,12 +124,10 @@ XSLTDIR = $(DATADIR)/subsurface
 		else: QMAKE_LRELEASE = $$[QT_INSTALL_BINS]/lrelease
 	}
 	isEmpty(TS_DIR):TS_DIR = translations
-	TSQM.target = .translations
-	TSQM.name = lrelease subsurface.pro
-	TSQM.depends = $$TRANSLATIONS
+	TSQM.input = TRANSLATIONS
 	TSQM.output = $$TS_DIR/${QMAKE_FILE_BASE}.qm
-	TSQM.commands = $$QMAKE_LRELEASE subsurface.pro && echo "OK" > .translations
-	QMAKE_EXTRA_TARGETS += TSQM
-	PRE_TARGETDEPS += .translations
+	TSQM.CONFIG += no_link target_predeps
+	TSQM.commands = $$QMAKE_LRELEASE ${QMAKE_FILE_IN} -qm $$TS_DIR/${QMAKE_FILE_BASE}.qm
+	QMAKE_EXTRA_COMPILERS += TSQM
 }
 QMAKE_EXTRA_TARGETS += install $$install.depends

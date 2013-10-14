@@ -62,6 +62,7 @@ GlobeGPS::GlobeGPS(QWidget* parent) : MarbleWidget(parent), loadedDives(0)
 
 	setMinimumHeight(0);
 	setMinimumWidth(0);
+	editingDiveCoords = 0;
 }
 
 void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
@@ -198,9 +199,8 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 		lon = lon * 180 / M_PI;
 		lat = lat * 180 / M_PI;
 	}
-	if (!editingDiveCoords) {
+	if (!editingDiveCoords)
 		return;
-	}
 
 	editingDiveCoords->latitude.udeg = lrint(lat * 1000000.0);
 	editingDiveCoords->longitude.udeg = lrint(lon * 1000000.0);
@@ -222,13 +222,10 @@ void GlobeGPS::mousePressEvent(QMouseEvent* event)
 void GlobeGPS::resizeEvent(QResizeEvent* event)
 {
 	int size  = event->size().width();
-
 	MarbleWidget::resizeEvent(event);
-
 	if (size > 600)
 		messageWidget->setGeometry((size - 600) / 2, 5, 600, 0);
 	else
 		messageWidget->setGeometry(5, 5, size - 10, 0);
-
 	messageWidget->setMaximumHeight(500);
 }

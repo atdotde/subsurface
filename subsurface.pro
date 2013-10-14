@@ -143,8 +143,18 @@ TRANSLATIONS = \
 	translations/subsurface_sk_SK.ts \
 	translations/subsurface_sv_SE.ts
 
-doc.commands = $(CHK_DIR_EXISTS) Documentation || $(MKDIR) Documentation
-doc.commands += $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation doc
+QTTRANSLATIONS = \
+	qt_da.qm \
+	qt_de.qm \
+	qt_es.qm \
+	qt_fr.qm \
+	qt_pl.qm \
+	qt_pt.qm \
+	qt_ru.qm \
+	qt_sk.qm \
+	qt_sv.qm
+
+doc.commands += $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
 all.depends += doc
 QMAKE_EXTRA_TARGETS += doc all
 
@@ -154,7 +164,7 @@ else: ICON = subsurface-icon.svg
 MANPAGE = subsurface.1
 XSLT_FILES = xslt
 DOC_FILES = $$OUT_PWD/Documentation/user-manual.html Documentation/images
-MARBLEDIR = marbledata/maps
+MARBLEDIR = marbledata/maps marbledata/bitmaps
 DEPLOYMENT_PLUGIN += imageformats/qjpeg
 
 # This information will go into the Windows .rc file and linked into the .exe

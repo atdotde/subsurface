@@ -1,3 +1,4 @@
+translations/*.qm
 *.o
 *.orig
 *.rej
@@ -26,3 +27,4 @@ callgrind.out.*
 .obj
 Makefile
 subsurface.pro.user*
+Subsurface.app

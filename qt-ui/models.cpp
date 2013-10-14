@@ -25,11 +25,16 @@ QFont defaultModelFont()
 	return font;
 }
 
-CylindersModel::CylindersModel(QObject* parent): QAbstractTableModel(parent), current(0), rows(0)
+CleanerTableModel::CleanerTableModel(): QAbstractTableModel()
 {
 }
 
-QVariant CylindersModel::headerData(int section, Qt::Orientation orientation, int role) const
+int CleanerTableModel::columnCount(const QModelIndex& parent) const
+{
+	return headers.count();
+}
+
+QVariant CleanerTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
 	QVariant ret;
 
@@ -41,22 +46,20 @@ QVariant CylindersModel::headerData(int section, Qt::Orientation orientation, in
 		ret = defaultModelFont();
 		break;
 	case Qt::DisplayRole:
-		switch(section) {
-		case TYPE:		ret = tr("Type"); break;
-		case SIZE:		ret = tr("Size"); break;
-		case WORKINGPRESS:	ret = tr("WorkPress"); break;
-		case START:		ret = tr("StartPress"); break;
-		case END:		ret = tr("EndPress  "); break;
-		case O2:		ret = tr("O2% "); break;
-		case HE:		ret = tr("He% "); break;
-		}
+		ret = headers.at(section);
 	}
 	return ret;
 }
 
-int CylindersModel::columnCount(const QModelIndex& parent) const
+void CleanerTableModel::setHeaderDataStrings(const QStringList& newHeaders)
 {
-	return COLUMNS;
+	headers = newHeaders;
+}
+
+CylindersModel::CylindersModel(QObject* parent): current(0), rows(0)
+{
+	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE,};
+	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  tr("O2%") << tr("HE"));
 }
 
 static QVariant percent_string(fraction_t fraction)
@@ -65,7 +68,6 @@ static QVariant percent_string(fraction_t fraction)
 
 	if (!permille)
 		return QVariant();
-
 	return QString("%1%").arg(permille / 10.0, 0, 'f', 1);
 }
 
@@ -321,12 +323,13 @@ void CylindersModel::setDive(dive* d)
 			break;
 		}
 	}
-
-	beginInsertRows(QModelIndex(), 0, amount-1);
 	rows = amount;
 	current = d;
 	changed = false;
-	endInsertRows();
+	if (amount > 0) {
+		beginInsertRows(QModelIndex(), 0, amount - 1);
+		endInsertRows();
+	}
 }
 
 Qt::ItemFlags CylindersModel::flags(const QModelIndex& index) const
@@ -348,8 +351,10 @@ void CylindersModel::remove(const QModelIndex& index)
 	endRemoveRows();
 }
 
-WeightModel::WeightModel(QObject* parent): QAbstractTableModel(parent), current(0), rows(0)
+WeightModel::WeightModel(QObject* parent): current(0), rows(0)
 {
+	//enum Column {REMOVE, TYPE, WEIGHT};
+	setHeaderDataStrings(QStringList() << tr("") << tr("Type") << tr("Weight"));
 }
 
 weightsystem_t* WeightModel::weightSystemAt(const QModelIndex& index)
@@ -375,11 +380,6 @@ void WeightModel::clear()
 		beginRemoveRows(QModelIndex(), 0, rows-1);
 		endRemoveRows();
 	}
-}
-
-int WeightModel::columnCount(const QModelIndex& parent) const
-{
-	return COLUMNS;
 }
 
 QVariant WeightModel::data(const QModelIndex& index, int role) const
@@ -475,30 +475,6 @@ int WeightModel::rowCount(const QModelIndex& parent) const
 	return rows;
 }
 
-QVariant WeightModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-	QVariant ret;
-	if (orientation == Qt::Vertical)
-		return ret;
-
-	switch (role) {
-	case Qt::FontRole:
-		ret = defaultModelFont();
-		break;
-	case Qt::DisplayRole:
-		switch(section) {
-		case TYPE:
-			ret = tr("Type");
-			break;
-		case WEIGHT:
-			ret = tr("Weight");
-			break;
-		}
-		break;
-	}
-	return ret;
-}
-
 void WeightModel::add()
 {
 	if (rows >= MAX_WEIGHTSYSTEMS)
@@ -529,12 +505,13 @@ void WeightModel::setDive(dive* d)
 			break;
 		}
 	}
-
-	beginInsertRows(QModelIndex(), 0, amount-1);
 	rows = amount;
 	current = d;
 	changed = false;
-	endInsertRows();
+	if (amount > 0) {
+		beginInsertRows(QModelIndex(), 0, amount - 1);
+		endInsertRows();
+	}
 }
 
 WSInfoModel* WSInfoModel::instance()
@@ -570,11 +547,6 @@ void WSInfoModel::clear()
 {
 }
 
-int WSInfoModel::columnCount(const QModelIndex& parent) const
-{
-	return 2;
-}
-
 QVariant WSInfoModel::data(const QModelIndex& index, int role) const
 {
 	QVariant ret;
@@ -603,31 +575,6 @@ QVariant WSInfoModel::data(const QModelIndex& index, int role) const
 	return ret;
 }
 
-QVariant WSInfoModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-	QVariant ret;
-
-	if (orientation != Qt::Horizontal)
-		return ret;
-
-	switch(role){
-		case Qt::FontRole :
-			ret = defaultModelFont();
-			break;
-		case Qt::DisplayRole :
-			switch(section) {
-				case GR:
-					ret = tr("kg");
-					break;
-				case DESCRIPTION:
-					ret = tr("Description");
-					break;
-			}
-			break;
-	}
-	return ret;
-}
-
 int WSInfoModel::rowCount(const QModelIndex& parent) const
 {
 	return rows+1;
@@ -638,14 +585,14 @@ const QString& WSInfoModel::biggerString() const
 	return biggerEntry;
 }
 
-WSInfoModel::WSInfoModel() : QAbstractTableModel(), rows(-1)
+WSInfoModel::WSInfoModel() : rows(-1)
 {
+	setHeaderDataStrings( QStringList() << tr("Description") << tr("kg"));
 	struct ws_info_t *info = ws_info;
 	for (info = ws_info; info->name; info++, rows++){
 		QString wsInfoName(info->name);
-		if( wsInfoName.count() > biggerEntry.count()){
+		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
-		}
 	}
 
 	if (rows > -1) {
@@ -662,9 +609,8 @@ void WSInfoModel::updateInfo()
 	rows = -1;
 	for (info = ws_info; info->name; info++, rows++){
 		QString wsInfoName(info->name);
-		if( wsInfoName.count() > biggerEntry.count()){
+		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
-		}
 	}
 
 	if (rows > -1) {
@@ -730,11 +676,6 @@ void TankInfoModel::clear()
 {
 }
 
-int TankInfoModel::columnCount(const QModelIndex& parent) const
-{
-	return 3;
-}
-
 QVariant TankInfoModel::data(const QModelIndex& index, int role) const
 {
 	QVariant ret;
@@ -767,47 +708,19 @@ QVariant TankInfoModel::data(const QModelIndex& index, int role) const
 	return ret;
 }
 
-QVariant TankInfoModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-	QVariant ret;
-
-	if (orientation != Qt::Horizontal)
-		return ret;
-
-	switch(role){
-		case Qt::FontRole:
-			ret = defaultModelFont();
-			break;
-		case Qt::DisplayRole:
-			switch(section) {
-			case BAR:
-				ret = tr("Bar");
-				break;
-			case ML:
-				ret = tr("Ml");
-				break;
-			case DESCRIPTION:
-				ret = tr("Description");
-				break;
-			}
-			break;
-	}
-	return ret;
-}
-
 int TankInfoModel::rowCount(const QModelIndex& parent) const
 {
 	return rows+1;
 }
 
-TankInfoModel::TankInfoModel() : QAbstractTableModel(), rows(-1)
+TankInfoModel::TankInfoModel() :  rows(-1)
 {
+	setHeaderDataStrings( QStringList() << tr("Description") << tr("Ml") << tr("Bar"));
 	struct tank_info_t *info = tank_info;
 	for (info = tank_info; info->name; info++, rows++){
 		QString infoName(info->name);
-		if (infoName.count() > biggerEntry.count()){
+		if (infoName.count() > biggerEntry.count())
 			biggerEntry = infoName;
-		}
 	}
 
 	if (rows > -1) {
@@ -929,7 +842,6 @@ int TreeModel::rowCount(const QModelIndex& parent) const
 		parentItem = static_cast<TreeItem*>(parent.internalPointer());
 
 	int amount = parentItem->children.count();
-
 	return amount;
 }
 
@@ -1081,27 +993,22 @@ QString DiveItem::displayDuration() const
 QString DiveItem::displayTemperature() const
 {
 	QString str;
-
 	if (!dive->watertemp.mkelvin)
 		return str;
-
 	if (get_units()->temperature == units::CELSIUS)
 		str = QString::number(mkelvin_to_C(dive->watertemp.mkelvin), 'f', 1);
 	else
 		str = QString::number(mkelvin_to_F(dive->watertemp.mkelvin), 'f', 1);
-
 	return str;
 }
 
 QString DiveItem::displaySac() const
 {
 	QString str;
-
 	if (get_units()->volume == units::LITER)
 		str = QString::number(dive->sac / 1000.0, 'f', 1);
 	else
 		str = QString::number(ml_to_cuft(dive->sac), 'f', 2);
-
 	return str;
 }
 
@@ -1226,29 +1133,11 @@ void DiveTripModel::setLayout(DiveTripModel::Layout layout)
  *####################################################################
  */
 
-DiveComputerModel::DiveComputerModel(QMultiMap<QString, DiveComputerNode> &dcMap, QObject* parent): QAbstractTableModel(parent)
+DiveComputerModel::DiveComputerModel(QMultiMap<QString, DiveComputerNode> &dcMap, QObject* parent): CleanerTableModel()
 {
+	setHeaderDataStrings(QStringList() << "" << tr("Model") << tr("Device ID") << tr("Nickname"));
 	dcWorkingMap = dcMap;
 	numRows = 0;
-}
-
-int DiveComputerModel::columnCount(const QModelIndex& parent) const
-{
-	return COLUMNS;
-}
-
-QVariant DiveComputerModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-	QVariant ret;
-	if (role != Qt::DisplayRole || orientation != Qt::Horizontal){
-		return ret;
-	}
-	switch(section){
-		case ID:	ret = tr("Device ID"); break;
-		case MODEL:	ret = tr("Model"); break;
-		case NICKNAME:	ret = tr("Nickname"); break;
-	}
-	return ret;
 }
 
 QVariant DiveComputerModel::data(const QModelIndex& index, int role) const
@@ -1499,20 +1388,13 @@ QVariant TablePrintModel::data(const QModelIndex &index, int role) const
 		return QColor(list.at(index.row())->colorBackground);
 	if (role == Qt::DisplayRole)
 		switch (index.column()) {
-			case 0:
-				return list.at(index.row())->number;
-			case 1:
-				return list.at(index.row())->date;
-			case 2:
-				return list.at(index.row())->depth;
-			case 3:
-				return list.at(index.row())->duration;
-			case 4:
-				return list.at(index.row())->divemaster;
-			case 5:
-				return list.at(index.row())->buddy;
-			case 6:
-				return list.at(index.row())->location;
+			case 0: return list.at(index.row())->number;
+			case 1: return list.at(index.row())->date;
+			case 2:	return list.at(index.row())->depth;
+			case 3: return list.at(index.row())->duration;
+			case 4:	return list.at(index.row())->divemaster;
+			case 5:	return list.at(index.row())->buddy;
+			case 6:	return list.at(index.row())->location;
 		}
 	return QVariant();
 }
@@ -1522,20 +1404,13 @@ bool TablePrintModel::setData(const QModelIndex &index, const QVariant &value, i
 	if (index.isValid()) {
 		if (role == Qt::DisplayRole) {
 			switch (index.column()) {
-			case 0:
-				list.at(index.row())->number = value.toString();
-			case 1:
-				list.at(index.row())->date = value.toString();
-			case 2:
-				list.at(index.row())->depth = value.toString();
-			case 3:
-				list.at(index.row())->duration = value.toString();
-			case 4:
-				list.at(index.row())->divemaster = value.toString();
-			case 5:
-				list.at(index.row())->buddy = value.toString();
-			case 6:
-				list.at(index.row())->location = value.toString();
+			case 0: list.at(index.row())->number = value.toString();
+			case 1: list.at(index.row())->date = value.toString();
+			case 2: list.at(index.row())->depth = value.toString();
+			case 3: list.at(index.row())->duration = value.toString();
+			case 4: list.at(index.row())->divemaster = value.toString();
+			case 5: list.at(index.row())->buddy = value.toString();
+			case 6: list.at(index.row())->location = value.toString();
 			}
 			return true;
 		}
@@ -1616,19 +1491,18 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 	switch (role) {
 	case Qt::DisplayRole: {
 		struct DiveItem di;
-		di.dive = dive;
-		QString unit;
+		di.dive = dive;;
 		char buf[80];
-		const QString empty = QString("");
-		const QString unknown = QString(tr("unknown"));
+
+		const QString unknown = tr("unknown");
 
 		// dive# + date, depth, location, duration
 		if (row == 0) {
 			if (col == 0)
-				return QString(tr("Dive #%1 - %2")).arg(dive->number).arg(di.displayDate());
+				return tr("Dive #%1 - %2").arg(dive->number).arg(di.displayDate());
 			if (col == 5) {
-				unit = (get_units()->length == units::METERS) ? "m" : "ft";
-				return QString(tr("Max depth: %1 %2")).arg(di.displayDepth()).arg(unit);
+				QString unit = (get_units()->length == units::METERS) ? "m" : "ft";
+				return tr("Max depth: %1 %2").arg(di.displayDepth()).arg(unit);
 			}
 		}
 		if (row == 1) {
@@ -1640,11 +1514,11 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 		// cylinder headings
 		if (row == 2) {
 			if (col == 0)
-				return QString(tr("Cylinder"));
+				return tr("Cylinder");
 			if (col == 1)
-				return QString(tr("Gasmix"));
+				return tr("Gasmix");
 			if (col == 2)
-				return QString(tr("Gas Used"));
+				return tr("Gas Used");
 		}
 		// cylinder data
 		if (row > 2 && row < 10 && row - 3 < MAX_CYLINDERS) {
@@ -1670,11 +1544,11 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 		// sac, cns, otu - headings
 		if (col == 3) {
 			if (row == 2)
-				return QString(tr("SAC"));
+				return tr("SAC");
 			if (row == 4)
-				return QString(tr("Max. CNS"));
+				return tr("Max. CNS");
 			if (row == 6)
-				return QString(tr("OTU"));
+				return tr("OTU");
 		}
 		// sac, cns, otu - data
 		if (col == 4) {
@@ -1687,13 +1561,13 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 		}
 		// weights heading
 		if (row == 2 && col == 5)
-			return QString(tr("Weights"));
+			return tr("Weights");
 		// total weight
 		if (row == 9) {
 			weight_t tw = { total_weight(dive) };
 			if (tw.grams) {
 				if (col == 5)
-					return QString("Total weight");
+					return tr("Total weight");
 				if (col == 6)
 					return get_weight_string(tw, true);
 			}
@@ -1712,7 +1586,7 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 				}
 			}
 		}
-		return empty;
+		return QString();
 	}
 	case Qt::FontRole: {
 		QFont font;
