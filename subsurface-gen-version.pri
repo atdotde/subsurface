@@ -6,6 +6,8 @@ win32: VER_OS = win
 exists(.git/HEAD): {
     GIT_HEAD = .git/HEAD
     VERSION_SCRIPT = $$PWD/scripts/get-version
+    # always use linux here -------------------vvv    so we get the true full version
+    FULL_VERSION = $$system("$$VERSION_SCRIPT linux")
     version_h.depends = $$VERSION_SCRIPT
     version_h.commands = echo \\$${LITERAL_HASH}define VERSION_STRING \\\"`$$VERSION_SCRIPT $$VER_OS`\\\" > ${QMAKE_FILE_OUT}
     version_h.input = GIT_HEAD
@@ -15,5 +17,6 @@ exists(.git/HEAD): {
     QMAKE_EXTRA_COMPILERS += version_h
 } else {
     # This is probably a package
+    FULL_VERSION = $$VERSION
     system(echo \\$${LITERAL_HASH}define VERSION_STRING \\\"$$VERSION\\\" > $$VERSION_FILE)
 }
