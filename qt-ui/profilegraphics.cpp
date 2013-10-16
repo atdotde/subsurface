@@ -1179,7 +1179,7 @@ QGraphicsItemGroup *ProfileGraphicsView::plot_text(text_render_options_t *tro,co
 	QFontMetrics fm(fnt);
 
 	if (printMode)
-		fnt.setPixelSize(10);
+		fnt.setPixelSize(tro->size);
 
 	QPointF point(SCALEGC(pos.x(), pos.y())); // This is neded because of the SCALE macro.
 	double dx = tro->hpos * (fm.width(text));
@@ -1392,8 +1392,7 @@ ToolTipItem::ToolTipItem(QGraphicsItem* parent): QGraphicsPathItem(parent), back
 {
 	title = new QGraphicsSimpleTextItem(tr("Information"), this);
 	separator = new QGraphicsLineItem(this);
-	dragging = false;
-	setFlag(ItemIgnoresTransformations);
+	setFlags(ItemIgnoresTransformations | ItemIsMovable);
 	status = COLLAPSED;
 	updateTitlePosition();
 	setZValue(99);
@@ -1440,12 +1439,7 @@ bool ToolTipItem::isExpanded() {
 void ToolTipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
 	persistPos();
-	dragging = false;
-}
-
-void ToolTipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
-{
-	dragging = true;
+	QGraphicsPathItem::mouseReleaseEvent(event);
 }
 
 void ToolTipItem::persistPos()
@@ -1466,16 +1460,6 @@ void ToolTipItem::readPos()
 		s.value("tooltip_position").toPoint()
 	);
 	setPos(value);
-}
-
-bool ToolTipItem::eventFilter(QObject* view, QEvent* event)
-{
-	if (event->type() == QEvent::HoverMove && dragging){
-		QHoverEvent *e = static_cast<QHoverEvent*>(event);
-		QGraphicsView *v = scene()->views().at(0);
-		setPos( v->mapToScene(e->pos()));
-	}
-	return false;
 }
 
 QColor EventItem::getColor(const color_indice_t i)

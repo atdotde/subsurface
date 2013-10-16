@@ -39,9 +39,7 @@ public:
 	bool isExpanded();
 	void persistPos();
 	void readPos();
-	void mousePressEvent(QGraphicsSceneMouseEvent* event);
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
-	bool eventFilter(QObject* , QEvent* );
 public slots:
 	void setRect(const QRectF& rect);
 
@@ -53,7 +51,6 @@ private:
 	QGraphicsSimpleTextItem *title;
 	Status status;
 	QRectF rectangle;
-	bool dragging;
 	QRectF nextRectangle;
 };
 
@@ -117,11 +114,11 @@ private:
 class GraphicsTextEditor : public QGraphicsTextItem{
 	Q_OBJECT
 public:
-    GraphicsTextEditor(QGraphicsItem* parent = 0);
+	GraphicsTextEditor(QGraphicsItem* parent = 0);
 
 protected:
-    virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event);
-    virtual void keyReleaseEvent(QKeyEvent* event);
+	virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event);
+	virtual void keyReleaseEvent(QKeyEvent* event);
 
 signals:
 	void textChanged(const QString& text);

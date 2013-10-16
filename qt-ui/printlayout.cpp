@@ -44,7 +44,7 @@ PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct op
 	profilePrintColumnWidths.append(dw - 5);
 	profilePrintColumnWidths.append(dw + 5);
 	profilePrintColumnWidths.append(dw - 5); // fit to 100%
-	const int sr = 8; // smallest row height in pixels
+	const int sr = 9; // smallest row height in pixels
 	profilePrintRowHeights.append(sr + 2);
 	profilePrintRowHeights.append(sr + 7);
 	profilePrintRowHeights.append(sr);
@@ -133,7 +133,7 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 	const int scaledW = ESTIMATE_DIVE_DIM(scaledPageW, divesPerColumn, padW);
 	const int scaledH = ESTIMATE_DIVE_DIM(scaledPageH, divesPerRow, padH);
 	// padding in pixels between profile and table
-	const int padPT = 10;
+	const int padPT = 5;
 	// create a model and table
 	ProfilePrintModel model;
 	QTableView *table = createProfileTable(&model, scaledW);
@@ -166,14 +166,14 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 		profile->plot(dive, true);
 		QPixmap profilePm = QPixmap::grabWidget(profile); // Qt4
 		painter.drawPixmap((scaledW + padW) * col,
-		                   (scaledH + padH) * row + yOffsetProfile,
-		                   profilePm);
+				   (scaledH + padH) * row + yOffsetProfile,
+				   profilePm);
 		// draw a table
 		model.setDive(dive);
 		QPixmap tablePm = QPixmap::grabWidget(table); // Qt4
 		painter.drawPixmap((scaledW + padW) * col,
-		                   (scaledH + padH) * row + yOffsetTable,
-		                   tablePm);
+				   (scaledH + padH) * row + yOffsetTable,
+				   tablePm);
 		col++;
 	}
 
@@ -337,8 +337,8 @@ void PrintLayout::printTable()
 		if (i > 0)
 			printer->newPage();
 		QRegion region(0, pageIndexes.at(i) - 1,
-		               table.width(),
-		               pageIndexes.at(i + 1) - pageIndexes.at(i) + 1);
+			       table.width(),
+			       pageIndexes.at(i + 1) - pageIndexes.at(i) + 1);
 		table.render(&painter, QPoint(0, 0), region);
 	}
 }
@@ -364,18 +364,4 @@ void PrintLayout::addTablePrintHeadingRow(TablePrintModel *model, int row) const
 		model->setData(model->index(row, i), tablePrintColumnNames.at(i), Qt::DisplayRole);
 		model->setData(model->index(row, i), tablePrintHeadingBackground, Qt::BackgroundRole);
 	}
-}
-
-// experimental
-QPixmap PrintLayout::convertPixmapToGrayscale(QPixmap pixmap) const
-{
-	QImage image = pixmap.toImage();
-	int gray, width = pixmap.width(), height = pixmap.height();
-	for (int i = 0; i < width; i++) {
-		for (int j = 0; j < height; j++) {
-			gray = qGray(image.pixel(i, j));
-			image.setPixel(i, j, qRgb(gray, gray, gray));
-		}
-	}
-    return pixmap.fromImage(image);
 }
