@@ -371,6 +371,42 @@ void DiveListView::deleteDive()
 	reload(currentLayout, false);
 }
 
+
+void DiveListView::exportTeX()
+{
+	int nr;
+	struct dive *dive = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
+	if (dive) {
+	  FILE *f = fopen("dive.tex","w");
+	  if (!f)
+	    return;
+	  
+	  struct tm tm;
+
+	  utc_mkdate(dive->when, &tm);
+	  
+	  fprintf(f, "\\def\\date{%04u-%02u-%02u}\n",
+		tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday);
+	  fprintf(f, "\\def\\number{%d}\n", dive->number);
+	  fprintf(f, "\\def\\place{%s}\n", dive->location);
+	  fputs("\\def\\spot{}\n", f);
+	  fputs("\\def\\country{}\n", f);
+	  fputs("\\def\\entrance{}\n", f);
+	  fprintf(f, "\\def\\time{%u:%02u}\n", FRACTION(dive->duration.seconds, 60));
+	  fprintf(f, "\\def\\depth{%u.%01um}\n", FRACTION(dive->maxdepth.mm/100, 10));
+	  fputs("\\def\\gasuse{}\n",f);
+	  fprintf(f, "\\def\\sac{%u.%01u l/min}\n", FRACTION(dive->sac/100,10));
+	  fputs("\\def\\type{}\n",f);
+	  fprintf(f, "\\def\\viz{%d}\n", dive->visibility);
+	  fputs("\\def\\plot{\\includegraphics[width=9cm,height=4cm]{Documentation/images/planned_dive}}\n",f);
+	  fprintf(f, "\\def\\comment{%s}\n", dive->notes);
+	  fprintf(f, "\\def\\buddy{%s}\n", dive->buddy);
+	  fputs("\\input logbookstyle\n", f);
+
+	  fclose(f);
+	}
+}
+
 void DiveListView::testSlot()
 {
 	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
@@ -400,14 +436,17 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		collapseAction = popup.addAction(tr("collapse"), this, SLOT(collapseAll()));
 		if (d) {
 			popup.addAction(tr("remove dive from trip"), this, SLOT(removeFromTrip()));
+			popup.addAction(tr("export as TeX"), this, SLOT(exportTeX()));
 		}
 		if (trip) {
 			popup.addAction(tr("Merge trip with trip above"), this, SLOT(mergeTripAbove()));
 			popup.addAction(tr("Merge trip with trip below"), this, SLOT(mergeTripBelow()));
 		}
 	}
-	if (d)
+	if (d){
 		popup.addAction(tr("delete dive"), this, SLOT(deleteDive()));
+		popup.addAction(tr("remove dive from trip"), this, SLOT(removeFromTrip()));
+	}
 	if (amount_selected > 1 && consecutive_selected())
 		popup.addAction(tr("merge selected dives"), this, SLOT(mergeDives()));
 	// "collapse all" really closes all trips,

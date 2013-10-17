@@ -35,6 +35,7 @@ public slots:
 	void showSearchEdit();
 	void removeFromTrip();
 	void deleteDive();
+	void exportTeX();
 	void testSlot();
 	void fixMessyQtModelBehaviour();
 	void mergeTripAbove();
