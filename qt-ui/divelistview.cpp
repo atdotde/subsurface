@@ -377,6 +377,13 @@ void DiveListView::exportTeX()
 	int nr;
 	struct dive *dive = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
 	if (dive) {
+
+	  ProfileGraphicsView *profile = mainWindow()->graphics();
+	  profile->plot(dive,true);
+	  QString fileName = "profile.png";
+	  QPixmap pixMap = QPixmap::grabWidget(profile);
+	  pixMap.save(fileName);
+	  
 	  FILE *f = fopen("dive.tex","w");
 	  if (!f)
 	    return;
@@ -398,7 +405,7 @@ void DiveListView::exportTeX()
 	  fprintf(f, "\\def\\sac{%u.%01u l/min}\n", FRACTION(dive->sac/100,10));
 	  fputs("\\def\\type{}\n",f);
 	  fprintf(f, "\\def\\viz{%d}\n", dive->visibility);
-	  fputs("\\def\\plot{\\includegraphics[width=9cm,height=4cm]{Documentation/images/planned_dive}}\n",f);
+	  fputs("\\def\\plot{\\includegraphics[width=9cm,height=4cm]{profile}}\n",f);
 	  fprintf(f, "\\def\\comment{%s}\n", dive->notes);
 	  fprintf(f, "\\def\\buddy{%s}\n", dive->buddy);
 	  fputs("\\input logbookstyle\n", f);
