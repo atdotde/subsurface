@@ -412,6 +412,8 @@ void DiveListView::exportTeX()
 	  fputs("\\input logbookstyle\n", f);
 
 	  fclose(f);
+	  system("pdftex dive.tex");
+	  system("open dive.pdf");
 	}
 }
 
