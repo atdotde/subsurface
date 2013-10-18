@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include "gettext.h"
+#include <stdio.h>
+
 struct preferences prefs;
 struct preferences default_prefs = {
 	.units = SI_UNITS,
@@ -146,6 +148,8 @@ void renumber_dives(int nr)
 	mark_divelist_changed(TRUE);
 }
 
+bool has_pdftex = FALSE;
+
 /*
  * Under a POSIX setup, the locale string should have a format
  * like [language[_territory][.codeset][@modifier]].
@@ -159,6 +163,12 @@ void renumber_dives(int nr)
 void setup_system_prefs(void)
 {
 	const char *env;
+	
+	/* determine if a pdftex binary is in the PATH */
+	FILE *tex = popen("which pdftex","r");
+	getc(tex);
+	if(!feof(tex))
+	  has_pdftex = TRUE;
 
 	default_prefs.divelist_font = strdup(system_divelist_default_font);
 	default_prefs.default_filename = system_default_filename();
@@ -166,8 +176,7 @@ void setup_system_prefs(void)
 	env = getenv("LC_MEASUREMENT");
 	if (!env)
 		env = getenv("LC_ALL");
-	if (!env)
-		env = getenv("LANG");
+	if (!env)		env = getenv("LANG");
 	if (!env)
 		return;
 	env = strchr(env, '_');

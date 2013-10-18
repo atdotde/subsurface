@@ -9,6 +9,7 @@
 #include "modeldelegates.h"
 #include "mainwindow.h"
 #include "../display.h"
+#include "../subsurfacestartup.h"
 #include <QApplication>
 #include <QHeaderView>
 #include <QDebug>
@@ -443,7 +444,8 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		collapseAction = popup.addAction(tr("collapse"), this, SLOT(collapseAll()));
 		if (d) {
 			popup.addAction(tr("remove dive from trip"), this, SLOT(removeFromTrip()));
-			popup.addAction(tr("export as TeX"), this, SLOT(exportTeX()));
+			if(has_pdftex)
+			  popup.addAction(tr("export as TeX"), this, SLOT(exportTeX()));
 		}
 		if (trip) {
 			popup.addAction(tr("Merge trip with trip above"), this, SLOT(mergeTripAbove()));

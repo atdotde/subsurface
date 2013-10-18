@@ -5,6 +5,7 @@
 #include "divelist.h"
 #include "libdivecomputer.h"
 #include <stdbool.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,7 @@ extern "C" {
 extern struct preferences prefs;
 extern struct preferences default_prefs;
 extern bool imported;
+extern bool has_pdftex;
 
 void setup_system_prefs(void);
 void parse_argument(const char *arg);
