@@ -203,7 +203,7 @@ int get_cylinder_pressure_range(struct graphics_context *gc)
 
 
 /* Get local sac-rate (in ml/min) between entry1 and entry2 */
-int get_local_sac(struct plot_data *entry1, struct plot_data *entry2, struct dive *dive)
+static int get_local_sac(struct plot_data *entry1, struct plot_data *entry2, struct dive *dive)
 {
 	int index = entry1->cylinderindex;
 	cylinder_t *cyl;
@@ -821,6 +821,31 @@ static void populate_cylinder_pressure_data(int idx, int start, int end, struct 
 	}
 }
 
+static void calculate_sac(struct dive *dive, struct plot_info *pi)
+{
+	int i = 0, last = 0;
+	struct plot_data *last_entry = NULL;
+
+	for (i = 0; i < pi->nr; i++) {
+		struct plot_data *entry = pi->entry+i;
+		if (!last_entry || last_entry->cylinderindex != entry->cylinderindex) {
+			last = i;
+			last_entry = entry;
+			entry->sac = get_local_sac(entry, pi->entry + i + 1, dive);
+		} else {
+			int j;
+			entry->sac = 0;
+			for (j = last; j < i; j++)
+				entry->sac += get_local_sac(pi->entry + j, pi->entry + j + 1, dive);
+			entry->sac /= (i - last);
+			if (entry->sec - last_entry->sec >= SAC_WINDOW) {
+				last++;
+				last_entry = pi->entry + last;
+			}
+		}
+	}
+}
+
 static void populate_secondary_sensor_data(struct divecomputer *dc, struct plot_info *pi)
 {
 	/* We should try to see if it has interesting pressure data here */
@@ -1103,6 +1128,9 @@ struct plot_info *create_plot_info(struct dive *dive, struct divecomputer *dc, s
 	/* .. calculate missing pressure entries */
 	populate_pressure_information(dive, dc, pi);
 
+	/* Calculate sac */
+	calculate_sac(dive, pi);
+
 	/* Then, calculate partial pressures and deco information */
 	if (prefs.profile_calc_ceiling)
 		calculate_deco_information(dive, dc, pi);
@@ -1166,7 +1194,7 @@ static void plot_string(struct plot_data *entry, char *buf, int bufsize,
 	if (entry->temperature) {
 		tempvalue = get_temp_units(entry->temperature, &temp_unit);
 		memcpy(buf2, buf, bufsize);
-		snprintf(buf, bufsize, translate("gettextFromC","%s\nT:%.1f %s"), buf2, tempvalue, temp_unit);
+		snprintf(buf, bufsize, translate("gettextFromC","%s\nTemp:%.1f %s"), buf2, tempvalue, temp_unit);
 	}
 
 	speedvalue = get_vertical_speed_units(abs(entry->speed), NULL, &vertical_speed_unit);
@@ -1222,6 +1250,10 @@ static void plot_string(struct plot_data *entry, char *buf, int bufsize,
 		else
 			snprintf(buf, bufsize, translate("gettextFromC","%s\nNDL:%umin"), buf2, DIV_UP(entry->ndl, 60));
 	}
+	if (entry->sac && prefs.show_sac) {
+		memcpy(buf2, buf, bufsize);
+		snprintf(buf, bufsize, translate("gettextFromC","%s\nSAC:%2.1fl/min"), buf2, entry->sac / 1000.0);
+	}
 	if (entry->tts) {
 		memcpy(buf2, buf, bufsize);
 		snprintf(buf, bufsize, translate("gettextFromC","%s\nTTS:%umin"), buf2, DIV_UP(entry->tts, 60));
@@ -1276,7 +1308,7 @@ void get_plot_details(struct graphics_context *gc, int time, char *buf, int bufs
 void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int bufsize, int sum)
 {
 	struct plot_data *start, *stop, *data;
-	const char *depth_unit, *pressure_unit;
+	const char *depth_unit, *pressure_unit, *vertical_speed_unit;
 	char *buf2 = malloc(bufsize);
 	int avg_speed, max_speed, min_speed;
 	int delta_depth, avg_depth, max_depth, min_depth;
@@ -1365,16 +1397,16 @@ void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int 
 	snprintf(buf, bufsize, translate("gettextFromC","%s %sD:%.1f%s\n"), buf2, UTF8_AVERAGE, depthvalue, depth_unit);
 	memcpy(buf2, buf, bufsize);
 
-	speedvalue = get_depth_units(min_speed, NULL, &depth_unit);
-	snprintf(buf, bufsize, translate("gettextFromC","%s%sV:%.2f%s/s"), buf2, UTF8_DOWNWARDS_ARROW, speedvalue, depth_unit);
+	speedvalue = get_vertical_speed_units(abs(min_speed), NULL, &vertical_speed_unit);
+	snprintf(buf, bufsize, translate("gettextFromC","%s%sV:%.2f%s"), buf2, UTF8_DOWNWARDS_ARROW, speedvalue, vertical_speed_unit);
 	memcpy(buf2, buf, bufsize);
 
-	speedvalue = get_depth_units(max_speed, NULL, &depth_unit);
-	snprintf(buf, bufsize, translate("gettextFromC","%s %sV:%.2f%s/s"), buf2, UTF8_UPWARDS_ARROW, speedvalue, depth_unit);
+	speedvalue = get_vertical_speed_units(abs(max_speed), NULL, &vertical_speed_unit);
+	snprintf(buf, bufsize, translate("gettextFromC","%s %sV:%.2f%s"), buf2, UTF8_UPWARDS_ARROW, speedvalue, vertical_speed_unit);
 	memcpy(buf2, buf, bufsize);
 
-	speedvalue = get_depth_units(avg_speed, NULL, &depth_unit);
-	snprintf(buf, bufsize, translate("gettextFromC","%s %sV:%.2f%s/s"), buf2, UTF8_AVERAGE, speedvalue, depth_unit);
+	speedvalue = get_vertical_speed_units(abs(avg_speed), NULL, &vertical_speed_unit);
+	snprintf(buf, bufsize, translate("gettextFromC","%s %sV:%.2f%s"), buf2, UTF8_AVERAGE, speedvalue, vertical_speed_unit);
 	memcpy(buf2, buf, bufsize);
 
 	/* Only print if gas has been used */

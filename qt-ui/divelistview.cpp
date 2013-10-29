@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QFileDialog>
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
 	currentHeaderClicked(-1), searchBox(new QLineEdit(this))
@@ -410,6 +411,10 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		popup.addAction(tr("delete dive"), this, SLOT(deleteDive()));
 	if (amount_selected > 1 && consecutive_selected())
 		popup.addAction(tr("merge selected dives"), this, SLOT(mergeDives()));
+	if (amount_selected >= 1) {
+		popup.addAction(tr("save As"), this, SLOT(saveSelectedDivesAs()));
+		popup.addAction(tr("export As UDDF"), this, SLOT(exportSelectedDivesAsUDDF()));
+	}
 	// "collapse all" really closes all trips,
 	// "collapse" keeps the trip with the selected dive open
 	QAction * actionTaken = popup.exec(event->globalPos());
@@ -419,4 +424,42 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		this->setAnimated(true);
 	}
 	event->accept();
+}
+
+void DiveListView::saveSelectedDivesAs()
+{
+	QSettings settings;
+	QString lastDir = QDir::homePath();
+
+	settings.beginGroup("FileDialog");
+	if (settings.contains("LastDir")) {
+		if(QDir::setCurrent(settings.value("LastDir").toString())) {
+			lastDir = settings.value("LastDir").toString();
+		}
+	}
+	settings.endGroup();
+
+	QString fileName = QFileDialog::getOpenFileName(mainWindow(), tr("Save Dives As..."), QDir::homePath());
+	if (fileName.isEmpty())
+		return;
+
+	// Keep last open dir
+	QFileInfo fileInfo(fileName);
+	settings.beginGroup("FileDialog");
+	settings.setValue("LastDir",fileInfo.dir().path());
+	settings.endGroup();
+
+	QByteArray bt = fileName.toLocal8Bit();
+	save_dives_logic(bt.data(), TRUE);
+}
+
+void DiveListView::exportSelectedDivesAsUDDF()
+{
+	QString filename;
+	QFileInfo fi(system_default_filename());
+
+	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+						tr("UDDF files (*.uddf *.UDDF)"));
+	if (!filename.isNull() && !filename.isEmpty())
+		export_dives_uddf((const char *)filename.toStdString().c_str(), true);
 }

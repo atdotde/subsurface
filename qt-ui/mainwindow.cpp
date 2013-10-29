@@ -189,7 +189,13 @@ void MainWindow::on_actionImport_triggered()
 
 void MainWindow::on_actionExportUDDF_triggered()
 {
-	qDebug("actionExportUDDF");
+	QString filename;
+	QFileInfo fi(system_default_filename());
+
+	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+						tr("UDDF files (*.uddf *.UDDF)"));
+	if (!filename.isNull() && !filename.isEmpty())
+		export_dives_uddf((const char *)filename.toStdString().c_str(), false);
 }
 
 void MainWindow::on_actionPrint_triggered()
@@ -246,7 +252,12 @@ void MainWindow::on_actionDownloadDC_triggered()
 
 void MainWindow::on_actionDownloadWeb_triggered()
 {
-	SubsurfaceWebServices::instance()->runDialog();
+	SubsurfaceWebServices::instance()->exec();
+}
+
+void MainWindow::on_actionDivelogs_de_triggered()
+{
+	DivelogsDeWebServices::instance()->exec();
 }
 
 void MainWindow::on_actionEditDeviceNames_triggered()
@@ -287,7 +298,13 @@ void MainWindow::on_actionRenumber_triggered()
 
 void MainWindow::on_actionAutoGroup_triggered()
 {
-	qDebug("actionAutoGroup");
+	autogroup = ui.actionAutoGroup->isChecked();
+	if (autogroup)
+		autogroup_dives();
+	else
+		remove_autogen_trips();
+	refreshDisplay();
+	mark_divelist_changed(true);
 }
 
 void MainWindow::on_actionToggleZoom_triggered()
@@ -587,6 +604,7 @@ void MainWindow::readSettings()
 	GET_INT("gfhigh", gfhigh);
 	set_gf(prefs.gflow, prefs.gfhigh);
 	GET_BOOL("show_time", show_time);
+	GET_BOOL("show_sac", show_sac);
 	s.endGroup();
 
 	s.beginGroup("Display");
@@ -801,6 +819,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	ui.ListWidget->setFocus();
 	WSInfoModel *wsim = WSInfoModel::instance();
 	wsim->updateInfo();
+	ui.actionAutoGroup->setChecked(autogroup);
 }
 
 void MainWindow::on_actionImportCSV_triggered()
