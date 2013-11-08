@@ -31,6 +31,7 @@ struct NotesBackup{
 	int rating;
 	int visibility;
 	QString divemaster;
+	QString tags;
 	cylinder_t cylinders[MAX_CYLINDERS];
 	weightsystem_t weightsystem[MAX_WEIGHTSYSTEMS ];
 };
@@ -40,12 +41,15 @@ struct Completers{
 	QCompleter *divemaster;
 	QCompleter *buddy;
 	QCompleter *suit;
+	QCompleter *tags;
 };
 
 class MainTab : public QTabWidget
 {
 	Q_OBJECT
 public:
+	enum EditMode { NONE, DIVE, TRIP, ADD, MANUALLY_ADDED_DIVE };
+
 	MainTab(QWidget *parent);
 	void clearStats();
 	void clearInfo();
@@ -71,11 +75,14 @@ public slots:
 	void on_dateTimeEdit_dateTimeChanged(const QDateTime& datetime);
 	void on_rating_valueChanged(int value);
 	void on_visibility_valueChanged(int value);
+	void on_tagWidget_textChanged();
 	void editCylinderWidget(const QModelIndex& index);
 	void editWeightWidget(const QModelIndex& index);
 	void addDiveStarted();
+	void enableEdition(EditMode newEditMode = NONE);
 
 private:
+	EditMode editMode;
 	Ui::MainTab ui;
 	WeightModel *weightModel;
 	CylindersModel *cylindersModel;
@@ -88,10 +95,9 @@ private:
 	 * then applying the changes on the other dives.*/
 	struct dive multiEditEquipmentPlaceholder;
 
-	enum { NONE, DIVE, TRIP, ADD } editMode;
 	Completers completers;
-	void enableEdition();
 	void resetPallete();
+	void saveTags();
 	QString printGPSCoords(int lat, int lon);
 };
 

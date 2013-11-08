@@ -425,6 +425,23 @@ void DivePlannerPointsModel::createSimpleDive()
 	plannerModel->addStop(M_OR_FT(5,15), 45 * 60, tr("Air"), 0);
 }
 
+void DivePlannerPointsModel::loadFromDive(dive* d)
+{
+	/* We need to make a copy, because
+	 * as soon as the model is modified, it will
+	 * remove all samples from the current dive.
+	 * */
+	backupSamples.clear();
+	for(int i = 1; i < d->dc.samples-1; i++){
+		backupSamples.push_back( d->dc.sample[i]);
+	}
+
+	Q_FOREACH(const sample &s, backupSamples){
+		// we need to use the correct gas
+		plannerModel->addStop(s.depth.mm, s.time.seconds, tr("Air"), 0);
+	}
+}
+
 void DivePlannerGraphics::prepareSelectGas()
 {
 	currentGasChoice = static_cast<Button*>(sender());
@@ -1174,11 +1191,23 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	tempDive = NULL;
 	const char *errorString = NULL;
 	plan(&diveplan, &cache, &tempDive, isPlanner(), &errorString);
-	if (mode == ADD)
+	if (mode == ADD) {
 		copy_samples(tempDive, current_dive);
+		copy_cylinders(tempDive, current_dive);
+	}
 #if DEBUG_PLAN
 	dump_plan(&diveplan);
 #endif
+}
+
+void DivePlannerPointsModel::undoEdition()
+{
+	beginRemoveRows(QModelIndex(), 0, rowCount()-1);
+	divepoints.clear();
+	endRemoveRows();
+	Q_FOREACH(const sample &s, backupSamples){
+		plannerModel->addStop(s.depth.mm, s.time.seconds, tr("Air"), 0);
+	}
 }
 
 void DivePlannerPointsModel::deleteTemporaryPlan()

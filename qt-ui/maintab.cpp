@@ -58,6 +58,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	ui.airtemp->installEventFilter(this);
 	ui.watertemp->installEventFilter(this);
 	ui.dateTimeEdit->installEventFilter(this);
+	ui.tagWidget->installEventFilter(this);
 
 	QList<QObject *> statisticsTabWidgets = ui.statisticsTab->children();
 	Q_FOREACH(QObject* obj, statisticsTabWidgets) {
@@ -87,10 +88,12 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	completers.divemaster = new QCompleter(DiveMasterCompletionModel::instance(), ui.divemaster);
 	completers.location = new QCompleter(LocationCompletionModel::instance(), ui.location);
 	completers.suit = new QCompleter(SuitCompletionModel::instance(), ui.suit);
+	completers.tags = new QCompleter(TagCompletionModel::instance(), ui.tagWidget);
 	ui.buddy->setCompleter(completers.buddy);
 	ui.divemaster->setCompleter(completers.divemaster);
 	ui.location->setCompleter(completers.location);
 	ui.suit->setCompleter(completers.suit);
+	ui.tagWidget->setCompleter(completers.tags);
 
 	setMinimumHeight(0);
 	setMinimumWidth(0);
@@ -113,7 +116,7 @@ void MainTab::addDiveStarted()
 	editMode = ADD;
 }
 
-void MainTab::enableEdition()
+void MainTab::enableEdition(EditMode newEditMode)
 {
 	if (selected_dive < 0 || editMode != NONE)
 		return;
@@ -134,9 +137,14 @@ void MainTab::enableEdition()
 		notesBackup[NULL].location = ui.location->text();
 		editMode = TRIP;
 	} else {
-		ui.diveNotesMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
+		if (amount_selected > 1) {
+			ui.diveNotesMessage->setText(tr("Multiple dives are being edited. Select Save or Undo when ready."));
+			ui.diveEquipmentMessage->setText(tr("Multiple dives are being edited. Select Save or Undo when ready."));
+		} else {
+			ui.diveNotesMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
+			ui.diveEquipmentMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
+		}
 		ui.diveNotesMessage->animatedShow();
-		ui.diveEquipmentMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
 		ui.diveEquipmentMessage->animatedShow();
 
 		// We may be editing one or more dives here. backup everything.
@@ -161,6 +169,9 @@ void MainTab::enableEdition()
 			notesBackup[mydive].airtemp = get_temperature_string(mydive->airtemp, true);
 			notesBackup[mydive].watertemp = get_temperature_string(mydive->watertemp, true);
 			notesBackup[mydive].datetime = QDateTime::fromTime_t(mydive->when - gettimezoneoffset()).toString(QString("M/d/yy h:mm"));
+			char buf[1024];
+			taglist_get_tagstring(mydive->tag_list, buf, 1024);
+			notesBackup[mydive].tags = QString(buf);
 
 			// maybe this is a place for memset?
 			for (int i = 0; i < MAX_CYLINDERS; i++) {
@@ -170,7 +181,8 @@ void MainTab::enableEdition()
 				notesBackup[mydive].weightsystem[i] = mydive->weightsystem[i];
 			}
 		}
-		editMode = DIVE;
+
+		editMode = newEditMode != NONE ? newEditMode : DIVE;
 	}
 }
 
@@ -181,7 +193,9 @@ bool MainTab::eventFilter(QObject* object, QEvent* event)
 		enableEdition();
 	}
 
-	if (isEnabled() && event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility)) {
+	if (isEnabled() && event->type() == QEvent::FocusIn && (object == ui.rating ||
+								object == ui.visibility	||
+								object == ui.tagWidget)) {
 		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
 		enableEdition();
 	}
@@ -214,6 +228,7 @@ void MainTab::clearInfo()
 	ui.airTemperatureText->clear();
 	ui.airPressureText->clear();
 	ui.salinityText->clear();
+	ui.tagWidget->clear();
 }
 
 void MainTab::clearStats()
@@ -271,6 +286,7 @@ void MainTab::updateDiveInfo(int dive)
 		if (mainWindow() && mainWindow()->dive_list()->selectedTrips.count() == 1) {
 			// only use trip relevant fields
 			ui.coordinates->setVisible(false);
+			ui.CoordinatedLabel->setVisible(false);
 			ui.divemaster->setVisible(false);
 			ui.DivemasterLabel->setVisible(false);
 			ui.buddy->setVisible(false);
@@ -281,6 +297,11 @@ void MainTab::updateDiveInfo(int dive)
 			ui.RatingLabel->setVisible(false);
 			ui.visibility->setVisible(false);
 			ui.visibilityLabel->setVisible(false);
+			ui.tagWidget->setVisible(false);
+			ui.TagLabel->setVisible(false);
+			ui.TemperaturesLabel->setVisible(false);
+			ui.airtemp->setVisible(false);
+			ui.watertemp->setVisible(false);
 			// rename the remaining fields and fill data from selected trip
 			dive_trip_t *currentTrip = *mainWindow()->dive_list()->selectedTrips.begin();
 			ui.LocationLabel->setText(tr("Trip Location"));
@@ -290,6 +311,7 @@ void MainTab::updateDiveInfo(int dive)
 		} else {
 			// make all the fields visible writeable
 			ui.coordinates->setVisible(true);
+			ui.CoordinatedLabel->setVisible(true);
 			ui.divemaster->setVisible(true);
 			ui.buddy->setVisible(true);
 			ui.suit->setVisible(true);
@@ -300,6 +322,11 @@ void MainTab::updateDiveInfo(int dive)
 			ui.visibilityLabel->setVisible(true);
 			ui.BuddyLabel->setVisible(true);
 			ui.DivemasterLabel->setVisible(true);
+			ui.TagLabel->setVisible(true);
+			ui.tagWidget->setVisible(true);
+			ui.TemperaturesLabel->setVisible(true);
+			ui.airtemp->setVisible(true);
+			ui.watertemp->setVisible(true);
 			/* and fill them from the dive */
 			ui.rating->setCurrentStars(d->rating);
 			ui.visibility->setCurrentStars(d->visibility);
@@ -355,6 +382,11 @@ void MainTab::updateDiveInfo(int dive)
 		ui.timeLimits->setMaximum(get_time_string(stats_selection.longest_time.seconds, 0));
 		ui.timeLimits->setMinimum(get_time_string(stats_selection.shortest_time.seconds, 0));
 
+
+		char buf[1024];
+		taglist_get_tagstring(d->tag_list, buf, 1024);
+		ui.tagWidget->setText(QString(buf));
+
 		multiEditEquipmentPlaceholder = *d;
 		cylindersModel->setDive(&multiEditEquipmentPlaceholder);
 		weightModel->setDive(&multiEditEquipmentPlaceholder);
@@ -392,6 +424,7 @@ void MainTab::reload()
 	BuddyCompletionModel::instance()->updateModel();
 	LocationCompletionModel::instance()->updateModel();
 	DiveMasterCompletionModel::instance()->updateModel();
+	TagCompletionModel::instance()->updateModel();
 }
 
 void MainTab::acceptChanges()
@@ -422,13 +455,17 @@ void MainTab::acceptChanges()
 			notesBackup[curr].airtemp != ui.airtemp->text() ||
 			notesBackup[curr].watertemp != ui.watertemp->text() ||
 			notesBackup[curr].datetime != ui.dateTimeEdit->dateTime().toString(QString("M/d/yy h:mm")) ||
-			notesBackup[curr].visibility != ui.rating->currentStars()) {
+			notesBackup[curr].visibility != ui.rating->currentStars() ||
+			notesBackup[curr].tags != ui.tagWidget->text()) {
 			mark_divelist_changed(TRUE);
 		}
 		if (notesBackup[curr].location != ui.location->text() ||
 			notesBackup[curr].coordinates != ui.coordinates->text()) {
 			mainWindow()->globe()->reload();
 		}
+
+		if (notesBackup[curr].tags != ui.tagWidget->text())
+			saveTags();
 
 		if (cylindersModel->changed) {
 			mark_divelist_changed(TRUE);
@@ -449,7 +486,7 @@ void MainTab::acceptChanges()
 		}
 
 	}
-	if (editMode == ADD) {
+	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		// clean up the dive data (get duration, depth information from samples)
 		fixup_dive(current_dive);
 		if (dive_table.nr == 1)
@@ -479,6 +516,7 @@ void MainTab::resetPallete()
 	ui.airtemp->setPalette(p);
 	ui.watertemp->setPalette(p);
 	ui.dateTimeEdit->setPalette(p);
+	ui.tagWidget->setPalette(p);
 }
 
 #define EDIT_TEXT2(what, text) \
@@ -506,6 +544,9 @@ void MainTab::rejectChanges()
 			delete_single_dive(selected_dive);
 			DivePlannerPointsModel::instance()->cancelPlan();
 		}
+		else if (editMode == MANUALLY_ADDED_DIVE ){
+			DivePlannerPointsModel::instance()->undoEdition();
+		}
 		struct dive *curr = current_dive;
 		ui.notes->setText(notesBackup[curr].notes );
 		ui.location->setText(notesBackup[curr].location);
@@ -518,6 +559,7 @@ void MainTab::rejectChanges()
 		ui.airtemp->setText(notesBackup[curr].airtemp);
 		ui.watertemp->setText(notesBackup[curr].watertemp);
 		ui.dateTimeEdit->setDateTime(QDateTime::fromString(notesBackup[curr].datetime, QString("M/d/y h:mm")));
+		ui.tagWidget->setText(notesBackup[curr].tags);
 
 		struct dive *mydive;
 		for (int i = 0; i < dive_table.nr; i++) {
@@ -546,7 +588,7 @@ void MainTab::rejectChanges()
 				mydive->weightsystem[i] = notesBackup[mydive].weightsystem[i];
 			}
 		}
-		if (selected_dive > 0) {
+		if (selected_dive >= 0) {
 			multiEditEquipmentPlaceholder = *get_dive(selected_dive);
 			cylindersModel->setDive(&multiEditEquipmentPlaceholder);
 			weightModel->setDive(&multiEditEquipmentPlaceholder);
@@ -563,7 +605,7 @@ void MainTab::rejectChanges()
 	ui.equipmentButtonBox->hide();
 	notesBackup.clear();
 	resetPallete();
-	if (editMode == ADD) {
+	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		// more clean up
 		updateDiveInfo(selected_dive);
 		mainWindow()->showProfile();
@@ -622,6 +664,21 @@ void MainTab::on_dateTimeEdit_dateTimeChanged(const QDateTime& datetime)
 {
 	EDIT_SELECTED_DIVES( mydive->when = datetime.toTime_t() + gettimezoneoffset() );
 	markChangedWidget(ui.dateTimeEdit);
+}
+
+void MainTab::saveTags()
+{
+	EDIT_SELECTED_DIVES(
+		QString tag;
+		taglist_clear(mydive->tag_list);
+		foreach (tag, ui.tagWidget->getBlockStringList())
+			taglist_add_tag(mydive->tag_list, tag.toAscii().data());
+	);
+}
+
+void MainTab::on_tagWidget_textChanged()
+{
+	markChangedWidget(ui.tagWidget);
 }
 
 void MainTab::on_location_textChanged(const QString& text)

@@ -67,7 +67,7 @@ void MainWindow::refreshDisplay()
 {
 	ui.InfoWidget->reload();
 	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
+	ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
 	WSInfoModel *wsim = WSInfoModel::instance();
 	wsim->updateInfo();
@@ -279,8 +279,8 @@ void MainWindow::on_actionAddDive_triggered()
 	DivePlannerPointsModel::instance()->setPlanMode(false);
 	// now cheat - create one dive that we use to store the info tab data in
 	struct dive *dive = alloc_dive();
-	dive->when = QDateTime::currentMSecsSinceEpoch() / 1000L;
-	dive->dc.model = tr("manually added dive").toLocal8Bit().constData(); // do not use tr here since it expects a char*.
+	dive->when = QDateTime::currentMSecsSinceEpoch() / 1000L + gettimezoneoffset();
+	dive->dc.model = "manually added dive"; // don't translate! this is stored in the XML file
 	record_dive(dive);
 	select_dive(get_divenr(dive));
 	ui.InfoWidget->updateDiveInfo(selected_dive);
@@ -782,13 +782,7 @@ void MainWindow::importFiles(const QStringList fileNames)
 		}
 	}
 	process_dives(TRUE, FALSE);
-
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	refreshDisplay();
 }
 
 void MainWindow::loadFiles(const QStringList fileNames)
@@ -813,25 +807,33 @@ void MainWindow::loadFiles(const QStringList fileNames)
 
 	process_dives(FALSE, FALSE);
 
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	refreshDisplay();
 	ui.actionAutoGroup->setChecked(autogroup);
 }
 
 void MainWindow::on_actionImportCSV_triggered()
 {
-	CSVImportDialog *csvImport = new(CSVImportDialog);
+	CSVImportDialog *csvImport = new CSVImportDialog();
 	csvImport->show();
 	process_dives(TRUE, FALSE);
+	refreshDisplay();
+}
 
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+
+void MainWindow::editCurrentDive()
+{
+	struct dive *d = current_dive;
+	QString defaultDC(d->dc.model);
+
+	if (defaultDC == "manually added dive"){
+		disableDcShortcuts();
+		DivePlannerPointsModel::instance()->setPlanMode(false);
+		ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
+		ui.infoPane->setCurrentIndex(MAINTAB);
+		DivePlannerPointsModel::instance()->loadFromDive(d);
+		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
+	}
+	else if (defaultDC == "planned dive"){
+		// this looks like something is missing here
+	}
 }

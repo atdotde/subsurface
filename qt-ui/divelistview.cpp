@@ -22,7 +22,7 @@
 #include <QFileDialog>
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
-	currentHeaderClicked(-1), searchBox(new QLineEdit(this))
+	sortColumn(0), currentOrder(Qt::DescendingOrder), searchBox(new QLineEdit(this))
 {
 	setUniformRowHeights(true);
 	setItemDelegateForColumn(DiveTripModel::RATING, new StarWidgetsDelegate());
@@ -107,6 +107,7 @@ bool DiveListView::eventFilter(QObject* , QEvent* event)
 // index. TRIP_ROLE vs DIVE_ROLE?
 void DiveListView::headerClicked(int i)
 {
+	sortColumn = i;
 	QItemSelection oldSelection = selectionModel()->selection();
 	QList<struct dive*> currentSelectedDives;
 	DiveTripModel::Layout newLayout;
@@ -127,11 +128,13 @@ void DiveListView::headerClicked(int i)
 
 	/* No layout change? Just re-sort, and scroll to first selection, making sure all selections are expanded */
 	if (currentLayout == newLayout) {
-		sortByColumn(i);
+		currentOrder = (currentOrder == Qt::DescendingOrder) ? Qt::AscendingOrder : Qt::DescendingOrder;
+		sortByColumn(i, currentOrder);
 	} else {
 		// clear the model, repopulate with new indexes.
 		reload(newLayout, false);
-		sortByColumn(i, Qt::DescendingOrder);
+		currentOrder = Qt::DescendingOrder;
+		sortByColumn(i, currentOrder);
 	}
 
 	// repopulate the selections.
@@ -163,7 +166,7 @@ void DiveListView::reload(DiveTripModel::Layout layout, bool forceSort)
 	if(!forceSort)
 		return;
 
-	sortByColumn(0, Qt::DescendingOrder);
+	sortByColumn(sortColumn, currentOrder);
 	if (amount_selected && selected_dive >= 0) {
 		selectDive(current_dive, true);
 	} else {
@@ -306,10 +309,12 @@ void DiveListView::mergeDives()
 
 	for_each_dive(i, dive) {
 		if (dive->selected) {
-			if (!maindive)
+			if (!maindive) {
 				maindive = dive;
-			else
+			} else {
 				maindive = merge_two_dives(maindive, dive);
+				i--; // otherwise we skip a dive in the freshly changed list
+			}
 		}
 	}
 	mainWindow()->refreshDisplay();
