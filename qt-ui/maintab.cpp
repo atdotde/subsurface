@@ -353,6 +353,8 @@ void MainTab::updateDiveInfo(int dive)
 		ui.diveTimeText->setText(QString::number((int)((d->duration.seconds + 30) / 60)));
 		if (prevd)
 			ui.surfaceIntervalText->setText(get_time_string(d->when - (prevd->when + prevd->duration.seconds), 4));
+		else
+			ui.surfaceIntervalText->clear();
 		if ((sacVal.mliter = d->sac) > 0)
 			ui.sacText->setText(get_volume_string(sacVal, TRUE).append(tr("/min")));
 		else
@@ -474,7 +476,9 @@ void MainTab::acceptChanges()
 
 		if (notesBackup[curr].tags != ui.tagWidget->text())
 			saveTags();
-		if (editMode != ADD && cylindersModel->changed) {
+		if (editMode == MANUALLY_ADDED_DIVE) {
+			DivePlannerPointsModel::instance()->copyCylinders(curr);
+		} else if (editMode != ADD && cylindersModel->changed) {
 			mark_divelist_changed(TRUE);
 			Q_FOREACH (dive *d, notesBackup.keys()) {
 				for (int i = 0; i < MAX_CYLINDERS; i++) {
@@ -493,7 +497,6 @@ void MainTab::acceptChanges()
 		}
 
 	}
-	save_dive(stdout, current_dive);
 	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		// clean up the dive data (get duration, depth information from samples)
 		fixup_dive(current_dive);
@@ -509,13 +512,16 @@ void MainTab::acceptChanges()
 		mainWindow()->dive_list()->unselectDives();
 		mainWindow()->dive_list()->selectDive(addedDive, true, true);
 		mainWindow()->showProfile();
-		mainWindow()->refreshDisplay();
 		mark_divelist_changed(TRUE);
 		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
 	}
 	editMode = NONE;
 
 	resetPallete();
+	// now comes the scary moment... we need to re-sort dive table in case this dive wasn't the last
+	// so now all pointers become invalid
+	// fingers crossed that we aren't holding on to anything here
+	sort_table(&dive_table);
 	mainWindow()->refreshDisplay();
 }
 
@@ -558,7 +564,6 @@ void MainTab::rejectChanges()
 		if (lastMode == ADD) {
 			// clean up
 			DivePlannerPointsModel::instance()->cancelPlan();
-			delete_single_dive(selected_dive);
 		} else if (lastMode == MANUALLY_ADDED_DIVE ) {
 			DivePlannerPointsModel::instance()->undoEdition(); // that's BOGUS... just copy the original dive back and be done with it...
 		}
@@ -609,6 +614,11 @@ void MainTab::rejectChanges()
 			}
 		}
 		updateGpsCoordinates(curr);
+		if (lastMode == ADD) {
+			delete_single_dive(selected_dive);
+			mainWindow()->dive_list()->reload(DiveTripModel::CURRENT);
+			mainWindow()->dive_list()->restoreSelection();
+		}
 		if (selected_dive >= 0) {
 			multiEditEquipmentPlaceholder = *get_dive(selected_dive);
 			cylindersModel->setDive(&multiEditEquipmentPlaceholder);
@@ -627,14 +637,15 @@ void MainTab::rejectChanges()
 	ui.equipmentButtonBox->hide();
 	notesBackup.clear();
 	resetPallete();
+	editMode = NONE;
 	if (lastMode == ADD || lastMode == MANUALLY_ADDED_DIVE) {
 		// more clean up
 		updateDiveInfo(selected_dive);
 		mainWindow()->showProfile();
-		mainWindow()->refreshDisplay();
+		// we already reloaded the divelist above, so don't recreate it or we'll lose the selection
+		mainWindow()->refreshDisplay(false);
 		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
 	}
-	editMode = NONE;
 }
 #undef EDIT_TEXT2
 
