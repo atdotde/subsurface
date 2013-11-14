@@ -168,6 +168,13 @@ static int time_at_last_depth(struct dive *dive, int o2, int he, unsigned int ne
 	return wait;
 }
 
+void fill_default_cylinder(cylinder_t *cyl)
+{
+	cyl->type.description = strdup("AL80");
+	cyl->type.size.mliter = 11097;
+	cyl->type.workingpressure.mbar = 206843;
+}
+
 int add_gas(struct dive *dive, int o2, int he)
 {
 	int i;
@@ -185,11 +192,10 @@ int add_gas(struct dive *dive, int o2, int he)
 	if (i == MAX_CYLINDERS) {
 		return -1;
 	}
+	/* let's make it our default cylinder (right now hardcoded as AL80) */
+	fill_default_cylinder(cyl);
 	mix->o2.permille = o2;
 	mix->he.permille = he;
-	/* since air is stored as 0/0 we need to set a name or an air cylinder
-	 * would be seen as unset (by cylinder_nodata()) */
-	cyl->type.description = strdup(translate("gettextFromC","Cylinder for planning"));
 	return i;
 }
 
@@ -348,7 +354,7 @@ void add_to_end_of_diveplan(struct diveplan *diveplan, struct divedatapoint *dp)
 		lastdp = &(*lastdp)->next;
 	}
 	*lastdp = dp;
-	if (ldp)
+	if (ldp && dp->time != 0)
 		dp->time += lasttime;
 }
 
@@ -563,9 +569,9 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	int transitiontime, gi;
 	unsigned int stopidx, depth, ceiling;
 	double tissue_tolerance;
-	struct gaschanges *gaschanges;
+	struct gaschanges *gaschanges = NULL;
 	int gaschangenr;
-	unsigned int *stoplevels;
+	unsigned int *stoplevels = NULL;
 
 	set_gf(diveplan->gflow, diveplan->gfhigh);
 	if (!diveplan->surface_pressure)
@@ -611,10 +617,13 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 #endif
 	if (depth < ceiling) /* that's not good... */
 		depth = ceiling;
+	if (depth == 0 && ceiling == 0) /* we are done here */
+		goto done;
 	for (stopidx = 0; stopidx < sizeof(decostoplevels) / sizeof(int); stopidx++)
 		if (decostoplevels[stopidx] >= depth)
 			break;
-	stopidx--;
+	if (stopidx > 0)
+		stopidx--;
 
 	/* so now we know the first decostop level above us
 	 * NOTE, this could be the surface or a long list of potential stops
@@ -683,6 +692,8 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		record_dive(dive);
 		stopidx--;
 	}
+
+done:
 
 #if DO_WE_WANT_THIS_IN_QT
 	add_plan_to_notes(diveplan, dive);

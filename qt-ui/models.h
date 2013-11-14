@@ -79,9 +79,10 @@ private:
 class CylindersModel : public CleanerTableModel {
 Q_OBJECT
 public:
-	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE};
+	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, DEPTH};
 
 	explicit CylindersModel(QObject* parent = 0);
+	static CylindersModel *instance();
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;

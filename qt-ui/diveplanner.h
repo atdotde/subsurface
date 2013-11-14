@@ -14,13 +14,14 @@ class QStringListModel;
 class QModelIndex;
 
 // Return a Model containing the air types.
-QStringListModel *airTypes();
+QStringListModel *gasSelectionModel();
 
 class DivePlannerPointsModel : public QAbstractTableModel{
 	Q_OBJECT
 public:
 	static DivePlannerPointsModel* instance();
 	enum Sections{REMOVE, DEPTH, DURATION, GAS, CCSETPOINT, COLUMNS};
+	enum Mode { NOTHING, PLAN, ADD };
 	virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
@@ -28,11 +29,14 @@ public:
 	virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 	virtual Qt::ItemFlags flags(const QModelIndex& index) const;
 	void removeSelectedPoints(const QVector<int>& rows);
-	enum Modes { PLAN, ADD };
-	void setPlanMode(bool);
+	void setPlanMode(Mode mode);
 	bool isPlanner();
 	void createSimpleDive();
-
+	void clear();
+	Mode currentMode() const;
+	void tanksUpdated();
+	void rememberTanks();
+	bool tankInUse(int o2, int he);
 	/**
 	 * @return the row number.
 	 */
@@ -40,8 +44,12 @@ public:
 	divedatapoint at(int row);
 	int size();
 	struct diveplan getDiveplan();
+	QStringList &getGasList();
+	QList<QPair<int, int> > collectGases(dive *d);
+
 public slots:
-	int addStop(int meters = 0, int minutes = 0,const QString& gas = QString(), int ccpoint = 0 );
+	int addStop(int meters = 0, int minutes = 0, int o2 = 0, int he = 0, int ccpoint = 0 );
+	void addCylinder_clicked();
 	void setGFHigh(short gfhigh);
 	void setGFLow(short ghflow);
 	void setSurfacePressure(int pressure);
@@ -62,12 +70,15 @@ signals:
 
 private:
 	explicit DivePlannerPointsModel(QObject* parent = 0);
+	bool addGas(int o2, int he);
 	struct diveplan diveplan;
-	Modes mode;
+	Mode mode;
 	QVector<divedatapoint> divepoints;
 	struct dive *tempDive;
 	void deleteTemporaryPlan(struct divedatapoint *dp);
 	QVector<sample> backupSamples; // For editing added dives.
+	struct dive *stagingDive;
+	QList<QPair<int, int> > oldGases;
 };
 
 class Button : public QObject, public QGraphicsRectItem {

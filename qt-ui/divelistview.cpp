@@ -47,8 +47,62 @@ DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelec
 	connect(showSearchBox, SIGNAL(triggered(bool)), this, SLOT(showSearchEdit()));
 	connect(searchBox, SIGNAL(textChanged(QString)), model, SLOT(setFilterFixedString(QString)));
 	selectedTrips.clear();
+
+	setupUi();
 }
 
+DiveListView::~DiveListView()
+{
+	QSettings settings;
+	settings.beginGroup("ListWidget");
+	for (int i = DiveTripModel::NR; i < DiveTripModel::COLUMNS; i++){
+		if (isColumnHidden(i))
+			continue;
+		settings.setValue(QString("colwidth%1").arg(i), columnWidth(i));
+	}
+	settings.endGroup();
+}
+
+void DiveListView::setupUi(){
+	QSettings settings;
+	static bool firstRun = true;
+	if(firstRun)
+		backupExpandedRows();
+	settings.beginGroup("ListWidget");
+	/* if no width are set, use the calculated width for each column;
+	 * for that to work we need to temporarily expand all rows */
+	expandAll();
+	for (int i = DiveTripModel::NR; i < DiveTripModel::COLUMNS; i++) {
+		if(isColumnHidden(i))
+			continue;
+		QVariant width = settings.value(QString("colwidth%1").arg(i));
+		if (width.isValid())
+			setColumnWidth(i, width.toInt());
+		else
+			setColumnWidth(i, 100);
+	}
+	settings.endGroup();
+	if(firstRun)
+		restoreExpandedRows();
+	else
+		collapseAll();
+	firstRun = false;
+}
+
+void DiveListView::backupExpandedRows(){
+	expandedRows.clear();
+	for(int i = 0; i < model()->rowCount(); i++){
+		if(isExpanded( model()->index(i, 0) )){
+			expandedRows.push_back(i);
+		}
+	}
+}
+
+void DiveListView::restoreExpandedRows(){
+	Q_FOREACH(const int &i, expandedRows){
+		setExpanded( model()->index(i, 0), true );
+	}
+}
 void DiveListView::fixMessyQtModelBehaviour()
 {
 	QAbstractItemModel *m = model();
@@ -65,6 +119,8 @@ void DiveListView::unselectDives()
 
 void DiveListView::selectDive(struct dive *dive, bool scrollto, bool toggle)
 {
+	if (dive == NULL)
+		return;
 	QSortFilterProxyModel *m = qobject_cast<QSortFilterProxyModel*>(model());
 	QModelIndexList match = m->match(m->index(0,0), DiveTripModel::NR, dive->number, 1, Qt::MatchRecursive);
 	QItemSelectionModel::SelectionFlags flags;
@@ -132,9 +188,15 @@ void DiveListView::headerClicked(int i)
 		sortByColumn(i, currentOrder);
 	} else {
 		// clear the model, repopulate with new indexes.
+		if(currentLayout == DiveTripModel::TREE){
+			backupExpandedRows();
+		}
 		reload(newLayout, false);
 		currentOrder = Qt::DescendingOrder;
 		sortByColumn(i, currentOrder);
+		if (newLayout == DiveTripModel::TREE){
+			restoreExpandedRows();
+		}
 	}
 
 	// repopulate the selections.
@@ -167,7 +229,7 @@ void DiveListView::reload(DiveTripModel::Layout layout, bool forceSort)
 		return;
 
 	sortByColumn(sortColumn, currentOrder);
-	if (amount_selected && selected_dive >= 0) {
+	if (amount_selected && current_dive != NULL) {
 		selectDive(current_dive, true);
 	} else {
 		QModelIndex firstDiveOrTrip = m->index(0,0);
@@ -178,6 +240,7 @@ void DiveListView::reload(DiveTripModel::Layout layout, bool forceSort)
 				setCurrentIndex(firstDiveOrTrip);
 		}
 	}
+	setupUi();
 }
 
 void DiveListView::reloadHeaderActions()
@@ -372,6 +435,7 @@ void DiveListView::deleteDive()
 			else
 				mainWindow()->cleanUpEmpty();
 		}
+		mark_divelist_changed(TRUE);
 	}
 	mainWindow()->refreshDisplay();
 	reload(currentLayout, false);
@@ -444,7 +508,7 @@ void DiveListView::saveSelectedDivesAs()
 	}
 	settings.endGroup();
 
-	QString fileName = QFileDialog::getOpenFileName(mainWindow(), tr("Save Dives As..."), QDir::homePath());
+	QString fileName = QFileDialog::getSaveFileName(mainWindow(), tr("Save Dives As..."), QDir::homePath());
 	if (fileName.isEmpty())
 		return;
 

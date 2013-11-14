@@ -143,6 +143,7 @@ typedef struct {
 	cylinder_type_t type;
 	struct gasmix gasmix;
 	pressure_t start, end, sample_start, sample_end;
+	depth_t depth;
 } cylinder_t;
 
 typedef struct {
@@ -653,9 +654,11 @@ extern unsigned int dc_airtemp(struct divecomputer *dc);
 extern struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer_downloaded);
 extern struct dive *try_to_merge(struct dive *a, struct dive *b, bool prefer_downloaded);
 extern void renumber_dives(int nr);
+extern void copy_events(struct dive *s, struct dive *d);
 extern void copy_cylinders(struct dive *s, struct dive *d);
 extern void copy_samples(struct dive *s, struct dive *d);
 
+extern void fill_default_cylinder(cylinder_t *cyl);
 extern void add_gas_switch_event(struct dive *dive, struct divecomputer *dc, int time, int idx);
 extern void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
 

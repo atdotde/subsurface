@@ -58,6 +58,7 @@ public:
 	bool eventFilter(QObject* , QEvent*);
 	void initialUiSetup();
 	void equipmentPlusUpdate();
+	bool isEditing();
 public slots:
 	void addCylinder_clicked();
 	void addWeight_clicked();
@@ -94,11 +95,11 @@ private:
 	 * dive to this structure, making all editions there,
 	 * then applying the changes on the other dives.*/
 	struct dive multiEditEquipmentPlaceholder;
-
 	Completers completers;
 	void resetPallete();
 	void saveTags();
 	QString printGPSCoords(int lat, int lon);
+	void updateGpsCoordinates(const struct dive *dive);
 };
 
 #endif

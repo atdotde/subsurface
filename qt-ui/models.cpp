@@ -5,6 +5,8 @@
  *
  */
 #include "models.h"
+#include "diveplanner.h"
+#include "mainwindow.h"
 #include "../helpers.h"
 #include "../dive.h"
 #include "../device.h"
@@ -17,6 +19,7 @@
 #include <QBrush>
 #include <QFont>
 #include <QIcon>
+#include <QMessageBox>
 
 QFont defaultModelFont()
 {
@@ -58,8 +61,14 @@ void CleanerTableModel::setHeaderDataStrings(const QStringList& newHeaders)
 
 CylindersModel::CylindersModel(QObject* parent): current(0), rows(0)
 {
-	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE,};
-	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  tr("O2%") << tr("HE"));
+	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, DEPTH};
+	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  tr("O2%") << tr("HE") << tr("Switch at"));
+}
+
+CylindersModel *CylindersModel::instance()
+{
+	static CylindersModel *self = new CylindersModel();
+	return self;
 }
 
 static QVariant percent_string(fraction_t fraction)
@@ -142,6 +151,12 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 		case HE:
 			ret = percent_string(cyl->gasmix.he);
 			break;
+		case DEPTH:
+			if (prefs.units.length == prefs.units.FEET)
+				ret = mm_to_feet(cyl->depth.mm);
+			else
+				ret = cyl->depth.mm / 1000;
+			break;
 		}
 		break;
 	case Qt::DecorationRole:
@@ -163,7 +178,7 @@ cylinder_t* CylindersModel::cylinderAt(const QModelIndex& index)
 // so we only implement the two columns we care about
 void CylindersModel::passInData(const QModelIndex& index, const QVariant& value)
 {
-	cylinder_t *cyl = &current->cylinder[index.row()];
+	cylinder_t *cyl = cylinderAt(index);
 	switch(index.column()) {
 	case SIZE:
 		if (cyl->type.size.mliter != value.toInt()) {
@@ -184,7 +199,11 @@ void CylindersModel::passInData(const QModelIndex& index, const QVariant& value)
 
 bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-	cylinder_t *cyl = &current->cylinder[index.row()];
+	bool addDiveMode = DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING;
+	if (addDiveMode)
+		DivePlannerPointsModel::instance()->rememberTanks();
+
+	cylinder_t *cyl = cylinderAt(index);
 	switch(index.column()) {
 	case TYPE:
 		if (!value.isNull()) {
@@ -273,8 +292,19 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 			changed = true;
 		}
 		break;
+	case DEPTH:
+		if (CHANGED(toDouble, "ft", "m")) {
+			if (value.toInt() != 0) {
+				if (prefs.units.length == prefs.units.FEET)
+					cyl->depth.mm = feet_to_mm(value.toString().remove("ft").remove("m").toInt());
+				else
+					cyl->depth.mm = value.toString().remove("ft").remove("m").toInt() * 1000;
+			}
+		}
 	}
 	dataChanged(index, index);
+	if (addDiveMode)
+		DivePlannerPointsModel::instance()->tanksUpdated();
 	return true;
 }
 
@@ -290,7 +320,7 @@ void CylindersModel::add()
 	}
 
 	int row = rows;
-
+	fill_default_cylinder(&current->cylinder[row]);
 	beginInsertRows(QModelIndex(), row, row);
 	rows++;
 	changed = true;
@@ -314,7 +344,8 @@ void CylindersModel::setDive(dive* d)
 {
 	if (current)
 		clear();
-
+	if (!d)
+		return;
 	int amount = MAX_CYLINDERS;
 	for(int i = 0; i < MAX_CYLINDERS; i++) {
 		cylinder_t *cylinder = &d->cylinder[i];
@@ -342,6 +373,14 @@ Qt::ItemFlags CylindersModel::flags(const QModelIndex& index) const
 void CylindersModel::remove(const QModelIndex& index)
 {
 	if (index.column() != REMOVE) {
+		return;
+	}
+	cylinder_t *cyl = &current->cylinder[index.row()];
+	if (DivePlannerPointsModel::instance()->tankInUse(cyl->gasmix.o2.permille, cyl->gasmix.he.permille)) {
+		QMessageBox::warning(mainWindow(),
+				     tr("Cylinder cannot be removed"),
+				     tr("This gas in use. Only cylinders that are not used in the dive can be removed."),
+				     QMessageBox::Ok);
 		return;
 	}
 	beginRemoveRows(QModelIndex(), index.row(), index.row()); // yah, know, ugly.
@@ -1488,7 +1527,7 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 	switch (role) {
 	case Qt::DisplayRole: {
 		struct DiveItem di;
-		di.dive = dive;;
+		di.dive = dive;
 		char buf[80];
 
 		const QString unknown = tr("unknown");

@@ -25,7 +25,7 @@
 
 MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 				    weightModel(new WeightModel()),
-				    cylindersModel(new CylindersModel()),
+				    cylindersModel(CylindersModel::instance()),
 				    editMode(NONE)
 {
 	ui.setupUi(this);
@@ -83,7 +83,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 
 	ui.cylinders->view()->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate());
 	ui.weights->view()->setItemDelegateForColumn(WeightModel::TYPE, new WSInfoDelegate());
-
+	ui.cylinders->view()->setColumnHidden(CylindersModel::DEPTH, true);
 	completers.buddy = new QCompleter(BuddyCompletionModel::instance(), ui.buddy);
 	completers.divemaster = new QCompleter(DiveMasterCompletionModel::instance(), ui.divemaster);
 	completers.location = new QCompleter(LocationCompletionModel::instance(), ui.location);
@@ -253,8 +253,16 @@ void MainTab::clearStats()
 	else						\
 		ui.field->setText(get_temperature_string(d->field, TRUE))
 
+bool MainTab::isEditing()
+{
+	return editMode != NONE;
+}
+
 void MainTab::updateDiveInfo(int dive)
 {
+	// don't execute this while adding a dive
+	if (editMode == ADD)
+		return;
 	if (!isEnabled() && dive != -1)
 		setEnabled(true);
 	if (isEnabled() && dive == -1)
@@ -281,7 +289,7 @@ void MainTab::updateDiveInfo(int dive)
 	UPDATE_TEMP(d, airtemp);
 	UPDATE_TEMP(d, watertemp);
 	if (d) {
-		ui.coordinates->setText(printGPSCoords(d->latitude.udeg, d->longitude.udeg));
+		updateGpsCoordinates(d);
 		ui.dateTimeEdit->setDateTime(QDateTime::fromTime_t(d->when - gettimezoneoffset()));
 		if (mainWindow() && mainWindow()->dive_list()->selectedTrips.count() == 1) {
 			// only use trip relevant fields
@@ -444,7 +452,7 @@ void MainTab::acceptChanges()
 	} else {
 		struct dive *curr = current_dive;
 		//Reset coordinates field, in case it contains garbage.
-		ui.coordinates->setText(printGPSCoords(current_dive->latitude.udeg, current_dive->longitude.udeg));
+		updateGpsCoordinates(curr);
 		if (notesBackup[curr].buddy != ui.buddy->text() ||
 			notesBackup[curr].suit != ui.suit->text() ||
 			notesBackup[curr].notes != ui.notes->toPlainText() ||
@@ -466,8 +474,7 @@ void MainTab::acceptChanges()
 
 		if (notesBackup[curr].tags != ui.tagWidget->text())
 			saveTags();
-
-		if (cylindersModel->changed) {
+		if (editMode != ADD && cylindersModel->changed) {
 			mark_divelist_changed(TRUE);
 			Q_FOREACH (dive *d, notesBackup.keys()) {
 				for (int i = 0; i < MAX_CYLINDERS; i++) {
@@ -486,17 +493,25 @@ void MainTab::acceptChanges()
 		}
 
 	}
+	save_dive(stdout, current_dive);
 	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		// clean up the dive data (get duration, depth information from samples)
 		fixup_dive(current_dive);
 		if (dive_table.nr == 1)
 			current_dive->number = 1;
-		else if (current_dive == get_dive(dive_table.nr - 1) && get_dive(dive_table.nr - 2)->number)
+		else if (selected_dive == dive_table.nr - 1 && get_dive(dive_table.nr - 2)->number)
 			current_dive->number = get_dive(dive_table.nr - 2)->number + 1;
 		DivePlannerPointsModel::instance()->cancelPlan();
+		// now make sure the selection logic is in a sane state
+		// it's ok to hold on to the dive pointer for this short stretch of code
+		// unselectDives() doesn't mess with the dive_table at all
+		struct dive *addedDive = current_dive;
+		mainWindow()->dive_list()->unselectDives();
+		mainWindow()->dive_list()->selectDive(addedDive, true, true);
 		mainWindow()->showProfile();
 		mainWindow()->refreshDisplay();
 		mark_divelist_changed(TRUE);
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
 	}
 	editMode = NONE;
 
@@ -531,6 +546,7 @@ void MainTab::resetPallete()
 
 void MainTab::rejectChanges()
 {
+	EditMode lastMode = editMode;
 	tabBar()->setTabIcon(0, QIcon()); // Notes
 	tabBar()->setTabIcon(1, QIcon()); // Equipment
 
@@ -538,19 +554,17 @@ void MainTab::rejectChanges()
 	if (mainWindow() && mainWindow()->dive_list()->selectedTrips.count() == 1){
 		ui.notes->setText(notesBackup[NULL].notes );
 		ui.location->setText(notesBackup[NULL].location);
-	}else{
-		if (editMode == ADD) {
+	} else {
+		if (lastMode == ADD) {
 			// clean up
-			delete_single_dive(selected_dive);
 			DivePlannerPointsModel::instance()->cancelPlan();
-		}
-		else if (editMode == MANUALLY_ADDED_DIVE ){
-			DivePlannerPointsModel::instance()->undoEdition();
+			delete_single_dive(selected_dive);
+		} else if (lastMode == MANUALLY_ADDED_DIVE ) {
+			DivePlannerPointsModel::instance()->undoEdition(); // that's BOGUS... just copy the original dive back and be done with it...
 		}
 		struct dive *curr = current_dive;
 		ui.notes->setText(notesBackup[curr].notes );
 		ui.location->setText(notesBackup[curr].location);
-		ui.coordinates->setText(notesBackup[curr].coordinates);
 		ui.buddy->setText(notesBackup[curr].buddy);
 		ui.suit->setText(notesBackup[curr].suit);
 		ui.divemaster->setText(notesBackup[curr].divemaster);
@@ -558,8 +572,14 @@ void MainTab::rejectChanges()
 		ui.visibility->setCurrentStars(notesBackup[curr].visibility);
 		ui.airtemp->setText(notesBackup[curr].airtemp);
 		ui.watertemp->setText(notesBackup[curr].watertemp);
-		ui.dateTimeEdit->setDateTime(QDateTime::fromString(notesBackup[curr].datetime, QString("M/d/y h:mm")));
 		ui.tagWidget->setText(notesBackup[curr].tags);
+		// it's a little harder to do the right thing for the date time widget
+		if (curr) {
+			ui.dateTimeEdit->setDateTime(QDateTime::fromString(notesBackup[curr].datetime, QString("M/d/y h:mm")));
+		} else {
+			QLineEdit *le = ui.dateTimeEdit->findChild<QLineEdit*>();
+			le->setText("");
+		}
 
 		struct dive *mydive;
 		for (int i = 0; i < dive_table.nr; i++) {
@@ -588,6 +608,7 @@ void MainTab::rejectChanges()
 				mydive->weightsystem[i] = notesBackup[mydive].weightsystem[i];
 			}
 		}
+		updateGpsCoordinates(curr);
 		if (selected_dive >= 0) {
 			multiEditEquipmentPlaceholder = *get_dive(selected_dive);
 			cylindersModel->setDive(&multiEditEquipmentPlaceholder);
@@ -595,6 +616,7 @@ void MainTab::rejectChanges()
 		} else {
 			cylindersModel->clear();
 			weightModel->clear();
+			setEnabled(false);
 		}
 	}
 
@@ -605,11 +627,12 @@ void MainTab::rejectChanges()
 	ui.equipmentButtonBox->hide();
 	notesBackup.clear();
 	resetPallete();
-	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
+	if (lastMode == ADD || lastMode == MANUALLY_ADDED_DIVE) {
 		// more clean up
 		updateDiveInfo(selected_dive);
 		mainWindow()->showProfile();
 		mainWindow()->refreshDisplay();
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
 	}
 	editMode = NONE;
 }
@@ -700,6 +723,7 @@ void MainTab::on_location_textChanged(const QString& text)
 				    (dive->latitude.udeg || dive->longitude.udeg)) {
 					EDIT_SELECTED_DIVES( mydive->latitude = dive->latitude );
 					EDIT_SELECTED_DIVES( mydive->longitude = dive->longitude );
+					//Don't use updateGpsCoordinates() since we don't want to set modified state yet
 					ui.coordinates->setText(printGPSCoords(dive->latitude.udeg, dive->longitude.udeg));
 					markChangedWidget(ui.coordinates);
 					break;
@@ -796,4 +820,14 @@ QString MainTab::printGPSCoords(int lat, int lon)
 		       lath.toLocal8Bit().data(), latdeg, UTF8_DEGREE, ilatmin / 1000000, (ilatmin % 1000000) / 10,
 		       lonh.toLocal8Bit().data(), londeg, UTF8_DEGREE, ilonmin / 1000000, (ilonmin % 1000000) / 10);
 	return result;
+}
+
+void MainTab::updateGpsCoordinates(const struct dive *dive)
+{
+	if (dive) {
+		ui.coordinates->setText(printGPSCoords(dive->latitude.udeg, dive->longitude.udeg));
+		ui.coordinates->setModified(dive->latitude.udeg || dive->longitude.udeg);
+	} else {
+		ui.coordinates->clear();
+	}
 }
