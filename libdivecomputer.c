@@ -221,7 +221,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			printf("%02X", ((unsigned char *) value.vendor.data)[i]);
 		printf("</vendor>\n");
 		break;
-#if DC_VERSION_CHECK(0, 3, 0)
 	case DC_SAMPLE_SETPOINT:
 		/* for us a setpoint means constant pO2 from here */
 		sample->po2 = po2 = value.setpoint * 1000 + 0.5;
@@ -248,7 +247,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
 			sample->stoptime.seconds = stoptime = value.deco.time;
 		}
-#endif
 	default:
 		break;
 	}
@@ -449,7 +447,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 
-#if DC_VERSION_CHECK(0, 3, 0)
 	// Check if the libdivecomputer version already supports salinity & atmospheric
 	dc_salinity_t salinity = {
 		.type = DC_WATER_SALT,
@@ -471,7 +468,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 	dive->dc.surface_pressure.mbar = surface_pressure * 1000.0 + 0.5;
-#endif
 
 	rc = parse_gasmixes(devdata, dive, parser, ngases, data);
 	if (rc != DC_STATUS_SUCCESS) {
