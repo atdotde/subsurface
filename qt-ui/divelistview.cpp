@@ -37,6 +37,7 @@ DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelec
 	header()->setContextMenuPolicy(Qt::ActionsContextMenu);
 	const QFontMetrics metrics(defaultModelFont());
 	header()->setMinimumHeight(metrics.height() + 10);
+	header()->setStretchLastSection(true);
 	QAction *showSearchBox = new QAction(tr("Show Search Box"), this);
 	showSearchBox->setShortcut( Qt::CTRL + Qt::Key_F);
 	showSearchBox->setShortcutContext(Qt::ApplicationShortcut);
@@ -87,29 +88,37 @@ void DiveListView::setupUi(){
 	else
 		collapseAll();
 	firstRun = false;
+	setColumnWidth(lastVisibleColumn(), 10);
+}
+
+int DiveListView::lastVisibleColumn()
+{
+	int lastColumn = -1;
+	for (int i = DiveTripModel::NR; i < DiveTripModel::COLUMNS; i++) {
+		if(isColumnHidden(i))
+			continue;
+		lastColumn = i;
+	}
+	return lastColumn;
 }
 
 void DiveListView::backupExpandedRows(){
 	expandedRows.clear();
-	for(int i = 0; i < model()->rowCount(); i++){
-		if(isExpanded( model()->index(i, 0) )){
+	for(int i = 0; i < model()->rowCount(); i++)
+		if(isExpanded( model()->index(i, 0) ))
 			expandedRows.push_back(i);
-		}
-	}
 }
 
 void DiveListView::restoreExpandedRows(){
-	Q_FOREACH(const int &i, expandedRows){
+	Q_FOREACH(const int &i, expandedRows)
 		setExpanded( model()->index(i, 0), true );
-	}
 }
 void DiveListView::fixMessyQtModelBehaviour()
 {
 	QAbstractItemModel *m = model();
-	for(int i = 0; i < model()->rowCount(); i++){
+	for(int i = 0; i < model()->rowCount(); i++)
 		if (m->rowCount( m->index(i, 0) ) != 0)
 			setFirstColumnSpanned(i, QModelIndex(), true);
-	}
 }
 
 // this only remembers dives that were selected, not trips
@@ -265,6 +274,9 @@ void DiveListView::reload(DiveTripModel::Layout layout, bool forceSort)
 		}
 	}
 	setupUi();
+	QModelIndex curr = selectionModel()->currentIndex();
+	if (curr.parent().isValid() && !isExpanded(curr.parent()))
+		expand(curr.parent());
 }
 
 void DiveListView::reloadHeaderActions()
@@ -320,6 +332,7 @@ void DiveListView::toggleColumnVisibilityByIndex()
 	s.endGroup();
 	s.sync();
 	setColumnHidden(action->property("index").toInt(), !action->isChecked());
+	setColumnWidth(lastVisibleColumn(), 10);
 }
 
 void DiveListView::currentChanged(const QModelIndex& current, const QModelIndex& previous)
@@ -418,9 +431,9 @@ void DiveListView::merge_trip(const QModelIndex &a, int offset)
 	if (trip_a == trip_b || !trip_a || !trip_b)
 		return;
 
-	if (!trip_a->location)
+	if (!trip_a->location && trip_b->location)
 		trip_a->location = strdup(trip_b->location);
-	if (!trip_a->notes)
+	if (!trip_a->notes && trip_b->notes)
 		trip_a->notes = strdup(trip_b->notes);
 	while (trip_b->dives)
 		add_dive_to_trip(trip_b->dives, trip_a);
@@ -439,28 +452,60 @@ void DiveListView::mergeTripBelow()
 
 void DiveListView::removeFromTrip()
 {
+	int i;
 	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
 	if (!d) // shouldn't happen as we only are setting up this action if this is a dive
 		return;
-	remove_dive_from_trip(d);
+	for_each_dive(i, d) {
+		if (d->selected)
+			remove_dive_from_trip(d);
+	}
+	mark_divelist_changed(TRUE);
 	reload(currentLayout, false);
+}
+
+void DiveListView::newTripAbove()
+{
+	dive_trip_t *trip;
+	int idx;
+	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
+	if (!d) // shouldn't happen as we only are setting up this action if this is a dive
+		return;
+	rememberSelection();
+	trip = create_and_hookup_trip_from_dive(d);
+	for_each_dive(idx, d) {
+		if (d->selected)
+			add_dive_to_trip(d, trip);
+	}
+	trip->expanded = 1;
+	mark_divelist_changed(TRUE);
+	reload(currentLayout, false);
+	restoreSelection();
 }
 
 void DiveListView::deleteDive()
 {
-	int nr;
+	int i, nr;
 	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
-	if (d) {
-		nr = get_divenr(d);
-		delete_single_dive(get_index_for_dive(d));
-		if (amount_selected == 0) {
-			if (nr > 0)
-				select_dive(nr - 1);
-			else
-				mainWindow()->cleanUpEmpty();
-		}
-		mark_divelist_changed(TRUE);
+	if (!d)
+		return;
+	// after a dive is deleted the ones following it move forward in the dive_table
+	// so instead of using the for_each_dive macro I'm using an explicit for loop
+	// to make this easier to understand
+	for (i = 0; i < dive_table.nr; i++) {
+		d = get_dive(i);
+		if (!d->selected)
+			continue;
+		delete_single_dive(i);
+		i--; // so the next dive isn't skipped... it's now #i
 	}
+	if (amount_selected == 0) {
+		if (i > 0)
+			select_dive(nr - 1);
+		else
+			mainWindow()->cleanUpEmpty();
+	}
+	mark_divelist_changed(TRUE);
 	mainWindow()->refreshDisplay();
 	reload(currentLayout, false);
 }
@@ -493,15 +538,16 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		popup.addAction(tr("collapse all"), this, SLOT(collapseAll()));
 		collapseAction = popup.addAction(tr("collapse"), this, SLOT(collapseAll()));
 		if (d) {
-			popup.addAction(tr("remove dive from trip"), this, SLOT(removeFromTrip()));
+			popup.addAction(tr("remove dive(s) from trip"), this, SLOT(removeFromTrip()));
+			popup.addAction(tr("create new trip above"), this, SLOT(newTripAbove()));
 		}
 		if (trip) {
-			popup.addAction(tr("Merge trip with trip above"), this, SLOT(mergeTripAbove()));
-			popup.addAction(tr("Merge trip with trip below"), this, SLOT(mergeTripBelow()));
+			popup.addAction(tr("merge trip with trip above"), this, SLOT(mergeTripAbove()));
+			popup.addAction(tr("merge trip with trip below"), this, SLOT(mergeTripBelow()));
 		}
 	}
 	if (d)
-		popup.addAction(tr("delete dive"), this, SLOT(deleteDive()));
+		popup.addAction(tr("delete dive(s)"), this, SLOT(deleteDive()));
 	if (amount_selected > 1 && consecutive_selected())
 		popup.addAction(tr("merge selected dives"), this, SLOT(mergeDives()));
 	if (amount_selected >= 1) {
@@ -554,5 +600,5 @@ void DiveListView::exportSelectedDivesAsUDDF()
 	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
 						tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
-		export_dives_uddf((const char *)filename.toStdString().c_str(), true);
+		export_dives_uddf(filename.toUtf8(), true);
 }

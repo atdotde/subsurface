@@ -32,13 +32,6 @@
 
 #define M_OR_FT(_m,_f) ((prefs.units.length == units::METERS) ? ((_m) * 1000) : ((_f) * 304.8))
 
-QStringListModel *gasSelectionModel() {
-	static QStringListModel *self = new QStringListModel(QStringList()
-		<< QObject::tr("AIR"));
-	self->setStringList(DivePlannerPointsModel::instance()->getGasList());
-	return self;
-}
-
 QString gasToStr(const int o2Permille, const int hePermille) {
 	uint o2 = (o2Permille + 5) / 10, he = (hePermille + 5) / 10;
 	QString result = is_air(o2Permille, hePermille) ? QObject::tr("AIR")
@@ -175,7 +168,7 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	// Prepare the stuff for the gas-choices.
 	gasListView = new QListView();
 	gasListView->setWindowFlags(Qt::Popup);
-	gasListView->setModel(gasSelectionModel());
+	gasListView->setModel(GasSelectionModel::instance());
 	gasListView->hide();
 	gasListView->installEventFilter(this);
 
@@ -191,9 +184,16 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 
 bool DivePlannerGraphics::eventFilter(QObject *object, QEvent* event)
 {
-	if (object == gasListView && event->type() == QEvent::KeyPress) {
+	if (object != gasListView)
+		return false;
+	if (event->type() == QEvent::KeyPress) {
 		QKeyEvent *ke =  static_cast<QKeyEvent *>(event);
 		if (ke->key() == Qt::Key_Escape)
+			gasListView->hide();
+	}
+	if (event->type() == QEvent::MouseButtonPress){
+		QMouseEvent *me = static_cast<QMouseEvent *>(event);
+		if (!gasListView->geometry().contains(me->pos()))
 			gasListView->hide();
 	}
 	return false;
@@ -422,7 +422,7 @@ void DivePlannerGraphics::mouseDoubleClickEvent(QMouseEvent* event)
 
 void DivePlannerPointsModel::createSimpleDive()
 {
-	plannerModel->addStop(0, 0, O2_IN_AIR, 0, 0);
+//	plannerModel->addStop(0, 0, O2_IN_AIR, 0, 0);
 	plannerModel->addStop(M_OR_FT(15,45), 1 * 60, O2_IN_AIR, 0, 0);
 	plannerModel->addStop(M_OR_FT(15,45), 40 * 60, O2_IN_AIR, 0, 0);
 	plannerModel->addStop(M_OR_FT(5,15), 42 * 60, O2_IN_AIR, 0, 0);
@@ -483,7 +483,6 @@ void DivePlannerGraphics::prepareSelectGas()
 	currentGasChoice = static_cast<Button*>(sender());
 	QPoint c = QCursor::pos();
 	gasListView->setGeometry(c.x(), c.y(), 150, 100);
-	model->setStringList(DivePlannerPointsModel::instance()->getGasList());
 	gasListView->show();
 }
 
@@ -518,7 +517,7 @@ void DivePlannerGraphics::drawProfile()
 
 	// Re-position the user generated dive handlers
 	int last = 0;
-	for (int i = 1; i < plannerModel->rowCount(); i++) {
+	for (int i = 0; i < plannerModel->rowCount(); i++) {
 		divedatapoint dp = plannerModel->at(i);
 		if (dp.time == 0) // those are the magic entries for tanks
 			continue;
@@ -674,11 +673,13 @@ void DivePlannerGraphics::mousePressEvent(QMouseEvent* event)
 	}
 
 	QPointF mappedPos = mapToScene(event->pos());
-	Q_FOREACH(QGraphicsItem *item, scene()->items(mappedPos, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder, transform())) {
-		if (DiveHandler *h = qgraphicsitem_cast<DiveHandler*>(item)) {
-			activeDraggedHandler = h;
-			activeDraggedHandler->setBrush(Qt::red);
-			originalHandlerPos = activeDraggedHandler->pos();
+	if (event->button() == Qt::LeftButton){
+		Q_FOREACH(QGraphicsItem *item, scene()->items(mappedPos, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder, transform())) {
+			if (DiveHandler *h = qgraphicsitem_cast<DiveHandler*>(item)) {
+				activeDraggedHandler = h;
+				activeDraggedHandler->setBrush(Qt::red);
+				originalHandlerPos = activeDraggedHandler->pos();
+			}
 		}
 	}
 	QGraphicsView::mousePressEvent(event);
@@ -704,8 +705,25 @@ DiveHandler::DiveHandler(): QGraphicsEllipseItem()
 	setZValue(2);
 }
 
+void DiveHandler::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+	QMenu m;
+	m.addAction(QObject::tr("Remove this Point"), this, SLOT(selfRemove()));
+	m.exec(event->screenPos());
+}
+
+void DiveHandler::selfRemove()
+{
+	setSelected(true);
+	DivePlannerGraphics *view = qobject_cast<DivePlannerGraphics*>(scene()->views().first());
+	view->keyDeleteAction();
+}
+
 void DiveHandler::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
+	if (event->button() != Qt::LeftButton)
+		return;
+
 	if (event->modifiers().testFlag(Qt::ControlModifier)) {
 		setSelected(true);
 	}
@@ -924,15 +942,22 @@ DivePlannerWidget::DivePlannerWidget(QWidget* parent, Qt::WindowFlags f): QWidge
 	view->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate());
 	connect(ui.cylinderTableWidget, SIGNAL(addButtonClicked()), DivePlannerPointsModel::instance(), SLOT(addCylinder_clicked()));
 	connect(ui.tableWidget, SIGNAL(addButtonClicked()), DivePlannerPointsModel::instance(), SLOT(addStop()));
+
+	connect(CylindersModel::instance(), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+		GasSelectionModel::instance(), SLOT(repopulate()));
+	connect(CylindersModel::instance(), SIGNAL(rowsInserted(QModelIndex,int,int)),
+		GasSelectionModel::instance(), SLOT(repopulate()));
+	connect(CylindersModel::instance(), SIGNAL(rowsRemoved(QModelIndex,int,int)),
+		GasSelectionModel::instance(), SLOT(repopulate()));
+
 	ui.tableWidget->setBtnToolTip(tr("add dive data point"));
-	connect(ui.startTime, SIGNAL(timeChanged(QTime)), this, SLOT(startTimeChanged(QTime)));
+	connect(ui.startTime, SIGNAL(timeChanged(QTime)), plannerModel, SLOT(setStartTime(QTime)));
 	connect(ui.ATMPressure, SIGNAL(textChanged(QString)), this, SLOT(atmPressureChanged(QString)));
 	connect(ui.bottomSAC, SIGNAL(textChanged(QString)), this, SLOT(bottomSacChanged(QString)));
 	connect(ui.decoStopSAC, SIGNAL(textChanged(QString)), this, SLOT(decoSacChanged(QString)));
-	connect(ui.highGF, SIGNAL(textChanged(QString)), this, SLOT(gfhighChanged(QString)));
-	connect(ui.lowGF, SIGNAL(textChanged(QString)), this, SLOT(gflowChanged(QString)));
-	connect(ui.highGF, SIGNAL(textChanged(QString)), this, SLOT(gfhighChanged(QString)));
-	connect(ui.lastStop, SIGNAL(toggled(bool)), this, SLOT(lastStopChanged(bool)));
+	connect(ui.gfhigh, SIGNAL(valueChanged(int)), plannerModel, SLOT(setGFHigh(int)));
+	connect(ui.gflow, SIGNAL(valueChanged(int)), plannerModel, SLOT(setGFLow(int)));
+	connect(ui.lastStop, SIGNAL(toggled(bool)), plannerModel, SLOT(setLastStop6m(bool)));
 
 	// Creating the plan
 	connect(ui.buttonBox, SIGNAL(accepted()), plannerModel, SLOT(createPlan()));
@@ -946,8 +971,8 @@ DivePlannerWidget::DivePlannerWidget(QWidget* parent, Qt::WindowFlags f): QWidge
 	ui.ATMPressure->setText( "1013" );
 	ui.bottomSAC->setText("20");
 	ui.decoStopSAC->setText("17");
-	ui.lowGF->setText("30");
-	ui.highGF->setText("75");
+	ui.gflow->setValue(prefs.gflow);
+	ui.gfhigh->setValue(prefs.gfhigh);
 
 	setMinimumWidth(0);
 	setMinimumHeight(0);
@@ -956,11 +981,6 @@ DivePlannerWidget::DivePlannerWidget(QWidget* parent, Qt::WindowFlags f): QWidge
 void DivePlannerPointsModel::addCylinder_clicked()
 {
 	CylindersModel::instance()->add();
-}
-
-void DivePlannerWidget::startTimeChanged(const QTime& time)
-{
-	plannerModel->setStartTime(time);
 }
 
 void DivePlannerWidget::atmPressureChanged(const QString& pressure)
@@ -976,21 +996,6 @@ void DivePlannerWidget::bottomSacChanged(const QString& bottomSac)
 void DivePlannerWidget::decoSacChanged(const QString& decosac)
 {
 	plannerModel->setDecoSac(decosac.toInt());
-}
-
-void DivePlannerWidget::gfhighChanged(const QString& gfhigh)
-{
-	plannerModel->setGFHigh(gfhigh.toShort());
-}
-
-void DivePlannerWidget::gflowChanged(const QString& gflow)
-{
-	plannerModel->setGFLow(gflow.toShort());
-}
-
-void DivePlannerWidget::lastStopChanged(bool checked)
-{
-	plannerModel->setLastStop6m(checked);
 }
 
 void DivePlannerPointsModel::setPlanMode(Mode m)
@@ -1104,13 +1109,13 @@ void DivePlannerPointsModel::setDecoSac(int sac)
 	emit dataChanged(createIndex(0, 0), createIndex(rowCount()-1, COLUMNS-1));
 }
 
-void DivePlannerPointsModel::setGFHigh(short int gfhigh)
+void DivePlannerPointsModel::setGFHigh(const int gfhigh)
 {
 	diveplan.gfhigh = gfhigh;
 	emit dataChanged(createIndex(0, 0), createIndex(rowCount()-1, COLUMNS-1));
 }
 
-void DivePlannerPointsModel::setGFLow(short int ghflow)
+void DivePlannerPointsModel::setGFLow(const int ghflow)
 {
 	diveplan.gflow = ghflow;
 	emit dataChanged(createIndex(0, 0), createIndex(rowCount()-1, COLUMNS-1));
@@ -1163,25 +1168,18 @@ bool DivePlannerPointsModel::addGas(int o2, int he)
 int DivePlannerPointsModel::addStop(int milimeters, int minutes, int o2, int he, int ccpoint)
 {
 	int row = divepoints.count();
+	if (minutes == 0 && milimeters == 0 && row != 0){
+		/* this is only possible if the user clicked on the 'plus' sign on the DivePoints Table */
+		struct divedatapoint& t = divepoints.last();
+		milimeters = t.depth;
+		minutes = t.time + 600; // 10 minutes.
+	} else if (minutes == 0 && milimeters == 0 && row == 0) {
+		milimeters = M_OR_FT(5, 15); // 5m / 15ft
+		minutes = 600; // 10 min
+	}
 	if (o2 != -1)
 		if (!addGas(o2, he))
 			qDebug("addGas failed"); // FIXME add error propagation
-	if(row == 0) {
-		if (o2 == -1) {
-			o2 = O2_IN_AIR;
-			(void)addGas(o2, 0); // I know this is the first gas - won't fail
-		}
-		beginInsertRows(QModelIndex(), row, row);
-		divedatapoint point;
-		point.depth = 0;
-		point.time = 0;
-		point.o2 = o2;
-		point.he = he;
-		point.po2 = ccpoint;
-		divepoints.append( point );
-		endInsertRows();
-		row++;
-	}
 
 	// check if there's already a new stop before this one:
 	for (int i = 0; i < row; i++) {
@@ -1198,9 +1196,24 @@ int DivePlannerPointsModel::addStop(int milimeters, int minutes, int o2, int he,
 			break;
 		}
 	}
-	if (row > 1 && o2 == -1) { // this means "take the current gas"
-		o2 = divepoints.at(row - 1).o2;
-		he = divepoints.at(row - 1).he;
+	if (o2 == -1) {
+		if (row > 0) {
+			o2 = divepoints.at(row - 1).o2;
+			he = divepoints.at(row - 1).he;
+		} else {
+			// when we add a first data point we need to make sure that there is a
+			// tank for it to use;
+			// first check to the right, then to the left, but if there's nothing,
+			// we simply default to AIR
+			if (row < divepoints.count()) {
+				o2 = divepoints.at(row).o2;
+				he = divepoints.at(row).he;
+			} else {
+				o2 = O2_IN_AIR;
+				if (!addGas(o2, 0))
+					qDebug("addGas failed"); // FIXME add error propagation
+			}
+		}
 	}
 	// add the new stop
 	beginInsertRows(QModelIndex(), row, row);
@@ -1302,37 +1315,35 @@ bool DivePlannerPointsModel::tankInUse(int o2, int he)
 
 void DivePlannerPointsModel::tanksUpdated()
 {
-	if (mode == ADD) {
-		// we don't know exactly what changed - what we care about is
-		// "did a gas change on us". So we look through the diveplan to
-		// see if there is a gas that is now missing and if there is, we
-		// replace it with the matching new gas.
-		QList<QPair<int,int> > gases = collectGases(stagingDive);
-		if (gases.length() == oldGases.length()) {
-			// either nothing relevant changed, or exactly ONE gasmix changed
-			for (int i = 0; i < gases.length(); i++) {
-				if (gases.at(i) != oldGases.at(i)) {
-					if (oldGases.count(oldGases.at(i)) > 1) {
-						// we had this gas more than once, so don't
-						// change segments that used this gas as it still exists
-						break;
-					}
-					for (int j = 0; j < rowCount(); j++) {
-						divedatapoint& p = divepoints[j];
-						int o2 = oldGases.at(i).first;
-						int he = oldGases.at(i).second;
-						if (p.o2 == o2 && p.he == he ||
-						    (is_air(p.o2, p.he) && (is_air(o2, he) || (o2 == 0 && he == 0)))) {
-							p.o2 = gases.at(i).first;
-							p.he = gases.at(i).second;
-						}
-					}
+	// we don't know exactly what changed - what we care about is
+	// "did a gas change on us". So we look through the diveplan to
+	// see if there is a gas that is now missing and if there is, we
+	// replace it with the matching new gas.
+	QList<QPair<int,int> > gases = collectGases(stagingDive);
+	if (gases.length() == oldGases.length()) {
+		// either nothing relevant changed, or exactly ONE gasmix changed
+		for (int i = 0; i < gases.length(); i++) {
+			if (gases.at(i) != oldGases.at(i)) {
+				if (oldGases.count(oldGases.at(i)) > 1) {
+					// we had this gas more than once, so don't
+					// change segments that used this gas as it still exists
 					break;
 				}
+				for (int j = 0; j < rowCount(); j++) {
+					divedatapoint& p = divepoints[j];
+					int o2 = oldGases.at(i).first;
+					int he = oldGases.at(i).second;
+					if ((p.o2 == o2 && p.he == he) ||
+					    (is_air(p.o2, p.he) && (is_air(o2, he) || (o2 == 0 && he == 0)))) {
+						p.o2 = gases.at(i).first;
+						p.he = gases.at(i).second;
+					}
+				}
+				break;
 			}
 		}
-		emit dataChanged(createIndex(0, 0), createIndex(rowCount()-1, COLUMNS-1));
 	}
+	emit dataChanged(createIndex(0, 0), createIndex(rowCount()-1, COLUMNS-1));
 }
 
 void DivePlannerPointsModel::clear()

@@ -42,6 +42,7 @@ public slots:
 	void fixMessyQtModelBehaviour();
 	void mergeTripAbove();
 	void mergeTripBelow();
+	void newTripAbove();
 	void mergeDives();
 	void saveSelectedDivesAs();
 	void exportSelectedDivesAsUDDF();
@@ -62,6 +63,7 @@ private:
 	void setupUi();
 	void backupExpandedRows();
 	void restoreExpandedRows();
+	int lastVisibleColumn();
 };
 
 #endif // DIVELISTVIEW_H

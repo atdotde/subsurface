@@ -99,30 +99,10 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-	QSettings settings;
-	QString lastDir = QDir::homePath();
-
-	settings.beginGroup("FileDialog");
-	if (settings.contains("LastDir")) {
-		if(QDir::setCurrent(settings.value("LastDir").toString())) {
-			lastDir = settings.value("LastDir").toString();
-		}
-	}
-	settings.endGroup();
-
-	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastDir, filter());
+	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
 	if (filename.isEmpty())
 		return;
-
-	// Keep last open dir
-	QFileInfo fileInfo(filename);
-	settings.beginGroup("FileDialog");
-	settings.setValue("LastDir",fileInfo.dir().path());
-	settings.endGroup();
-
-	// Needed to convert to char*
-	QByteArray fileNamePtr = filename.toLocal8Bit();
-
+	updateLastUsedDir(QFileInfo(filename).dir().path());
 	on_actionClose_triggered();
 	loadFiles( QStringList() << filename );
 }
@@ -169,6 +149,15 @@ void MainWindow::on_actionClose_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
+	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import Files"), lastUsedDir(), filter());
+	if (!fileNames.size())
+		return; // no selection
+	updateLastUsedDir(QFileInfo(fileNames.at(0)).dir().path());
+	importFiles(fileNames);
+}
+
+QString MainWindow::lastUsedDir()
+{
 	QSettings settings;
 	QString lastDir = QDir::homePath();
 
@@ -176,30 +165,23 @@ void MainWindow::on_actionImport_triggered()
 	if (settings.contains("LastDir"))
 		if (QDir::setCurrent(settings.value("LastDir").toString()))
 			lastDir = settings.value("LastDir").toString();
-	settings.endGroup();
+	return lastDir;
+}
 
-	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import Files"), lastDir, filter());
-	if (!fileNames.size())
-		return; // no selection
-
-	// Keep last open dir
-	QFileInfo fileInfo(fileNames.at(0));
-	settings.beginGroup("FileDialog");
-	settings.setValue("LastDir", fileInfo.dir().path());
-	settings.endGroup();
-
-	importFiles(fileNames);
+void MainWindow::updateLastUsedDir(const QString& dir)
+{
+	QSettings s;
+	s.beginGroup("FileDialog");
+	s.setValue("LastDir", dir);
 }
 
 void MainWindow::on_actionExportUDDF_triggered()
 {
-	QString filename;
 	QFileInfo fi(system_default_filename());
-
-	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+	QString filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
 						tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
-		export_dives_uddf((const char *)filename.toStdString().c_str(), false);
+		export_dives_uddf(filename.toUtf8(), false);
 }
 
 void MainWindow::on_actionPrint_triggered()
@@ -239,7 +221,6 @@ void MainWindow::showProfile()
 	ui.stackedWidget->setCurrentIndex(PROFILE);
 	ui.infoPane->setCurrentIndex(MAINTAB);
 }
-
 
 void MainWindow::on_actionPreferences_triggered()
 {
@@ -566,7 +547,6 @@ bool MainWindow::askSaveChanges()
 void MainWindow::initialUiSetup()
 {
 	QSettings settings;
-	int i;
 	settings.beginGroup("MainWindow");
 	QSize sz = settings.value("size", qApp->desktop()->size()).value<QSize>();
 	resize(sz);
@@ -623,7 +603,6 @@ void MainWindow::readSettings()
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
 	set_gf(prefs.gflow, prefs.gfhigh);
-	GET_BOOL("show_time", show_time);
 	GET_BOOL("show_sac", show_sac);
 	s.endGroup();
 
@@ -641,7 +620,6 @@ void MainWindow::readSettings()
 
 void MainWindow::writeSettings()
 {
-	int i;
 	QSettings settings;
 
 	settings.beginGroup("MainWindow");
@@ -834,7 +812,6 @@ void MainWindow::on_actionImportCSV_triggered()
 	process_dives(TRUE, FALSE);
 	refreshDisplay();
 }
-
 
 void MainWindow::editCurrentDive()
 {

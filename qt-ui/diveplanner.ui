@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>352</height>
+    <width>515</width>
+    <height>591</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -45,8 +45,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>400</width>
-        <height>352</height>
+        <width>515</width>
+        <height>591</height>
        </rect>
       </property>
       <layout class="QGridLayout" name="gridLayout_2">
@@ -78,7 +78,7 @@
        <item row="4" column="1">
         <widget class="QLabel" name="label_6">
          <property name="text">
-          <string>High GF</string>
+          <string>GFHigh</string>
          </property>
         </widget>
        </item>
@@ -98,15 +98,32 @@
        <item row="4" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
-          <string>Low GF</string>
+          <string>GFLow</string>
          </property>
         </widget>
        </item>
        <item row="5" column="0">
-        <widget class="QLineEdit" name="lowGF"/>
+        <widget class="QSpinBox" name="gflow">
+         <property name="suffix">
+          <string>%</string>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>100</number>
+         </property>
+        </widget>
        </item>
        <item row="5" column="1">
-        <widget class="QLineEdit" name="highGF"/>
+        <widget class="QSpinBox" name="gfhigh">
+         <property name="suffix">
+          <string>%</string>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+        </widget>
        </item>
        <item row="6" column="0">
         <widget class="QCheckBox" name="lastStop">
@@ -118,10 +135,22 @@
        <item row="7" column="0" colspan="2">
         <widget class="TableView" name="cylinderTableWidget" native="true">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>150</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>150</height>
+          </size>
          </property>
         </widget>
        </item>

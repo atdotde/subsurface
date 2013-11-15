@@ -13,9 +13,6 @@ class QListView;
 class QStringListModel;
 class QModelIndex;
 
-// Return a Model containing the air types.
-QStringListModel *gasSelectionModel();
-
 class DivePlannerPointsModel : public QAbstractTableModel{
 	Q_OBJECT
 public:
@@ -51,8 +48,8 @@ public:
 public slots:
 	int addStop(int meters = 0, int minutes = 0, int o2 = 0, int he = 0, int ccpoint = 0 );
 	void addCylinder_clicked();
-	void setGFHigh(short gfhigh);
-	void setGFLow(short ghflow);
+	void setGFHigh(const int gfhigh);
+	void setGFLow(const int ghflow);
 	void setSurfacePressure(int pressure);
 	void setBottomSac(int sac);
 	void setDecoSac(int sac);
@@ -98,11 +95,15 @@ private:
 	QGraphicsSimpleTextItem *text;
 };
 
-class DiveHandler : public QGraphicsEllipseItem{
+class DiveHandler : public QObject, public QGraphicsEllipseItem{
+Q_OBJECT
 public:
 	DiveHandler();
 protected:
 	void mousePressEvent(QGraphicsSceneMouseEvent* event);
+	void contextMenuEvent(QGraphicsSceneContextMenuEvent* event);
+public slots:
+	void selfRemove();
 };
 
 class Ruler : public QGraphicsLineItem{
@@ -121,7 +122,6 @@ public:
 	qreal posAtValue(qreal value);
 	void setColor(const QColor& color);
 	void setTextColor(const QColor& color);
-
 private:
 	Qt::Orientation orientation;
 	QList<QGraphicsLineItem*> ticks;
@@ -213,6 +213,8 @@ private:
 
 	int minMinutes; // this holds the minimum duration of the dive.
 	int dpMaxTime; // this is the time of the dive calculated by the deco.
+
+	friend class DiveHandler;
 };
 
 #include "ui_diveplanner.h"
@@ -223,13 +225,9 @@ public:
     explicit DivePlannerWidget(QWidget* parent = 0, Qt::WindowFlags f = 0);
 
 public slots:
-	void startTimeChanged(const QTime& time);
 	void atmPressureChanged(const QString& pressure);
 	void bottomSacChanged(const QString& bottomSac);
 	void decoSacChanged(const QString& decosac);
-	void gflowChanged(const QString& gflow);
-	void gfhighChanged(const QString& gfhigh);
-	void lastStopChanged(bool checked);
 private:
 	Ui::DivePlanner ui;
 };
