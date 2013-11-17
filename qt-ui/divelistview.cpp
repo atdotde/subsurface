@@ -559,6 +559,7 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 	if (amount_selected >= 1) {
 		popup.addAction(tr("save As"), this, SLOT(saveSelectedDivesAs()));
 		popup.addAction(tr("export As UDDF"), this, SLOT(exportSelectedDivesAsUDDF()));
+		popup.addAction(tr("shift by one hour"), this, SLOT(shiftByOneHour()));
 	}
 	// "collapse all" really closes all trips,
 	// "collapse" keeps the trip with the selected dive open
@@ -608,4 +609,11 @@ void DiveListView::exportSelectedDivesAsUDDF()
 						tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
 		export_dives_uddf(filename.toUtf8(), true);
+}
+
+void DiveListView::shiftByOneHour()
+{
+	shift_times(3600);
+	mainWindow()->refreshDisplay();
+
 }
