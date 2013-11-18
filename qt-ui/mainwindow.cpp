@@ -73,8 +73,7 @@ void MainWindow::refreshDisplay(bool recreateDiveList)
 	if (recreateDiveList)
 		ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	WSInfoModel::instance()->updateInfo();
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -99,6 +98,11 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before opening a new file." );
+		return;
+	}
 	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
 	if (filename.isEmpty())
 		return;
@@ -131,6 +135,11 @@ void MainWindow::cleanUpEmpty()
 
 void MainWindow::on_actionClose_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 
@@ -138,9 +147,11 @@ void MainWindow::on_actionClose_triggered()
 	while (dive_table.nr)
 		delete_single_dive(0);
 
+	dive_list()->selectedTrips.clear();
 	/* clear the selection and the statistics */
 	selected_dive = -1;
 
+	existing_filename = NULL;
 	cleanUpEmpty();
 	mark_divelist_changed(FALSE);
 
@@ -203,8 +214,9 @@ void MainWindow::enableDcShortcuts()
 
 void MainWindow::on_actionDivePlanner_triggered()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
-		QMessageBox::warning(this, tr("Warning"), "First finish the current edition before trying to do another." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to plan a dive." );
 		return;
 	}
 	disableDcShortcuts();
@@ -229,6 +241,11 @@ void MainWindow::on_actionPreferences_triggered()
 
 void MainWindow::on_actionQuit_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 	writeSettings();
@@ -260,8 +277,9 @@ void MainWindow::on_actionEditDeviceNames_triggered()
 
 void MainWindow::on_actionAddDive_triggered()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
-		QMessageBox::warning(this, tr("Warning"), "First finish the current edition before trying to do another." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to add a dive." );
 		return;
 	}
 	dive_list()->rememberSelection();
@@ -462,12 +480,8 @@ QString MainWindow::filter()
 {
 	QString f;
 	f += "ALL ( *.ssrf *.xml *.XML *.uddf *.udcf *.UDFC *.jlb *.JLB ";
-#ifdef LIBZIP
 	f += "*.sde *.SDE *.dld *.DLD ";
-#endif
-#ifdef SQLITE3
 	f += "*.db";
-#endif
 	f += ");;";
 
 	f += "Subsurface (*.ssrf);;";
@@ -476,13 +490,9 @@ QString MainWindow::filter()
 	f += "UDCF (*.udcf *.UDCF);;";
 	f += "JLB  (*.jlb *.JLB);;";
 
-#ifdef LIBZIP
 	f += "SDE (*.sde *.SDE);;";
 	f += "DLD (*.dld *.DLD);;";
-#endif
-#ifdef SQLITE3
 	f += "DB (*.db)";
-#endif
 
 	return f;
 }

@@ -989,6 +989,9 @@ QVariant DiveItem::data(int column, int role) const
 	if (role == DiveTripModel::DIVE_ROLE)
 		retVal = QVariant::fromValue<void*>(dive);
 
+	if(role == DiveTripModel::DIVE_IDX){
+		retVal = get_divenr(dive);
+	}
 	return retVal;
 }
 
