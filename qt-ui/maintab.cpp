@@ -130,20 +130,20 @@ void MainTab::enableEdition(EditMode newEditMode)
 
 	if (mainWindow() && mainWindow()->dive_list()->selectedTrips.count() == 1) {
 		// we are editing trip location and notes
-		ui.diveNotesMessage->setText(tr("This trip is being edited. Select Save or Undo when ready."));
+		ui.diveNotesMessage->setText(tr("This trip is being edited. Select Save or Cancel when done."));
 		ui.diveNotesMessage->animatedShow();
-		ui.diveEquipmentMessage->setText(tr("This trip is being edited. Select Save or Undo when ready."));
+		ui.diveEquipmentMessage->setText(tr("This trip is being edited. Select Save or Cancel when done."));
 		ui.diveEquipmentMessage->animatedShow();
 		notesBackup[NULL].notes = ui.notes->toPlainText();
 		notesBackup[NULL].location = ui.location->text();
 		editMode = TRIP;
 	} else {
 		if (amount_selected > 1) {
-			ui.diveNotesMessage->setText(tr("Multiple dives are being edited. Select Save or Undo when ready."));
-			ui.diveEquipmentMessage->setText(tr("Multiple dives are being edited. Select Save or Undo when ready."));
+			ui.diveNotesMessage->setText(tr("Multiple dives are being edited. Select Save or Cancel when done."));
+			ui.diveEquipmentMessage->setText(tr("Multiple dives are being edited. Select Save or Cancel when done."));
 		} else {
-			ui.diveNotesMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
-			ui.diveEquipmentMessage->setText(tr("This dive is being edited. Select Save or Undo when ready."));
+			ui.diveNotesMessage->setText(tr("This dive is being edited. Select Save or Cancel when done."));
+			ui.diveEquipmentMessage->setText(tr("This dive is being edited. Select Save or Cancel when done."));
 		}
 		ui.diveNotesMessage->animatedShow();
 		ui.diveEquipmentMessage->animatedShow();
@@ -169,7 +169,7 @@ void MainTab::enableEdition(EditMode newEditMode)
 			notesBackup[mydive].coordinates  = ui.coordinates->text();
 			notesBackup[mydive].airtemp = get_temperature_string(mydive->airtemp, true);
 			notesBackup[mydive].watertemp = get_temperature_string(mydive->watertemp, true);
-			notesBackup[mydive].datetime = QDateTime::fromTime_t(mydive->when - gettimezoneoffset()).toString(QString("M/d/yy h:mm"));
+			notesBackup[mydive].datetime = QDateTime::fromTime_t(mydive->when - gettimezoneoffset()).toString();
 			char buf[1024];
 			taglist_get_tagstring(mydive->tag_list, buf, 1024);
 			notesBackup[mydive].tags = QString(buf);
@@ -465,7 +465,7 @@ void MainTab::acceptChanges()
 			notesBackup[curr].rating != ui.visibility->currentStars() ||
 			notesBackup[curr].airtemp != ui.airtemp->text() ||
 			notesBackup[curr].watertemp != ui.watertemp->text() ||
-			notesBackup[curr].datetime != ui.dateTimeEdit->dateTime().toString(QString("M/d/yy h:mm")) ||
+			notesBackup[curr].datetime != ui.dateTimeEdit->dateTime().toString() ||
 			notesBackup[curr].visibility != ui.rating->currentStars() ||
 			notesBackup[curr].tags != ui.tagWidget->text()) {
 			mark_divelist_changed(TRUE);
@@ -509,7 +509,6 @@ void MainTab::acceptChanges()
 		// now make sure the selection logic is in a sane state
 		// it's ok to hold on to the dive pointer for this short stretch of code
 		// unselectDives() doesn't mess with the dive_table at all
-		struct dive *addedDive = current_dive;
 		mainWindow()->dive_list()->unselectDives();
 		mainWindow()->dive_list()->selectDive(selected_dive, true, true);
 		mainWindow()->showProfile();
@@ -581,7 +580,7 @@ void MainTab::rejectChanges()
 		ui.tagWidget->setText(notesBackup[curr].tags);
 		// it's a little harder to do the right thing for the date time widget
 		if (curr) {
-			ui.dateTimeEdit->setDateTime(QDateTime::fromString(notesBackup[curr].datetime, QString("M/d/y h:mm")));
+			ui.dateTimeEdit->setDateTime(QDateTime::fromString(notesBackup[curr].datetime));
 		} else {
 			QLineEdit *le = ui.dateTimeEdit->findChild<QLineEdit*>();
 			le->setText("");
