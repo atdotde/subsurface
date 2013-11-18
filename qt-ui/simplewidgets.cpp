@@ -119,6 +119,32 @@ RenumberDialog::RenumberDialog(): QDialog()
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
 }
 
+ShiftTimesDialog* ShiftTimesDialog::instance()
+{
+	static ShiftTimesDialog* self = new ShiftTimesDialog();
+	return self;
+}
+
+void ShiftTimesDialog::buttonClicked(QAbstractButton* button)
+{
+	if (ui.buttonBox->buttonRole(button) == QDialogButtonBox::AcceptRole){
+		qDebug() << "ShiftTimesing.";
+		printf("Shifting times by %d ", ui.timeEdit->time().hour() * 3600 + ui.timeEdit->time().minute() * 60);
+		if(ui.forward->isChecked())
+		  printf("forward...\n");
+		else
+		  printf("backwards...\n");
+		    
+	
+}
+}
+
+ShiftTimesDialog::ShiftTimesDialog(): QDialog()
+{
+	ui.setupUi(this);
+	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+}
+
 bool isGnome3Session()
 {
 #if defined(QT_OS_WIW) || defined(QT_OS_MAC)
