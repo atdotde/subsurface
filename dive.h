@@ -416,8 +416,6 @@ struct dive {
 	struct divecomputer dc;
 };
 
-extern int get_index_for_dive(struct dive *dive);
-
 static inline int dive_has_gps_location(struct dive *dive)
 {
 	return dive->latitude.udeg || dive->longitude.udeg;
@@ -634,6 +632,8 @@ extern void save_dives(const char *filename);
 extern void save_dives_logic(const char *filename, bool select_only);
 extern void save_dive(FILE *f, struct dive *dive);
 extern void export_dives_uddf(const char *filename, const bool selected);
+
+extern void shift_times(const timestamp_t amount);
 
 extern xsltStylesheetPtr get_stylesheet(const char *name);
 

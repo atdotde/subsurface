@@ -73,8 +73,7 @@ void MainWindow::refreshDisplay(bool recreateDiveList)
 	if (recreateDiveList)
 		ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	WSInfoModel::instance()->updateInfo();
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -99,6 +98,10 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
+	if (ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before opening a new file." );
+		return;
+	}
 	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
 	if (filename.isEmpty())
 		return;
@@ -131,6 +134,10 @@ void MainWindow::cleanUpEmpty()
 
 void MainWindow::on_actionClose_triggered()
 {
+	if (ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before closing the file." );
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 
@@ -141,6 +148,7 @@ void MainWindow::on_actionClose_triggered()
 	/* clear the selection and the statistics */
 	selected_dive = -1;
 
+	existing_filename = NULL;
 	cleanUpEmpty();
 	mark_divelist_changed(FALSE);
 
@@ -203,8 +211,9 @@ void MainWindow::enableDcShortcuts()
 
 void MainWindow::on_actionDivePlanner_triggered()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
-		QMessageBox::warning(this, tr("Warning"), "First finish the current edition before trying to do another." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before trying to plan a dive." );
 		return;
 	}
 	disableDcShortcuts();
@@ -260,8 +269,9 @@ void MainWindow::on_actionEditDeviceNames_triggered()
 
 void MainWindow::on_actionAddDive_triggered()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
-		QMessageBox::warning(this, tr("Warning"), "First finish the current edition before trying to do another." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before trying to add a dive." );
 		return;
 	}
 	dive_list()->rememberSelection();

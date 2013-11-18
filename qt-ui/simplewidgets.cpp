@@ -13,6 +13,7 @@
 #include <QDebug>
 
 #include "../dive.h"
+#include "mainwindow.h"
 
 class MinMaxAvgWidgetPrivate{
 public:
@@ -127,15 +128,15 @@ ShiftTimesDialog* ShiftTimesDialog::instance()
 
 void ShiftTimesDialog::buttonClicked(QAbstractButton* button)
 {
+	int amount;
+
 	if (ui.buttonBox->buttonRole(button) == QDialogButtonBox::AcceptRole){
-		qDebug() << "ShiftTimesing.";
-		printf("Shifting times by %d ", ui.timeEdit->time().hour() * 3600 + ui.timeEdit->time().minute() * 60);
-		if(ui.forward->isChecked())
-		  printf("forward...\n");
-		else
-		  printf("backwards...\n");
-		    
-	
+		amount = ui.timeEdit->time().hour() * 3600 + ui.timeEdit->time().minute() * 60;
+		if(ui.backwards->isChecked())
+		  amount *= -1;
+
+		shift_times(amount);
+		mainWindow()->refreshDisplay();
 }
 }
 
