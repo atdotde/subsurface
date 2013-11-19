@@ -140,7 +140,7 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	timeHandler->icon->setPixmap(QString(":icon_time"));
 	connect(timeHandler->increaseBtn, SIGNAL(clicked()), this, SLOT(increaseTime()));
 	connect(timeHandler->decreaseBtn, SIGNAL(clicked()), this, SLOT(decreaseTime()));
-	timeHandler->setPos(fromPercent(83, Qt::Horizontal), fromPercent(85, Qt::Vertical));
+	timeHandler->setPos(fromPercent(83, Qt::Horizontal), fromPercent(100, Qt::Vertical));
 	timeHandler->setZValue(-2);
 	scene()->addItem(timeHandler);
 
@@ -148,9 +148,11 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	depthHandler->increaseBtn->setPixmap(QString(":arrow_up"));
 	depthHandler->decreaseBtn->setPixmap(QString(":arrow_down"));
 	depthHandler->icon->setPixmap(QString(":icon_depth"));
-	connect(depthHandler->increaseBtn, SIGNAL(clicked()), this, SLOT(increaseDepth()));
-	connect(depthHandler->decreaseBtn, SIGNAL(clicked()), this, SLOT(decreaseDepth()));
-	depthHandler->setPos(fromPercent(0, Qt::Horizontal), fromPercent(85, Qt::Vertical));
+	// Inverted here in the slots because the 'up' graphi should increase the depness,
+	// and the down should decrease.
+	connect(depthHandler->increaseBtn, SIGNAL(clicked()), this, SLOT(decreaseDepth()));
+	connect(depthHandler->decreaseBtn, SIGNAL(clicked()), this, SLOT(increaseDepth()));
+	depthHandler->setPos(fromPercent(0, Qt::Horizontal), fromPercent(100, Qt::Vertical));
 	depthHandler->setZValue(-2);
 	scene()->addItem(depthHandler);
 
@@ -442,26 +444,28 @@ void DivePlannerPointsModel::loadFromDive(dive* d)
 	 * as soon as the model is modified, it will
 	 * remove all samples from the current dive.
 	 * */
-	struct dive *backupDive = alloc_dive();
-	backupDive->when = current_dive->when; // do we need anything else?
-	copy_samples(current_dive, backupDive);
-	copy_cylinders(current_dive, backupDive);
-	copy_events(current_dive, backupDive);
-	backupSamples.clear();
-	for(int i = 0; i < d->dc.samples-1; i++){
-		backupSamples.push_back( d->dc.sample[i]);
-	}
+	memcpy(&backupDive, current_dive, sizeof(struct dive));
+	copy_samples(current_dive, &backupDive);
+	copy_events(current_dive, &backupDive);
 	copy_cylinders(current_dive, stagingDive); // this way the correct cylinder data is shown
 	CylindersModel::instance()->setDive(stagingDive);
 	int lasttime = 0;
-	Q_FOREACH(const sample &s, backupSamples){
-		int o2 = 0, he = 0;
+	// we start with the first gas and see if it was changed
+	int o2 = backupDive.cylinder[0].gasmix.o2.permille;
+	int he = backupDive.cylinder[0].gasmix.he.permille;
+	for (int i = 0; i < backupDive.dc.samples; i++) {
+		const sample &s = backupDive.dc.sample[i];
 		if (s.time.seconds == 0)
 			continue;
-		get_gas_from_events(&backupDive->dc, lasttime, &o2, &he);
+		get_gas_from_events(&backupDive.dc, lasttime, &o2, &he);
 		plannerModel->addStop(s.depth.mm, s.time.seconds, o2, he, 0);
 		lasttime = s.time.seconds;
 	}
+}
+
+void DivePlannerPointsModel::restoreBackupDive()
+{
+	memcpy(current_dive, &backupDive, sizeof(struct dive));
 }
 
 void DivePlannerPointsModel::copyCylinders(dive *d)
@@ -1412,16 +1416,6 @@ void DivePlannerPointsModel::createTemporaryPlan()
 #endif
 }
 
-void DivePlannerPointsModel::undoEdition()
-{
-	clear();
-	Q_FOREACH(const sample &s, backupSamples){
-		int o2, he;
-		get_gas_from_events(&current_dive->dc, s.time.seconds, &o2, &he);
-		plannerModel->addStop(s.depth.mm, s.time.seconds, o2, he, 0);
-	}
-}
-
 void DivePlannerPointsModel::deleteTemporaryPlan()
 {
 	deleteTemporaryPlan(diveplan.dp);
@@ -1486,12 +1480,6 @@ ExpanderGraphics::ExpanderGraphics(QGraphicsItem* parent): QGraphicsRectItem(par
 	decreaseBtn->setPixmap(QPixmap(":arrow_down"));
 	increaseBtn->setPixmap(QPixmap(":arrow_up"));
 
-	icon->setFlag(ItemIgnoresTransformations);
-	bg->setFlag(ItemIgnoresTransformations);
-	leftWing->setFlag(ItemIgnoresTransformations);
-	rightWing->setFlag(ItemIgnoresTransformations);
-	decreaseBtn->setFlag(ItemIgnoresTransformations);
-	increaseBtn->setFlag(ItemIgnoresTransformations);
 	setFlag(ItemIgnoresTransformations);
 	leftWing->setZValue(-2);
 	rightWing->setZValue(-2);
@@ -1503,5 +1491,12 @@ ExpanderGraphics::ExpanderGraphics(QGraphicsItem* parent): QGraphicsRectItem(par
 	decreaseBtn->setPos(leftWing->pos().x(), leftWing->pos().y() );
 	increaseBtn->setPos(rightWing->pos().x(), rightWing->pos().y() );
 	icon->setPos(bg->pos().x(), bg->pos().y() - 5);
-	setTransformOriginPoint(transformOriginPoint().x(), transformOriginPoint().y() - childrenBoundingRect().height());
+
+	//I need to bottom align the items, I need to make the 0,0 ( orgin ) to be
+	// the bottom of this item, so shift everything up.
+	QRectF r = childrenBoundingRect();
+	Q_FOREACH(QGraphicsItem *i, childItems()){
+		i->setPos(i->pos().x(), i->pos().y() - r.height());
+	}
+	setScale(0.7);
 }

@@ -13,6 +13,7 @@
 #include <QDebug>
 
 #include "../dive.h"
+#include "mainwindow.h"
 
 class MinMaxAvgWidgetPrivate{
 public:
@@ -114,6 +115,38 @@ void RenumberDialog::buttonClicked(QAbstractButton* button)
 }
 
 RenumberDialog::RenumberDialog(): QDialog()
+{
+	ui.setupUi(this);
+	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+}
+
+ShiftTimesDialog* ShiftTimesDialog::instance()
+{
+	static ShiftTimesDialog* self = new ShiftTimesDialog();
+	return self;
+}
+
+void ShiftTimesDialog::buttonClicked(QAbstractButton* button)
+{
+	int amount;
+
+	if (ui.buttonBox->buttonRole(button) == QDialogButtonBox::AcceptRole){
+		amount = ui.timeEdit->time().hour() * 3600 + ui.timeEdit->time().minute() * 60;
+		if (ui.backwards->isChecked())
+			amount *= -1;
+		if (amount != 0) {
+			// DANGER, DANGER - this could get our dive_table unsorted...
+			shift_times(amount);
+			sort_table(&dive_table);
+			mark_divelist_changed(TRUE);
+			mainWindow()->dive_list()->rememberSelection();
+			mainWindow()->refreshDisplay();
+			mainWindow()->dive_list()->restoreSelection();
+		}
+	}
+}
+
+ShiftTimesDialog::ShiftTimesDialog(): QDialog()
 {
 	ui.setupUi(this);
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
