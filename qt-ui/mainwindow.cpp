@@ -53,6 +53,8 @@ MainWindow::MainWindow() : helpView(0)
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(update()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(reloadHeaderActions()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ProfileWidget, SLOT(refresh()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.InfoWidget, SLOT(updateDiveInfo()));
+
 	ui.mainErrorMessage->hide();
 	initialUiSetup();
 	readSettings();
@@ -437,12 +439,14 @@ void MainWindow::saveSplitterSizes(){
 void MainWindow::on_actionPreviousDC_triggered()
 {
 	dc_number--;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 
 void MainWindow::on_actionNextDC_triggered()
 {
 	dc_number++;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 

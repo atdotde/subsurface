@@ -120,19 +120,12 @@ void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 	}
 }
 
-void GlobeGPS::reload()
+void GlobeGPS::repopulateLabels()
 {
 	if (loadedDives) {
 		model()->treeModel()->removeDocument(loadedDives);
 		delete loadedDives;
 	}
-
-	if (editingDiveCoords) {
-		editingDiveCoords = 0;
-		if (messageWidget->isVisible())
-			messageWidget->animatedHide();
-	}
-
 	loadedDives = new GeoDataDocument;
 	QMap<QString, GeoDataPlacemark *> locationMap;
 
@@ -160,6 +153,16 @@ void GlobeGPS::reload()
 		}
 	}
 	model()->treeModel()->addDocument(loadedDives);
+}
+
+void GlobeGPS::reload()
+{
+	if (editingDiveCoords) {
+		editingDiveCoords = 0;
+		if (messageWidget->isVisible())
+			messageWidget->animatedHide();
+	}
+	repopulateLabels();
 }
 
 void GlobeGPS::centerOn(dive* dive)
@@ -212,6 +215,16 @@ void GlobeGPS::prepareForGetDiveCoordinates(dive* dive)
 	editingDiveCoords = dive;
 }
 
+void GlobeGPS::diveEditMode()
+{
+	if (messageWidget->isVisible())
+		messageWidget->animatedHide();
+	messageWidget->setMessageType(KMessageWidget::Warning);
+	messageWidget->setText(QObject::tr("Editing dive - move the map and double-click to set the dive location"));
+	messageWidget->setWordWrap(true);
+	messageWidget->animatedShow();
+}
+
 void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 {
 	// convert to degrees if in radian.
@@ -241,7 +254,13 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 void GlobeGPS::mousePressEvent(QMouseEvent* event)
 {
 	qreal lat, lon;
-	if (editingDiveCoords &&  geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
+	// there could be two scenarios that got us here; let's check if we are editing a dive
+	if (mainWindow()->information()->isEditing() &&
+	    geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
+		mainWindow()->information()->updateCoordinatesText(lat, lon);
+		repopulateLabels();
+	} else if (editingDiveCoords &&
+		    geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
 		changeDiveGeoPosition(lon, lat, GeoDataCoordinates::Degree);
 	}
 }

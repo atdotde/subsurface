@@ -174,14 +174,6 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	ADD_ACTION(Qt::Key_Right, keyRightAction());
 #undef ADD_ACTION
 
-	// Prepare the stuff for the gas-choices.
-	gasListView = new QListView();
-	gasListView->setWindowFlags(Qt::Popup);
-	gasListView->setModel(GasSelectionModel::instance());
-	gasListView->hide();
-	gasListView->installEventFilter(this);
-
-	connect(gasListView, SIGNAL(activated(QModelIndex)), this, SLOT(selectGas(QModelIndex)));
 	connect(plannerModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(drawProfile()));
 
 	connect(plannerModel, SIGNAL(rowsInserted(const QModelIndex&,int,int)),
@@ -191,34 +183,16 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	setRenderHint(QPainter::Antialiasing);
 }
 
-bool DivePlannerGraphics::eventFilter(QObject *object, QEvent* event)
-{
-	if (object != gasListView)
-		return false;
-	if (event->type() == QEvent::KeyPress) {
-		QKeyEvent *ke =  static_cast<QKeyEvent *>(event);
-		if (ke->key() == Qt::Key_Escape)
-			gasListView->hide();
-	}
-	if (event->type() == QEvent::MouseButtonPress){
-		QMouseEvent *me = static_cast<QMouseEvent *>(event);
-		if (!gasListView->geometry().contains(me->pos()))
-			gasListView->hide();
-	}
-	return false;
-}
-
 void DivePlannerGraphics::pointInserted(const QModelIndex& parent, int start , int end)
 {
 	DiveHandler *item = new DiveHandler ();
 	scene()->addItem(item);
 	handles << item;
 
-	Button *gasChooseBtn = new Button();
+	QGraphicsSimpleTextItem *gasChooseBtn = new QGraphicsSimpleTextItem();
 	scene()->addItem(gasChooseBtn);
 	gasChooseBtn->setZValue(10);
-	connect(gasChooseBtn, SIGNAL(clicked()), this, SLOT(prepareSelectGas()));
-
+	gasChooseBtn->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 	gases << gasChooseBtn;
 	drawProfile();
 }
@@ -475,35 +449,20 @@ void DivePlannerPointsModel::copyCylinders(dive *d)
 
 QStringList& DivePlannerPointsModel::getGasList()
 {
+	struct dive *activeDive = isPlanner() ? stagingDive : current_dive;
 	static QStringList list;
 	list.clear();
-	if (!stagingDive) {
+	if (!activeDive) {
 		list.push_back(tr("AIR"));
 	} else {
 		for (int i = 0; i < MAX_CYLINDERS; i++) {
-			cylinder_t *cyl = &stagingDive->cylinder[i];
+			cylinder_t *cyl = &activeDive->cylinder[i];
 			if (cylinder_nodata(cyl))
 				break;
 			list.push_back(gasToStr(cyl->gasmix.o2.permille, cyl->gasmix.he.permille));
 		}
 	}
 	return list;
-}
-
-void DivePlannerGraphics::prepareSelectGas()
-{
-	currentGasChoice = static_cast<Button*>(sender());
-	QPoint c = QCursor::pos();
-	gasListView->setGeometry(c.x(), c.y(), 150, 100);
-	gasListView->show();
-}
-
-void DivePlannerGraphics::selectGas(const QModelIndex& index)
-{
-	QString gasSelected = gasListView->model()->data(index, Qt::DisplayRole).toString();
-	int idx = gases.indexOf(currentGasChoice);
-	plannerModel->setData(plannerModel->index(idx, DivePlannerPointsModel::GAS), gasSelected);
-	gasListView->hide();
 }
 
 void DivePlannerGraphics::drawProfile()
@@ -535,7 +494,7 @@ void DivePlannerGraphics::drawProfile()
 			continue;
 		DiveHandler *h = handles.at(i);
 		h->setPos(timeLine->posAtValue(dp.time / 60), depthLine->posAtValue(dp.depth));
-		QPointF p1 = handles[last]->pos();
+		QPointF p1 = (last == i) ?  QPointF(timeLine->posAtValue(0), depthLine->posAtValue(0)) : handles[last]->pos();
 		QPointF p2 = handles[i]->pos();
 		QLineF line(p1, p2);
 		QPointF pos = line.pointAt(0.5);
@@ -599,16 +558,30 @@ void DivePlannerGraphics::showEvent(QShowEvent* event)
 void DivePlannerGraphics::mouseMoveEvent(QMouseEvent* event)
 {
 	QPointF mappedPos = mapToScene(event->pos());
-	if (isPointOutOfBoundaries(mappedPos))
+
+
+	double xpos = timeLine->valueAt(mappedPos);
+	double ypos = depthLine->valueAt(mappedPos);
+
+	xpos =  (xpos > timeLine->maximum()) ? timeLine->posAtValue(timeLine->maximum())
+		: (xpos < timeLine->minimum()) ? timeLine->posAtValue(timeLine->minimum())
+		: timeLine->posAtValue(xpos);
+
+	ypos =  (ypos > depthLine->maximum()) ? depthLine->posAtValue(depthLine->maximum())
+		: ( ypos < depthLine->minimum()) ? depthLine->posAtValue(depthLine->minimum())
+		: depthLine->posAtValue(ypos);
+
+	verticalLine->setPos(xpos, fromPercent(0, Qt::Vertical));
+	horizontalLine->setPos(fromPercent(0, Qt::Horizontal), ypos);
+
+	depthString->setPos(fromPercent(1, Qt::Horizontal), ypos);
+	timeString->setPos(xpos+1, fromPercent(95, Qt::Vertical));
+
+	if(isPointOutOfBoundaries(mappedPos))
 		return;
 
-	verticalLine->setPos(mappedPos.x(), fromPercent(0, Qt::Vertical));
-	horizontalLine->setPos(fromPercent(0, Qt::Horizontal), mappedPos.y());
-
 	depthString->setText(get_depth_string(depthLine->valueAt(mappedPos), true, false));
-	depthString->setPos(fromPercent(1, Qt::Horizontal), mappedPos.y());
 	timeString->setText(QString::number(rint(timeLine->valueAt(mappedPos))) + "min");
-	timeString->setPos(mappedPos.x()+1, fromPercent(95, Qt::Vertical));
 
 	// calculate the correct color for the depthString.
 	// QGradient doesn't returns it's interpolation, meh.
@@ -717,9 +690,25 @@ DiveHandler::DiveHandler(): QGraphicsEllipseItem()
 	setZValue(2);
 }
 
+int DiveHandler::parentIndex()
+{
+	DivePlannerGraphics *view = qobject_cast<DivePlannerGraphics*>(scene()->views().first());
+	return view->handles.indexOf(this);
+}
+
 void DiveHandler::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
 	QMenu m;
+	GasSelectionModel *model = GasSelectionModel::instance();
+	model->repopulate();
+	int rowCount = model->rowCount();
+	for(int i = 0; i < rowCount; i++){
+		QAction *action = new QAction(&m);
+		action->setText( model->data(model->index(i, 0),Qt::DisplayRole).toString());
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(changeGas()));
+		m.addAction(action);
+	}
+	m.addSeparator();
 	m.addAction(QObject::tr("Remove this Point"), this, SLOT(selfRemove()));
 	m.exec(event->screenPos());
 }
@@ -729,6 +718,13 @@ void DiveHandler::selfRemove()
 	setSelected(true);
 	DivePlannerGraphics *view = qobject_cast<DivePlannerGraphics*>(scene()->views().first());
 	view->keyDeleteAction();
+}
+
+void DiveHandler::changeGas()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QModelIndex index = plannerModel->index(parentIndex(), DivePlannerPointsModel::GAS);
+	plannerModel->setData(index, action->text());
 }
 
 void DiveHandler::mousePressEvent(QGraphicsSceneMouseEvent* event)

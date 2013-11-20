@@ -284,14 +284,20 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 		break;
 	case O2:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.o2.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int o2 = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.he.permille + o2 <= 1000) {
+				cyl->gasmix.o2.permille = o2;
+				changed = true;
+			}
 		}
 		break;
 	case HE:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.he.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int he = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.o2.permille + he <= 1000) {
+				cyl->gasmix.he.permille = he;
+				changed = true;
+			}
 		}
 		break;
 	case DEPTH:
@@ -923,7 +929,10 @@ QVariant TripItem::data(int column, int role) const
 	if (role == Qt::DisplayRole) {
 		switch (column) {
 			case DiveTripModel::NR:
-			ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			if (trip->location && *trip->location)
+				ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			else
+				ret = get_trip_date_string(trip->when, trip->nrdives);
 			break;
 		}
 	}
@@ -1723,18 +1732,18 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 
 Qt::ItemFlags GasSelectionModel::flags(const QModelIndex& index) const
 {
-    return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 GasSelectionModel* GasSelectionModel::instance()
 {
-    static GasSelectionModel* self = new GasSelectionModel();
-    return self;
+	static GasSelectionModel* self = new GasSelectionModel();
+	return self;
 }
 
 void GasSelectionModel::repopulate()
 {
-    setStringList(DivePlannerPointsModel::instance()->getGasList());
+	setStringList(DivePlannerPointsModel::instance()->getGasList());
 }
 
 QVariant GasSelectionModel::data(const QModelIndex& index, int role) const

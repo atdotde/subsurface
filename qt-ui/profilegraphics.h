@@ -100,7 +100,8 @@ private:
 class EventItem : public QGraphicsPolygonItem
 {
 public:
-	explicit EventItem(QGraphicsItem* parent = 0, bool grayscale = FALSE);
+	explicit EventItem(struct event *ev, QGraphicsItem* parent = 0, bool grayscale = FALSE);
+	struct event* ev;
 
 private:
 	ToolTipItem *controller;
@@ -142,13 +143,17 @@ protected:
 	void mouseMoveEvent(QMouseEvent* event);
 	void wheelEvent(QWheelEvent* event);
 	void showEvent(QShowEvent* event);
+	void contextMenuEvent(QContextMenuEvent* event);
 
 public slots:
 	void refresh();
 	void edit_dive_time(const QString& time);
 	void on_rulerAction();
 	void on_scaleAction();
-
+	void changeGas();
+	void hideEvents();
+	void removeEvent();
+	void addBookmark();
 private:
 	void plot_depth_profile();
 	QGraphicsItemGroup *plot_text(text_render_options_t *tro, const QPointF& pos, const QString &text, QGraphicsItem *parent = 0);

@@ -13,6 +13,7 @@
 #include "globe.h"
 #include "completionmodels.h"
 #include "diveplanner.h"
+#include "divelist.h"
 #include "qthelper.h"
 
 #include <QLabel>
@@ -123,6 +124,7 @@ void MainTab::enableEdition(EditMode newEditMode)
 		return;
 
 	mainWindow()->dive_list()->setEnabled(false);
+	mainWindow()->globe()->diveEditMode();
 	// We may be editing one or more dives here. backup everything.
 	notesBackup.clear();
 	ui.notesButtonBox->show();
@@ -348,7 +350,29 @@ void MainTab::updateDiveInfo(int dive)
 		ui.otuText->setText(QString("%1").arg(d->otu));
 		ui.waterTemperatureText->setText(get_temperature_string(d->watertemp, TRUE));
 		ui.airTemperatureText->setText(get_temperature_string(d->airtemp, TRUE));
-		ui.gasUsedText->setText(get_volume_string(get_gas_used(d), TRUE));
+		volume_t gases[MAX_CYLINDERS] = { 0 };
+		get_gas_used(d, gases);
+		QString volumes = get_volume_string(gases[0], TRUE);
+		int mean[MAX_CYLINDERS], duration[MAX_CYLINDERS];
+		per_cylinder_mean_depth(d, select_dc(&d->dc), mean, duration);
+		volume_t sac;
+		QString SACs;
+		if (mean[0] && duration[0]) {
+			sac.mliter = gases[0].mliter * 1000.0 / (depth_to_mbar(mean[0], d) * duration[0] / 60.0);
+			SACs = get_volume_string(sac, TRUE).append(tr("/min"));
+		} else {
+			SACs = QString(tr("unknown"));
+		}
+		for(int i=1; i < MAX_CYLINDERS && gases[i].mliter != 0; i++) {
+			volumes.append("\n" + get_volume_string(gases[i], TRUE));
+			if (duration[i]) {
+				sac.mliter = gases[i].mliter * 1000.0 / (depth_to_mbar(mean[i], d) * duration[i] / 60);
+				SACs.append("\n" + get_volume_string(sac, TRUE).append(tr("/min")));
+			} else {
+				SACs.append("\n");
+			}
+		}
+		ui.gasUsedText->setText(volumes);
 		ui.oxygenHeliumText->setText(get_gaslist(d));
 		ui.dateText->setText(get_short_dive_date_string(d->when));
 		ui.diveTimeText->setText(QString::number((int)((d->duration.seconds + 30) / 60)));
@@ -356,8 +380,8 @@ void MainTab::updateDiveInfo(int dive)
 			ui.surfaceIntervalText->setText(get_time_string(d->when - (prevd->when + prevd->duration.seconds), 4));
 		else
 			ui.surfaceIntervalText->clear();
-		if ((sacVal.mliter = d->sac) > 0)
-			ui.sacText->setText(get_volume_string(sacVal, TRUE).append(tr("/min")));
+		if (mean[0])
+			ui.sacText->setText(SACs);
 		else
 			ui.sacText->clear();
 		if (d->surface_pressure.mbar)
@@ -497,6 +521,10 @@ void MainTab::acceptChanges()
 			}
 		}
 
+	}
+	if (current_dive->divetrip) {
+		current_dive->divetrip->when = current_dive->when;
+		find_new_trip_start_time(current_dive->divetrip);
 	}
 	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		// clean up the dive data (get duration, depth information from samples)
@@ -744,8 +772,8 @@ void MainTab::on_location_textChanged(const QString& text)
 			}
 		}
 		EDIT_SELECTED_DIVES( EDIT_TEXT(mydive->location, text) );
+		mainWindow()->globe()->repopulateLabels();
 	}
-
 	markChangedWidget(ui.location);
 }
 
@@ -833,6 +861,13 @@ QString MainTab::printGPSCoords(int lat, int lon)
 		       lath.toLocal8Bit().data(), latdeg, UTF8_DEGREE, ilatmin / 1000000, (ilatmin % 1000000) / 10,
 		       lonh.toLocal8Bit().data(), londeg, UTF8_DEGREE, ilonmin / 1000000, (ilonmin % 1000000) / 10);
 	return result;
+}
+
+void MainTab::updateCoordinatesText(qreal lat, qreal lon)
+{
+	int ulat = rint(lat * 1000000);
+	int ulon = rint(lon * 1000000);
+	ui.coordinates->setText(printGPSCoords(ulat, ulon));
 }
 
 void MainTab::updateGpsCoordinates(const struct dive *dive)
