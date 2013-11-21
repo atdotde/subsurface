@@ -361,12 +361,9 @@ void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *me
 		int time = sample->time.seconds;
 		int depth = sample->depth.mm;
 		if (ev && time >= ev->time.seconds) {
-			int o2 = (ev->value & 0xFFFF) * 10;
-			int he = (ev->value >> 16) * 10;
-			idx = get_gasidx(dive, o2, he);
+			idx = get_cylinder_index(dive, ev);
 			ev = get_next_event(ev->next, "gaschange");
 		}
-
 		/* We ignore segments at the surface */
 		if (depth > SURFACE_THRESHOLD || lastdepth > SURFACE_THRESHOLD) {
 			duration[idx] += time - lasttime;
@@ -1179,20 +1176,13 @@ static int find_cylinder_match(cylinder_t *cyl, cylinder_t array[], unsigned int
 /* Force an initial gaschange event to the (old) gas #0 */
 static void add_initial_gaschange(struct dive *dive, struct divecomputer *dc)
 {
-	int o2, he, value;
 	struct event *ev = get_next_event(dc->events, "gaschange");
 
 	if (ev && ev->time.seconds < 30)
 		return;
 
 	/* Old starting gas mix */
-	o2 = get_o2(&dive->cylinder[0].gasmix);
-	he = get_he(&dive->cylinder[0].gasmix);
-	o2 = (o2 + 5) / 10;
-	he = (he + 5) / 10;
-	value = o2 + (he << 16);
-
-	add_event(dc, 0, 25, 0, value, "gaschange"); /* SAMPLE_EVENT_GASCHANGE2 */
+	add_gas_switch_event(dive, dc, 0, 0);
 }
 
 static void dc_cylinder_renumber(struct dive *dive, struct divecomputer *dc, int mapping[])

@@ -385,10 +385,10 @@ void CylindersModel::remove(const QModelIndex& index)
 	}
 	cylinder_t *cyl = &current->cylinder[index.row()];
 	if (DivePlannerPointsModel::instance()->tankInUse(cyl->gasmix.o2.permille, cyl->gasmix.he.permille)) {
-		QMessageBox::warning(mainWindow(),
-				     tr("Cylinder cannot be removed"),
-				     tr("This gas in use. Only cylinders that are not used in the dive can be removed."),
-				     QMessageBox::Ok);
+		QMessageBox::warning(mainWindow(), TITLE_OR_TEXT(
+				tr("Cylinder cannot be removed"),
+				tr("This gas in use. Only cylinders that are not used in the dive can be removed.")),
+				QMessageBox::Ok);
 		return;
 	}
 	beginRemoveRows(QModelIndex(), index.row(), index.row()); // yah, know, ugly.
@@ -859,6 +859,7 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
 
 bool TreeItem::setData(const QModelIndex& index, const QVariant& value, int role)
 {
+	return false;
 }
 
 QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent)
