@@ -87,9 +87,9 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	timeLine->setColor(getColor(TIME_GRID));
 	timeLine->setLine(
 		fromPercent(10, Qt::Horizontal),
-		fromPercent(90, Qt::Vertical),
+		fromPercent(85, Qt::Vertical),
 		fromPercent(90, Qt::Horizontal),
-		fromPercent(90, Qt::Vertical)
+		fromPercent(85, Qt::Vertical)
 	);
 	timeLine->setOrientation(Qt::Horizontal);
 	timeLine->setTickSize(fromPercent(1, Qt::Vertical));
@@ -105,7 +105,7 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 		fromPercent(10, Qt::Horizontal),
 		fromPercent(10, Qt::Vertical),
 		fromPercent(10, Qt::Horizontal),
-		fromPercent(90, Qt::Vertical)
+		fromPercent(85, Qt::Vertical)
 	);
 	depthLine->setOrientation(Qt::Vertical);
 	depthLine->setTickSize(fromPercent(1, Qt::Horizontal));
@@ -128,26 +128,35 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	diveBg->setPen(QPen(QBrush(),0));
 	scene()->addItem(diveBg);
 
-#define ADDBTN(obj, icon, text, horizontal, vertical, tooltip, value, slot) \
-	obj = new Button(); \
-	obj->setPixmap(QPixmap(icon)); \
-	obj->setPos(fromPercent(horizontal, Qt::Horizontal), fromPercent(vertical, Qt::Vertical)); \
-	obj->setToolTip(QString(tooltip.arg(value))); \
-	scene()->addItem(obj); \
-	connect(obj, SIGNAL(clicked()), this, SLOT(slot));
-
 	QString incrText;
 	if (prefs.units.length == units::METERS)
 		incrText = tr("10m");
 	else
 		incrText = tr("30ft");
-	ADDBTN(plusDepth, ":plus",   ""  , 5,  5, tr("Increase maximum depth by %1"), incrText, increaseDepth());
-	ADDBTN(lessDepth, ":minimum",""  , 2,  5, tr("Decreases maximum depth by %1"), incrText, decreaseDepth());
-	ADDBTN(plusTime,  ":plus",   ""  , 95, 95, tr("Increase minimum time by %1"), tr("10min"), increaseTime());
-	ADDBTN(lessTime,  ":minimum",""  , 92, 95, tr("Decreases minimum time by %1"), tr("10min"), decreaseTime());
-#undef ADDBTN
-	minMinutes = TIME_INITIAL_MAX;
 
+	timeHandler = new ExpanderGraphics();
+	timeHandler->increaseBtn->setPixmap(QString(":plan_plus"));
+	timeHandler->decreaseBtn->setPixmap(QString(":plan_minus"));
+	timeHandler->icon->setPixmap(QString(":icon_time"));
+	connect(timeHandler->increaseBtn, SIGNAL(clicked()), this, SLOT(increaseTime()));
+	connect(timeHandler->decreaseBtn, SIGNAL(clicked()), this, SLOT(decreaseTime()));
+	timeHandler->setPos(fromPercent(83, Qt::Horizontal), fromPercent(100, Qt::Vertical));
+	timeHandler->setZValue(-2);
+	scene()->addItem(timeHandler);
+
+	depthHandler = new ExpanderGraphics();
+	depthHandler->increaseBtn->setPixmap(QString(":arrow_up"));
+	depthHandler->decreaseBtn->setPixmap(QString(":arrow_down"));
+	depthHandler->icon->setPixmap(QString(":icon_depth"));
+	// Inverted here in the slots because the 'up' graphi should increase the depness,
+	// and the down should decrease.
+	connect(depthHandler->increaseBtn, SIGNAL(clicked()), this, SLOT(decreaseDepth()));
+	connect(depthHandler->decreaseBtn, SIGNAL(clicked()), this, SLOT(increaseDepth()));
+	depthHandler->setPos(fromPercent(0, Qt::Horizontal), fromPercent(100, Qt::Vertical));
+	depthHandler->setZValue(-2);
+	scene()->addItem(depthHandler);
+
+	minMinutes = TIME_INITIAL_MAX;
 	QAction *action = NULL;
 
 #define ADD_ACTION( SHORTCUT, Slot ) \
@@ -165,14 +174,6 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	ADD_ACTION(Qt::Key_Right, keyRightAction());
 #undef ADD_ACTION
 
-	// Prepare the stuff for the gas-choices.
-	gasListView = new QListView();
-	gasListView->setWindowFlags(Qt::Popup);
-	gasListView->setModel(GasSelectionModel::instance());
-	gasListView->hide();
-	gasListView->installEventFilter(this);
-
-	connect(gasListView, SIGNAL(activated(QModelIndex)), this, SLOT(selectGas(QModelIndex)));
 	connect(plannerModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(drawProfile()));
 
 	connect(plannerModel, SIGNAL(rowsInserted(const QModelIndex&,int,int)),
@@ -182,34 +183,16 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	setRenderHint(QPainter::Antialiasing);
 }
 
-bool DivePlannerGraphics::eventFilter(QObject *object, QEvent* event)
-{
-	if (object != gasListView)
-		return false;
-	if (event->type() == QEvent::KeyPress) {
-		QKeyEvent *ke =  static_cast<QKeyEvent *>(event);
-		if (ke->key() == Qt::Key_Escape)
-			gasListView->hide();
-	}
-	if (event->type() == QEvent::MouseButtonPress){
-		QMouseEvent *me = static_cast<QMouseEvent *>(event);
-		if (!gasListView->geometry().contains(me->pos()))
-			gasListView->hide();
-	}
-	return false;
-}
-
 void DivePlannerGraphics::pointInserted(const QModelIndex& parent, int start , int end)
 {
 	DiveHandler *item = new DiveHandler ();
 	scene()->addItem(item);
 	handles << item;
 
-	Button *gasChooseBtn = new Button();
+	QGraphicsSimpleTextItem *gasChooseBtn = new QGraphicsSimpleTextItem();
 	scene()->addItem(gasChooseBtn);
 	gasChooseBtn->setZValue(10);
-	connect(gasChooseBtn, SIGNAL(clicked()), this, SLOT(prepareSelectGas()));
-
+	gasChooseBtn->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 	gases << gasChooseBtn;
 	drawProfile();
 }
@@ -435,26 +418,28 @@ void DivePlannerPointsModel::loadFromDive(dive* d)
 	 * as soon as the model is modified, it will
 	 * remove all samples from the current dive.
 	 * */
-	struct dive *backupDive = alloc_dive();
-	backupDive->when = current_dive->when; // do we need anything else?
-	copy_samples(current_dive, backupDive);
-	copy_cylinders(current_dive, backupDive);
-	copy_events(current_dive, backupDive);
-	backupSamples.clear();
-	for(int i = 0; i < d->dc.samples-1; i++){
-		backupSamples.push_back( d->dc.sample[i]);
-	}
+	memcpy(&backupDive, current_dive, sizeof(struct dive));
+	copy_samples(current_dive, &backupDive);
+	copy_events(current_dive, &backupDive);
 	copy_cylinders(current_dive, stagingDive); // this way the correct cylinder data is shown
 	CylindersModel::instance()->setDive(stagingDive);
 	int lasttime = 0;
-	Q_FOREACH(const sample &s, backupSamples){
-		int o2 = 0, he = 0;
+	// we start with the first gas and see if it was changed
+	int o2 = backupDive.cylinder[0].gasmix.o2.permille;
+	int he = backupDive.cylinder[0].gasmix.he.permille;
+	for (int i = 0; i < backupDive.dc.samples; i++) {
+		const sample &s = backupDive.dc.sample[i];
 		if (s.time.seconds == 0)
 			continue;
-		get_gas_from_events(&backupDive->dc, lasttime, &o2, &he);
+		get_gas_from_events(&backupDive.dc, lasttime, &o2, &he);
 		plannerModel->addStop(s.depth.mm, s.time.seconds, o2, he, 0);
 		lasttime = s.time.seconds;
 	}
+}
+
+void DivePlannerPointsModel::restoreBackupDive()
+{
+	memcpy(current_dive, &backupDive, sizeof(struct dive));
 }
 
 void DivePlannerPointsModel::copyCylinders(dive *d)
@@ -464,36 +449,20 @@ void DivePlannerPointsModel::copyCylinders(dive *d)
 
 QStringList& DivePlannerPointsModel::getGasList()
 {
+	struct dive *activeDive = isPlanner() ? stagingDive : current_dive;
 	static QStringList list;
 	list.clear();
-	if (!stagingDive) {
+	if (!activeDive) {
 		list.push_back(tr("AIR"));
 	} else {
 		for (int i = 0; i < MAX_CYLINDERS; i++) {
-			cylinder_t *cyl = &stagingDive->cylinder[i];
+			cylinder_t *cyl = &activeDive->cylinder[i];
 			if (cylinder_nodata(cyl))
 				break;
 			list.push_back(gasToStr(cyl->gasmix.o2.permille, cyl->gasmix.he.permille));
 		}
 	}
 	return list;
-}
-
-void DivePlannerGraphics::prepareSelectGas()
-{
-	QStringListModel *model = qobject_cast<QStringListModel*>(gasListView->model());
-	currentGasChoice = static_cast<Button*>(sender());
-	QPoint c = QCursor::pos();
-	gasListView->setGeometry(c.x(), c.y(), 150, 100);
-	gasListView->show();
-}
-
-void DivePlannerGraphics::selectGas(const QModelIndex& index)
-{
-	QString gasSelected = gasListView->model()->data(index, Qt::DisplayRole).toString();
-	int idx = gases.indexOf(currentGasChoice);
-	plannerModel->setData(plannerModel->index(idx, DivePlannerPointsModel::GAS), gasSelected);
-	gasListView->hide();
 }
 
 void DivePlannerGraphics::drawProfile()
@@ -525,7 +494,7 @@ void DivePlannerGraphics::drawProfile()
 			continue;
 		DiveHandler *h = handles.at(i);
 		h->setPos(timeLine->posAtValue(dp.time / 60), depthLine->posAtValue(dp.depth));
-		QPointF p1 = handles[last]->pos();
+		QPointF p1 = (last == i) ?  QPointF(timeLine->posAtValue(0), depthLine->posAtValue(0)) : handles[last]->pos();
 		QPointF p2 = handles[i]->pos();
 		QLineF line(p1, p2);
 		QPointF pos = line.pointAt(0.5);
@@ -589,16 +558,30 @@ void DivePlannerGraphics::showEvent(QShowEvent* event)
 void DivePlannerGraphics::mouseMoveEvent(QMouseEvent* event)
 {
 	QPointF mappedPos = mapToScene(event->pos());
-	if (isPointOutOfBoundaries(mappedPos))
+
+
+	double xpos = timeLine->valueAt(mappedPos);
+	double ypos = depthLine->valueAt(mappedPos);
+
+	xpos =  (xpos > timeLine->maximum()) ? timeLine->posAtValue(timeLine->maximum())
+		: (xpos < timeLine->minimum()) ? timeLine->posAtValue(timeLine->minimum())
+		: timeLine->posAtValue(xpos);
+
+	ypos =  (ypos > depthLine->maximum()) ? depthLine->posAtValue(depthLine->maximum())
+		: ( ypos < depthLine->minimum()) ? depthLine->posAtValue(depthLine->minimum())
+		: depthLine->posAtValue(ypos);
+
+	verticalLine->setPos(xpos, fromPercent(0, Qt::Vertical));
+	horizontalLine->setPos(fromPercent(0, Qt::Horizontal), ypos);
+
+	depthString->setPos(fromPercent(1, Qt::Horizontal), ypos);
+	timeString->setPos(xpos+1, fromPercent(95, Qt::Vertical));
+
+	if(isPointOutOfBoundaries(mappedPos))
 		return;
 
-	verticalLine->setPos(mappedPos.x(), fromPercent(0, Qt::Vertical));
-	horizontalLine->setPos(fromPercent(0, Qt::Horizontal), mappedPos.y());
-
 	depthString->setText(get_depth_string(depthLine->valueAt(mappedPos), true, false));
-	depthString->setPos(fromPercent(1, Qt::Horizontal), mappedPos.y());
 	timeString->setText(QString::number(rint(timeLine->valueAt(mappedPos))) + "min");
-	timeString->setPos(mappedPos.x()+1, fromPercent(95, Qt::Vertical));
 
 	// calculate the correct color for the depthString.
 	// QGradient doesn't returns it's interpolation, meh.
@@ -707,9 +690,25 @@ DiveHandler::DiveHandler(): QGraphicsEllipseItem()
 	setZValue(2);
 }
 
+int DiveHandler::parentIndex()
+{
+	DivePlannerGraphics *view = qobject_cast<DivePlannerGraphics*>(scene()->views().first());
+	return view->handles.indexOf(this);
+}
+
 void DiveHandler::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
 	QMenu m;
+	GasSelectionModel *model = GasSelectionModel::instance();
+	model->repopulate();
+	int rowCount = model->rowCount();
+	for(int i = 0; i < rowCount; i++){
+		QAction *action = new QAction(&m);
+		action->setText( model->data(model->index(i, 0),Qt::DisplayRole).toString());
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(changeGas()));
+		m.addAction(action);
+	}
+	m.addSeparator();
 	m.addAction(QObject::tr("Remove this Point"), this, SLOT(selfRemove()));
 	m.exec(event->screenPos());
 }
@@ -719,6 +718,13 @@ void DiveHandler::selfRemove()
 	setSelected(true);
 	DivePlannerGraphics *view = qobject_cast<DivePlannerGraphics*>(scene()->views().first());
 	view->keyDeleteAction();
+}
+
+void DiveHandler::changeGas()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QModelIndex index = plannerModel->index(parentIndex(), DivePlannerPointsModel::GAS);
+	plannerModel->setData(index, action->text());
 }
 
 void DiveHandler::mousePressEvent(QGraphicsSceneMouseEvent* event)
@@ -889,7 +895,7 @@ void Ruler::setColor(const QColor& color)
 	setPen(defaultPen);
 }
 
-Button::Button(QObject* parent): QObject(parent), QGraphicsRectItem()
+Button::Button(QObject* parent, QGraphicsItem *itemParent): QObject(parent), QGraphicsRectItem(itemParent)
 {
 	icon = new QGraphicsPixmapItem(this);
 	text = new QGraphicsSimpleTextItem(this);
@@ -901,7 +907,7 @@ Button::Button(QObject* parent): QObject(parent), QGraphicsRectItem()
 
 void Button::setPixmap(const QPixmap& pixmap)
 {
-	icon->setPixmap(pixmap.scaled(20,20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	icon->setPixmap(pixmap);
 	if(pixmap.isNull())
 		icon->hide();
 	else
@@ -1266,8 +1272,8 @@ struct diveplan DivePlannerPointsModel::getDiveplan()
 void DivePlannerPointsModel::cancelPlan()
 {
 	if (mode == PLAN && rowCount()) {
-		if (QMessageBox::warning(mainWindow(), tr("Discard the Plan?"),
-			tr("You are about to discard your plan."),
+		if (QMessageBox::warning(mainWindow(), TITLE_OR_TEXT(tr("Discard the Plan?"),
+			tr("You are about to discard your plan.")),
 			QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Discard) != QMessageBox::Discard) {
 			return;
 		}
@@ -1406,16 +1412,6 @@ void DivePlannerPointsModel::createTemporaryPlan()
 #endif
 }
 
-void DivePlannerPointsModel::undoEdition()
-{
-	clear();
-	Q_FOREACH(const sample &s, backupSamples){
-		int o2, he;
-		get_gas_from_events(&current_dive->dc, s.time.seconds, &o2, &he);
-		plannerModel->addStop(s.depth.mm, s.time.seconds, o2, he, 0);
-	}
-}
-
 void DivePlannerPointsModel::deleteTemporaryPlan()
 {
 	deleteTemporaryPlan(diveplan.dp);
@@ -1455,4 +1451,48 @@ void DivePlannerPointsModel::createPlan()
 	stagingDive = NULL;
 	CylindersModel::instance()->setDive(current_dive);
 	CylindersModel::instance()->update();
+}
+
+ExpanderGraphics::ExpanderGraphics(QGraphicsItem* parent): QGraphicsRectItem(parent)
+{
+	icon = new QGraphicsPixmapItem(this);
+	bg = new QGraphicsPixmapItem(this);
+	leftWing = new QGraphicsPixmapItem(this);
+	rightWing = new QGraphicsPixmapItem(this);
+
+	QPixmap p;
+	#define CREATE(item, pixmap) \
+	p = QPixmap(QString( pixmap ));\
+	item->setPixmap(p); \
+
+	CREATE(icon, ":icon_time");
+	CREATE(bg, ":round_base");
+	CREATE(leftWing, ":left_wing");
+	CREATE(rightWing, ":right_wing");
+	#undef CREATE
+
+	decreaseBtn = new Button(0, this);
+	increaseBtn = new Button(0, this);
+	decreaseBtn->setPixmap(QPixmap(":arrow_down"));
+	increaseBtn->setPixmap(QPixmap(":arrow_up"));
+
+	setFlag(ItemIgnoresTransformations);
+	leftWing->setZValue(-2);
+	rightWing->setZValue(-2);
+	bg->setZValue(-1);
+
+	leftWing->setPos(0,0);
+	bg->setPos(leftWing->pos().x() + leftWing->boundingRect().width() -60, 5);
+	rightWing->setPos(leftWing->pos().x() + leftWing->boundingRect().width() - 20, 0);
+	decreaseBtn->setPos(leftWing->pos().x(), leftWing->pos().y() );
+	increaseBtn->setPos(rightWing->pos().x(), rightWing->pos().y() );
+	icon->setPos(bg->pos().x(), bg->pos().y() - 5);
+
+	//I need to bottom align the items, I need to make the 0,0 ( orgin ) to be
+	// the bottom of this item, so shift everything up.
+	QRectF r = childrenBoundingRect();
+	Q_FOREACH(QGraphicsItem *i, childItems()){
+		i->setPos(i->pos().x(), i->pos().y() - r.height());
+	}
+	setScale(0.7);
 }

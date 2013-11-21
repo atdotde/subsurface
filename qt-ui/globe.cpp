@@ -120,19 +120,12 @@ void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 	}
 }
 
-void GlobeGPS::reload()
+void GlobeGPS::repopulateLabels()
 {
 	if (loadedDives) {
 		model()->treeModel()->removeDocument(loadedDives);
 		delete loadedDives;
 	}
-
-	if (editingDiveCoords) {
-		editingDiveCoords = 0;
-		if (messageWidget->isVisible())
-			messageWidget->animatedHide();
-	}
-
 	loadedDives = new GeoDataDocument;
 	QMap<QString, GeoDataPlacemark *> locationMap;
 
@@ -160,6 +153,16 @@ void GlobeGPS::reload()
 		}
 	}
 	model()->treeModel()->addDocument(loadedDives);
+}
+
+void GlobeGPS::reload()
+{
+	if (editingDiveCoords) {
+		editingDiveCoords = 0;
+		if (messageWidget->isVisible())
+			messageWidget->animatedHide();
+	}
+	repopulateLabels();
 }
 
 void GlobeGPS::centerOn(dive* dive)
@@ -212,6 +215,16 @@ void GlobeGPS::prepareForGetDiveCoordinates(dive* dive)
 	editingDiveCoords = dive;
 }
 
+void GlobeGPS::diveEditMode()
+{
+	if (messageWidget->isVisible())
+		messageWidget->animatedHide();
+	messageWidget->setMessageType(KMessageWidget::Warning);
+	messageWidget->setText(QObject::tr("Editing dive - move the map and double-click to set the dive location"));
+	messageWidget->setWordWrap(true);
+	messageWidget->animatedShow();
+}
+
 void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 {
 	// convert to degrees if in radian.
@@ -222,19 +235,32 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 	if (!editingDiveCoords)
 		return;
 
-	editingDiveCoords->latitude.udeg = lrint(lat * 1000000.0);
-	editingDiveCoords->longitude.udeg = lrint(lon * 1000000.0);
+	/* change everything on the selection. */
+	int i;
+	struct dive* dive;
+	for_each_dive(i, dive){
+		if(!dive->selected)
+			continue;
+		dive->latitude.udeg = lrint(lat * 1000000.0);
+		dive->longitude.udeg = lrint(lon * 1000000.0);
+	}
 	centerOn(lon, lat, true);
-	reload();
 	editingDiveCoords = 0;
-	messageWidget->animatedHide();
 	mark_divelist_changed(TRUE);
+	messageWidget->animatedHide();
+	mainWindow()->refreshDisplay();
 }
 
 void GlobeGPS::mousePressEvent(QMouseEvent* event)
 {
 	qreal lat, lon;
-	if (editingDiveCoords &&  geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
+	// there could be two scenarios that got us here; let's check if we are editing a dive
+	if (mainWindow()->information()->isEditing() &&
+	    geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
+		mainWindow()->information()->updateCoordinatesText(lat, lon);
+		repopulateLabels();
+	} else if (editingDiveCoords &&
+		    geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree)) {
 		changeDiveGeoPosition(lon, lat, GeoDataCoordinates::Degree);
 	}
 }

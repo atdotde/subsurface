@@ -61,7 +61,8 @@ public slots:
 	void createTemporaryPlan();
 	void deleteTemporaryPlan();
 	void loadFromDive(dive* d);
-	void undoEdition();
+	void restoreBackupDive();
+
 signals:
 	void planCreated();
 	void planCanceled();
@@ -73,6 +74,7 @@ private:
 	Mode mode;
 	QVector<divedatapoint> divepoints;
 	struct dive *tempDive;
+	struct dive backupDive;
 	void deleteTemporaryPlan(struct divedatapoint *dp);
 	QVector<sample> backupSamples; // For editing added dives.
 	struct dive *stagingDive;
@@ -82,10 +84,9 @@ private:
 class Button : public QObject, public QGraphicsRectItem {
 	Q_OBJECT
 public:
-	explicit Button(QObject* parent = 0);
+	Button(QObject* parent = 0, QGraphicsItem *itemParent = 0);
 	void setText(const QString& text);
 	void setPixmap(const QPixmap& pixmap);
-
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent* event);
 signals:
@@ -95,6 +96,20 @@ private:
 	QGraphicsSimpleTextItem *text;
 };
 
+
+class ExpanderGraphics : public QGraphicsRectItem {
+public:
+	ExpanderGraphics(QGraphicsItem *parent = 0);
+
+	QGraphicsPixmapItem *icon;
+	Button *increaseBtn;
+	Button *decreaseBtn;
+private:
+	QGraphicsPixmapItem *bg;
+	QGraphicsPixmapItem *leftWing;
+	QGraphicsPixmapItem *rightWing;
+};
+
 class DiveHandler : public QObject, public QGraphicsEllipseItem{
 Q_OBJECT
 public:
@@ -102,8 +117,11 @@ public:
 protected:
 	void mousePressEvent(QGraphicsSceneMouseEvent* event);
 	void contextMenuEvent(QGraphicsSceneContextMenuEvent* event);
+private:
+	int parentIndex();
 public slots:
 	void selfRemove();
+	void changeGas();
 };
 
 class Ruler : public QGraphicsLineItem{
@@ -160,11 +178,8 @@ private slots:
 	void decreaseTime();
 	void decreaseDepth();;
 	void drawProfile();
-	void prepareSelectGas();
-	void selectGas(const QModelIndex& index);
 	void pointInserted(const QModelIndex&, int start, int end);
 	void pointsRemoved(const QModelIndex&, int start, int end);
-	bool eventFilter(QObject *object, QEvent* event);
 private:
 	void moveActiveHandler(const QPointF& MappedPos, const int pos);
 
@@ -173,15 +188,7 @@ private:
 
 	/* This is the user-entered handles. */
 	QList<DiveHandler *> handles;
-
-	/* this is the user-entered gases.
-		This must be a button, so the
-		user cna click to choose a new gas.
-	 */
-	QList<Button*> gases;
-	QListView *gasListView;
-	QStringListModel *gasChoices;
-	Button *currentGasChoice;
+	QList<QGraphicsSimpleTextItem*> gases;
 
 	/* those are the lines that follows the mouse. */
 	QGraphicsLineItem *verticalLine;
@@ -206,10 +213,8 @@ private:
 	QGraphicsSimpleTextItem *depthString;
 
 	/* Buttons */
-	Button *plusTime;  // adds 10 minutes to the time ruler.
-	Button *plusDepth; // adds 10 meters to the depth ruler.
-	Button *lessTime;  // remove 10 minutes to the time ruler.
-	Button *lessDepth; // remove 10 meters to the depth ruler.
+	ExpanderGraphics *depthHandler;
+	ExpanderGraphics *timeHandler;
 
 	int minMinutes; // this holds the minimum duration of the dive.
 	int dpMaxTime; // this is the time of the dive calculated by the deco.

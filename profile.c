@@ -496,6 +496,9 @@ static inline int pressure_time(struct dive *dive, struct divecomputer *dc, stru
 	int time = b->sec - a->sec;
 	int depth = (a->depth + b->depth)/2;
 
+	if (depth <= SURFACE_THRESHOLD)
+		return 0;
+
 	return depth_to_mbar(depth, dive) * time;
 }
 
@@ -553,7 +556,7 @@ static void fill_missing_tank_pressures(struct dive *dive, struct plot_info *pi,
 	}
 }
 
-static int get_cylinder_index(struct dive *dive, struct event *ev)
+int get_cylinder_index(struct dive *dive, struct event *ev)
 {
 	int i;
 	int best = 0, score = INT_MAX;

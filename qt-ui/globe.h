@@ -17,7 +17,9 @@ public:
 	using MarbleWidget::centerOn;
 	GlobeGPS(QWidget *parent);
 	void reload();
+	void repopulateLabels();
 	void centerOn(struct dive* dive);
+	void diveEditMode();
 
 protected:
 	/* reimp */ void resizeEvent(QResizeEvent *event);

@@ -5,8 +5,19 @@
 #include <limits.h>
 #include "gettext.h"
 #include "dive.h"
+#include "planner.h"
 
 struct tag_entry *g_tag_list = NULL;
+
+static const char* default_tags[] = {
+	QT_TRANSLATE_NOOP("gettextFromC", "boat"), QT_TRANSLATE_NOOP("gettextFromC", "shore"), QT_TRANSLATE_NOOP("gettextFromC", "drift"),
+	QT_TRANSLATE_NOOP("gettextFromC", "deep"), QT_TRANSLATE_NOOP("gettextFromC", "cavern") , QT_TRANSLATE_NOOP("gettextFromC", "ice"),
+	QT_TRANSLATE_NOOP("gettextFromC", "wreck"), QT_TRANSLATE_NOOP("gettextFromC", "cave"), QT_TRANSLATE_NOOP("gettextFromC", "altitude"),
+	QT_TRANSLATE_NOOP("gettextFromC", "pool"), QT_TRANSLATE_NOOP("gettextFromC", "lake"), QT_TRANSLATE_NOOP("gettextFromC", "river"),
+	QT_TRANSLATE_NOOP("gettextFromC", "night"), QT_TRANSLATE_NOOP("gettextFromC", "fresh"), QT_TRANSLATE_NOOP("gettextFromC", "student"),
+	QT_TRANSLATE_NOOP("gettextFromC", "instructor"), QT_TRANSLATE_NOOP("gettextFromC", "photo"), QT_TRANSLATE_NOOP("gettextFromC", "video"),
+	QT_TRANSLATE_NOOP("gettextFromC", "deco")
+};
 
 void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name)
 {
@@ -326,6 +337,44 @@ static void fixup_dc_duration(struct divecomputer *dc)
 	if (duration) {
 		dc->duration.seconds = duration;
 		dc->meandepth.mm = (depthtime + duration/2) / duration;
+	}
+}
+
+void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration)
+{
+	int i;
+	int depthtime[MAX_CYLINDERS] = {0,};
+	int lasttime = 0, lastdepth = 0;
+	int idx = 0;
+
+	for (i = 0; i < MAX_CYLINDERS; i++)
+		mean[i] = duration[i] = 0;
+	struct event *ev = get_next_event(dc->events, "gaschange");
+	if (!ev) {
+		// special case - no gas changes
+		mean[0] = dc->meandepth.mm;
+		duration[0] = dc->duration.seconds;
+		return;
+	}
+	for (i = 0; i < dc->samples; i++) {
+		struct sample *sample = dc->sample + i;
+		int time = sample->time.seconds;
+		int depth = sample->depth.mm;
+		if (ev && time >= ev->time.seconds) {
+			idx = get_cylinder_index(dive, ev);
+			ev = get_next_event(ev->next, "gaschange");
+		}
+		/* We ignore segments at the surface */
+		if (depth > SURFACE_THRESHOLD || lastdepth > SURFACE_THRESHOLD) {
+			duration[idx] += time - lasttime;
+			depthtime[idx] += (time - lasttime) * (depth + lastdepth) / 2;
+		}
+		lastdepth = depth;
+		lasttime = time;
+	}
+	for (i = 0; i < MAX_CYLINDERS; i++) {
+		if (duration[i])
+			mean[i] = (depthtime[i] + duration[i] / 2) / duration[i];
 	}
 }
 
@@ -1127,20 +1176,13 @@ static int find_cylinder_match(cylinder_t *cyl, cylinder_t array[], unsigned int
 /* Force an initial gaschange event to the (old) gas #0 */
 static void add_initial_gaschange(struct dive *dive, struct divecomputer *dc)
 {
-	int o2, he, value;
 	struct event *ev = get_next_event(dc->events, "gaschange");
 
 	if (ev && ev->time.seconds < 30)
 		return;
 
 	/* Old starting gas mix */
-	o2 = get_o2(&dive->cylinder[0].gasmix);
-	he = get_he(&dive->cylinder[0].gasmix);
-	o2 = (o2 + 5) / 10;
-	he = (he + 5) / 10;
-	value = o2 + (he << 16);
-
-	add_event(dc, 0, 25, 0, value, "gaschange"); /* SAMPLE_EVENT_GASCHANGE2 */
+	add_gas_switch_event(dive, dc, 0, 0);
 }
 
 static void dc_cylinder_renumber(struct dive *dive, struct divecomputer *dc, int mapping[])
@@ -1912,20 +1954,28 @@ static struct divetag *taglist_add_divetag(struct tag_entry *tag_list, struct di
 
 struct divetag *taglist_add_tag(struct tag_entry *tag_list, const char *tag)
 {
+	int i = 0, is_default_tag = 0;
 	struct divetag *ret_tag, *new_tag;
 	const char *translation;
 	new_tag = malloc(sizeof(struct divetag));
 
-	translation = translate("gettextFromC", tag);
-	if (strcmp(tag, translation) == 0) {
-		new_tag->source = NULL;
-		new_tag->name = malloc(strlen(tag)+1);
-		memcpy(new_tag->name, tag, strlen(tag)+1);
-	} else {
+	for (i=0; i<sizeof(default_tags)/sizeof(char*); i++) {
+		if (strcmp(default_tags[i], tag) == 0) {
+			is_default_tag = 1;
+			break;
+		}
+	}
+	/* Only translate default tags */
+	if (is_default_tag) {
+		translation = translate("gettextFromC", tag);
 		new_tag->name = malloc(strlen(translation)+1);
 		memcpy(new_tag->name, translation, strlen(translation)+1);
 		new_tag->source = malloc(strlen(tag)+1);
 		memcpy(new_tag->source, tag, strlen(tag)+1);
+	} else {
+		new_tag->source = NULL;
+		new_tag->name = malloc(strlen(tag)+1);
+		memcpy(new_tag->name, tag, strlen(tag)+1);
 	}
 	/* Try to insert new_tag into g_tag_list if we are not operating on it */
 	if (tag_list != g_tag_list) {
@@ -1979,16 +2029,6 @@ static void taglist_merge(struct tag_entry *dst, struct tag_entry *src1, struct 
 void taglist_init_global()
 {
 	int i;
-	const char* default_tags[] = {
-		QT_TRANSLATE_NOOP("gettextFromC", "boat"), QT_TRANSLATE_NOOP("gettextFromC", "shore"), QT_TRANSLATE_NOOP("gettextFromC", "drift"),
-		QT_TRANSLATE_NOOP("gettextFromC", "deep"), QT_TRANSLATE_NOOP("gettextFromC", "cavern") , QT_TRANSLATE_NOOP("gettextFromC", "ice"),
-		QT_TRANSLATE_NOOP("gettextFromC", "wreck"), QT_TRANSLATE_NOOP("gettextFromC", "cave"), QT_TRANSLATE_NOOP("gettextFromC", "altitude"),
-		QT_TRANSLATE_NOOP("gettextFromC", "pool"), QT_TRANSLATE_NOOP("gettextFromC", "lake"), QT_TRANSLATE_NOOP("gettextFromC", "river"),
-		QT_TRANSLATE_NOOP("gettextFromC", "night"), QT_TRANSLATE_NOOP("gettextFromC", "fresh"), QT_TRANSLATE_NOOP("gettextFromC", "student"),
-		QT_TRANSLATE_NOOP("gettextFromC", "instructor"), QT_TRANSLATE_NOOP("gettextFromC", "photo"), QT_TRANSLATE_NOOP("gettextFromC", "video"),
-		QT_TRANSLATE_NOOP("gettextFromC", "deco")
-	};
-
 	taglist_init(&g_tag_list);
 
 	for(i=0; i<sizeof(default_tags)/sizeof(char*); i++)
@@ -2071,4 +2111,16 @@ struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset)
 				return dive;
 	}
 	return NULL;
+}
+
+void shift_times(const timestamp_t amount)
+{
+	int i;
+	struct dive *dive;
+
+	for_each_dive (i, dive) {
+		if (!dive->selected)
+			continue;
+		dive->when += amount;
+	}
 }

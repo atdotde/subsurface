@@ -57,6 +57,8 @@ void set_last_stop(bool last_stop_6m)
 
 void get_gas_from_events(struct divecomputer *dc, int time, int *o2, int *he)
 {
+	// we don't modify the values passed in if nothing is found
+	// so don't call with uninitialized o2/he !
 	struct event *event = dc->events;
 	while (event && event->time.seconds <= time) {
 		if (!strcmp(event->name, "gaschange")) {
@@ -74,7 +76,7 @@ static inline bool match_percent(int a, int b)
 	return (a + 5) / 10 == (b + 5) / 10;
 }
 
-static int get_gasidx(struct dive *dive, int o2, int he)
+int get_gasidx(struct dive *dive, int o2, int he)
 {
 	int gasidx = -1;
 
@@ -265,11 +267,10 @@ struct dive *create_dive_from_plan(struct diveplan *diveplan, const char **error
 		if (o2 != oldo2 || he != oldhe) {
 			int plano2 = (o2 + 5) / 10 * 10;
 			int planhe = (he + 5) / 10 * 10;
-			int value;
-			if (add_gas(dive, plano2, planhe) < 0)
+			int idx;
+            if ((idx = add_gas(dive, plano2, planhe)) < 0)
 				goto gas_error_exit;
-			value = (plano2 / 10) | ((planhe / 10) << 16);
-			add_event(dc, lasttime, 25, 0, value, "gaschange"); // SAMPLE_EVENT_GASCHANGE2
+			add_gas_switch_event(dive, dc, lasttime, idx);
 			oldo2 = o2; oldhe = he;
 		}
 		/* Create sample */
@@ -573,7 +574,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	int gaschangenr;
 	unsigned int *stoplevels = NULL;
 
-	set_gf(diveplan->gflow, diveplan->gfhigh);
+	set_gf(diveplan->gflow, diveplan->gfhigh, default_prefs.gf_low_at_maxdepth);
 	if (!diveplan->surface_pressure)
 		diveplan->surface_pressure = SURFACE_PRESSURE;
 	if (*divep)

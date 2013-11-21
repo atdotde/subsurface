@@ -633,6 +633,8 @@ extern void save_dives_logic(const char *filename, bool select_only);
 extern void save_dive(FILE *f, struct dive *dive);
 extern void export_dives_uddf(const char *filename, const bool selected);
 
+extern void shift_times(const timestamp_t amount);
+
 extern xsltStylesheetPtr get_stylesheet(const char *name);
 
 extern char *xslt_path;
@@ -659,6 +661,8 @@ extern void copy_samples(struct dive *s, struct dive *d);
 extern void fill_default_cylinder(cylinder_t *cyl);
 extern void add_gas_switch_event(struct dive *dive, struct divecomputer *dc, int time, int idx);
 extern void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
+extern void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration);
+extern int get_cylinder_index(struct dive *dive, struct event *ev);
 
 /* UI related protopypes */
 
@@ -711,7 +715,7 @@ extern double add_segment(double pressure, const struct gasmix *gasmix, int peri
 extern void clear_deco(double surface_pressure);
 extern void dump_tissues(void);
 extern unsigned int deco_allowed_depth(double tissues_tolerance, double surface_pressure, struct dive *dive, bool smooth);
-extern void set_gf(short gflow, short gfhigh);
+extern void set_gf(short gflow, short gfhigh, bool gf_low_at_maxdepth);
 extern void cache_deco_state(double, char **datap);
 extern double restore_deco_state(char *data);
 

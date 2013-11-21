@@ -53,6 +53,8 @@ MainWindow::MainWindow() : helpView(0)
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(update()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(reloadHeaderActions()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ProfileWidget, SLOT(refresh()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.InfoWidget, SLOT(updateDiveInfo()));
+
 	ui.mainErrorMessage->hide();
 	initialUiSetup();
 	readSettings();
@@ -98,8 +100,9 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-	if (ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before opening a new file." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before opening a new file." );
 		return;
 	}
 	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
@@ -134,8 +137,9 @@ void MainWindow::cleanUpEmpty()
 
 void MainWindow::on_actionClose_triggered()
 {
-	if (ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before closing the file." );
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
 		return;
 	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
@@ -145,6 +149,7 @@ void MainWindow::on_actionClose_triggered()
 	while (dive_table.nr)
 		delete_single_dive(0);
 
+	dive_list()->selectedTrips.clear();
 	/* clear the selection and the statistics */
 	selected_dive = -1;
 
@@ -213,7 +218,7 @@ void MainWindow::on_actionDivePlanner_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before trying to plan a dive." );
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to plan a dive." );
 		return;
 	}
 	disableDcShortcuts();
@@ -238,6 +243,11 @@ void MainWindow::on_actionPreferences_triggered()
 
 void MainWindow::on_actionQuit_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 	writeSettings();
@@ -271,7 +281,7 @@ void MainWindow::on_actionAddDive_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or undo the current dive edit before trying to add a dive." );
+		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to add a dive." );
 		return;
 	}
 	dive_list()->rememberSelection();
@@ -429,12 +439,14 @@ void MainWindow::saveSplitterSizes(){
 void MainWindow::on_actionPreviousDC_triggered()
 {
 	dc_number--;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 
 void MainWindow::on_actionNextDC_triggered()
 {
 	dc_number++;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 
@@ -472,12 +484,8 @@ QString MainWindow::filter()
 {
 	QString f;
 	f += "ALL ( *.ssrf *.xml *.XML *.uddf *.udcf *.UDFC *.jlb *.JLB ";
-#ifdef LIBZIP
 	f += "*.sde *.SDE *.dld *.DLD ";
-#endif
-#ifdef SQLITE3
 	f += "*.db";
-#endif
 	f += ");;";
 
 	f += "Subsurface (*.ssrf);;";
@@ -486,13 +494,9 @@ QString MainWindow::filter()
 	f += "UDCF (*.udcf *.UDCF);;";
 	f += "JLB  (*.jlb *.JLB);;";
 
-#ifdef LIBZIP
 	f += "SDE (*.sde *.SDE);;";
 	f += "DLD (*.dld *.DLD);;";
-#endif
-#ifdef SQLITE3
 	f += "DB (*.db)";
-#endif
 
 	return f;
 }
@@ -550,6 +554,20 @@ bool MainWindow::askSaveChanges()
 	v = s.value(QString(name));				\
 	if (v.isValid())					\
 		prefs.field = v.toInt();			\
+	else							\
+		prefs.field = default_prefs.field
+
+#define GET_TXT(name, field)					\
+	v = s.value(QString(name));				\
+	if (v.isValid())					\
+		prefs.field = strdup(v.toString().toUtf8().constData());			\
+	else							\
+		prefs.field = default_prefs.field
+
+#define GET_TXT(name, field)					\
+	v = s.value(QString(name));				\
+	if (v.isValid())					\
+		prefs.field = strdup(v.toString().toUtf8().constData());			\
 	else							\
 		prefs.field = default_prefs.field
 
@@ -612,21 +630,21 @@ void MainWindow::readSettings()
 	GET_BOOL("calcalltissues", calc_all_tissues);
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
-	set_gf(prefs.gflow, prefs.gfhigh);
+	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
+	set_gf(prefs.gflow, prefs.gfhigh, prefs.gf_low_at_maxdepth);
 	GET_BOOL("show_sac", show_sac);
 	s.endGroup();
 
-	s.beginGroup("Display");
-	v = s.value(QString("divelist_font"));
-	if (v.isValid())
-		prefs.divelist_font = strdup(v.toString().toUtf8().data());
-}
+	s.beginGroup("GeneralSettings");
+	GET_TXT("default_filename", default_filename);
+	s.endGroup();
 
-#define SAVE_VALUE(name, field)				\
-	if (prefs.field != default_prefs.field)		\
-		settings.setValue(name, prefs.field);	\
-	else						\
-		settings.remove(name)
+	s.beginGroup("Display");
+	GET_TXT("divelist_font", divelist_font);
+	GET_INT("font_size", font_size);
+	GET_INT("displayinvalid", display_invalid_dives);
+	s.endGroup();
+}
 
 void MainWindow::writeSettings()
 {
@@ -638,36 +656,6 @@ void MainWindow::writeSettings()
 	if (state == VIEWALL){
 		saveSplitterSizes();
 	}
-	settings.endGroup();
-
-	settings.beginGroup("Units");
-	SAVE_VALUE("length", units.length);
-	SAVE_VALUE("pressure", units.pressure);
-	SAVE_VALUE("volume", units.volume);
-	SAVE_VALUE("temperature", units.temperature);
-	SAVE_VALUE("weight", units.weight);
-	SAVE_VALUE("vertical_speed_time", units.vertical_speed_time);
-	settings.endGroup();
-	settings.beginGroup("TecDetails");
-	SAVE_VALUE("po2graph", pp_graphs.po2);
-	SAVE_VALUE("pn2graph", pp_graphs.pn2);
-	SAVE_VALUE("phegraph", pp_graphs.phe);
-	SAVE_VALUE("po2threshold", pp_graphs.po2_threshold);
-	SAVE_VALUE("pn2threshold", pp_graphs.pn2_threshold);
-	SAVE_VALUE("phethreshold", pp_graphs.phe_threshold);
-	SAVE_VALUE("mod", mod);
-	SAVE_VALUE("modppO2", mod_ppO2);
-	SAVE_VALUE("ead", ead);
-	SAVE_VALUE("redceiling", profile_red_ceiling);
-	SAVE_VALUE("calcceiling", profile_calc_ceiling);
-	SAVE_VALUE("calcceiling3m", calc_ceiling_3m_incr);
-	SAVE_VALUE("calcalltissues", calc_all_tissues);
-	SAVE_VALUE("dcceiling", profile_dc_ceiling);
-	SAVE_VALUE("gflow", gflow);
-	SAVE_VALUE("gfhigh", gfhigh);
-	settings.endGroup();
-	settings.beginGroup("GeneralSettings");
-	SAVE_VALUE("default_filename", default_filename);
 	settings.endGroup();
 }
 

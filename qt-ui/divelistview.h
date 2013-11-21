@@ -43,9 +43,11 @@ public slots:
 	void mergeTripAbove();
 	void mergeTripBelow();
 	void newTripAbove();
+	void addToTripAbove();
 	void mergeDives();
 	void saveSelectedDivesAs();
 	void exportSelectedDivesAsUDDF();
+	void shiftTimes();
 
 signals:
 	void currentDiveChanged(int divenr);

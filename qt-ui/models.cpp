@@ -284,14 +284,20 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 		break;
 	case O2:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.o2.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int o2 = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.he.permille + o2 <= 1000) {
+				cyl->gasmix.o2.permille = o2;
+				changed = true;
+			}
 		}
 		break;
 	case HE:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.he.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int he = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.o2.permille + he <= 1000) {
+				cyl->gasmix.he.permille = he;
+				changed = true;
+			}
 		}
 		break;
 	case DEPTH:
@@ -379,10 +385,10 @@ void CylindersModel::remove(const QModelIndex& index)
 	}
 	cylinder_t *cyl = &current->cylinder[index.row()];
 	if (DivePlannerPointsModel::instance()->tankInUse(cyl->gasmix.o2.permille, cyl->gasmix.he.permille)) {
-		QMessageBox::warning(mainWindow(),
-				     tr("Cylinder cannot be removed"),
-				     tr("This gas in use. Only cylinders that are not used in the dive can be removed."),
-				     QMessageBox::Ok);
+		QMessageBox::warning(mainWindow(), TITLE_OR_TEXT(
+				tr("Cylinder cannot be removed"),
+				tr("This gas in use. Only cylinders that are not used in the dive can be removed.")),
+				QMessageBox::Ok);
 		return;
 	}
 	beginRemoveRows(QModelIndex(), index.row(), index.row()); // yah, know, ugly.
@@ -810,6 +816,11 @@ TreeItem::~TreeItem()
 	qDeleteAll(children);
 }
 
+Qt::ItemFlags TreeItem::flags(const QModelIndex& index) const
+{
+	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+}
+
 int TreeItem::row() const
 {
 	if (parent)
@@ -844,6 +855,11 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
 		return defaultModelFont();
 	else
 		return val;
+}
+
+bool TreeItem::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	return false;
 }
 
 QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent)
@@ -914,7 +930,10 @@ QVariant TripItem::data(int column, int role) const
 	if (role == Qt::DisplayRole) {
 		switch (column) {
 			case DiveTripModel::NR:
-			ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			if (trip->location && *trip->location)
+				ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			else
+				ret = get_trip_date_string(trip->when, trip->nrdives);
 			break;
 		}
 	}
@@ -993,6 +1012,37 @@ QVariant DiveItem::data(int column, int role) const
 		retVal = get_divenr(dive);
 	}
 	return retVal;
+}
+
+Qt::ItemFlags DiveItem::flags(const QModelIndex& index) const
+{
+	if(index.column() == NR){
+		return TreeItem::flags(index) | Qt::ItemIsEditable;
+	}
+	return TreeItem::flags(index);
+}
+
+bool DiveItem::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	if (role != Qt::EditRole)
+		return false;
+	if (index.column() != NR)
+		return false;
+
+	int v = value.toInt();
+	if (v == 0)
+		return false;
+
+	int i;
+	struct dive *d;
+	for_each_dive(i, d){
+		if (d->number == v)
+			return false;
+	}
+
+	dive->number = value.toInt();
+	mark_divelist_changed(TRUE);
+	return true;
 }
 
 QString DiveItem::displayDate() const
@@ -1075,7 +1125,8 @@ Qt::ItemFlags DiveTripModel::flags(const QModelIndex& index) const
 	if (!index.isValid())
 		return 0;
 
-	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+	TripItem *item = static_cast<TripItem*>(index.internalPointer());
+	return item->flags(index);
 }
 
 QVariant DiveTripModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -1166,6 +1217,15 @@ void DiveTripModel::setLayout(DiveTripModel::Layout layout)
 	currentLayout = layout;
 	setupModelData();
 }
+
+bool DiveTripModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	TreeItem* item = static_cast<TreeItem*>(index.internalPointer());
+	DiveItem *diveItem = dynamic_cast<DiveItem*>(item);
+	if(!diveItem)
+		return false;
+	return diveItem->setData(index, value, role);}
+
 
 /*####################################################################
  *
@@ -1673,18 +1733,18 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 
 Qt::ItemFlags GasSelectionModel::flags(const QModelIndex& index) const
 {
-    return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 GasSelectionModel* GasSelectionModel::instance()
 {
-    static GasSelectionModel* self = new GasSelectionModel();
-    return self;
+	static GasSelectionModel* self = new GasSelectionModel();
+	return self;
 }
 
 void GasSelectionModel::repopulate()
 {
-    setStringList(DivePlannerPointsModel::instance()->getGasList());
+	setStringList(DivePlannerPointsModel::instance()->getGasList());
 }
 
 QVariant GasSelectionModel::data(const QModelIndex& index, int role) const

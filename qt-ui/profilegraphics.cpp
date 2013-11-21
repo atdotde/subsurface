@@ -17,6 +17,7 @@
 #include <QMouseEvent>
 #include <QToolBar>
 #include <qtextdocument.h>
+#include <QMessageBox>
 #include <limits>
 
 #include "../color.h"
@@ -25,6 +26,7 @@
 #include "../profile.h"
 #include "../device.h"
 #include "../helpers.h"
+#include "../planner.h"
 
 #include <libdivecomputer/parser.h>
 #include <libdivecomputer/version.h>
@@ -111,6 +113,118 @@ void ProfileGraphicsView::wheelEvent(QWheelEvent* event)
 	scrollViewTo(event->pos());
 	toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
 }
+
+void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
+{
+	if(selected_dive == -1)
+		return;
+	QMenu m;
+	QMenu *gasChange = m.addMenu("Add Gas Change");
+	GasSelectionModel *model = GasSelectionModel::instance();
+	model->repopulate();
+	int rowCount = model->rowCount();
+	for(int i = 0; i < rowCount; i++){
+		QAction *action = new QAction(&m);
+		action->setText( model->data(model->index(i, 0),Qt::DisplayRole).toString());
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(changeGas()));
+		action->setData(event->globalPos());
+		gasChange->addAction(action);
+	}
+	QAction *action = m.addAction("Add Bookmark", this, SLOT(addBookmark()));
+	action->setData(event->globalPos());
+	QList<QGraphicsItem*> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
+	Q_FOREACH(QGraphicsItem *i, itemsAtPos){
+		EventItem *item = dynamic_cast<EventItem*>(i);
+		if(!item)
+			continue;
+		QAction *action = new QAction(&m);
+		action->setText("Remove Event");
+		action->setData(QVariant::fromValue<void*>(item)); // so we know what to remove.
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(removeEvent()));
+		m.addAction(action);
+		action = new QAction(&m);
+		action->setText("Hide similar events");
+		action->setData(QVariant::fromValue<void*>(item));
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(hideEvents()));
+		m.addAction(action);
+		break;
+	}
+	m.exec(event->globalPos());
+}
+
+void ProfileGraphicsView::addBookmark()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QPoint globalPos = action->data().toPoint();
+	QPoint viewPos = mapFromGlobal(globalPos);
+	QPointF scenePos = mapToScene(viewPos);
+	int seconds = scenePos.x() / gc.maxx * (gc.rightx - gc.leftx) + gc.leftx;
+	add_event(current_dc, seconds, SAMPLE_EVENT_BOOKMARK, 0, 0, "bookmark");
+	mark_divelist_changed(TRUE);
+	plot(current_dive, TRUE);
+}
+
+void ProfileGraphicsView::changeGas()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QPoint globalPos = action->data().toPoint();
+	QPoint viewPos = mapFromGlobal(globalPos);
+	QPointF scenePos = mapToScene(viewPos);
+	QString gas = action->text();
+	int o2, he;
+	validate_gas(gas.toUtf8().constData(), &o2, &he);
+	int seconds = scenePos.x() / gc.maxx * (gc.rightx - gc.leftx) + gc.leftx;
+	add_gas_switch_event(current_dive, current_dc, seconds, get_gasidx(current_dive, o2, he));
+	mark_divelist_changed(TRUE);
+	plot(current_dive, TRUE);
+}
+
+void ProfileGraphicsView::hideEvents()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
+	struct event *event = item->ev;
+
+	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+				  tr("Hide events"),
+				  tr("Hide all %1 events?").arg(event->name)),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok){
+		if (event->name) {
+			for (int i = 0; i < evn_used; i++) {
+				if (! strcmp(event->name, ev_namelist[i].ev_name)) {
+					ev_namelist[i].plot_ev = false;
+					break;
+				}
+			}
+		}
+		plot(current_dive, TRUE);
+	}
+}
+
+void ProfileGraphicsView::removeEvent()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
+	struct event *event = item->ev;
+
+	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+				  tr("Remove the selected event?"),
+				  tr("%1 @ %2:%3").arg(event->name)
+				  .arg(event->time.seconds / 60)
+				  .arg(event->time.seconds % 60, 2, 10, QChar('0'))),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok){
+		struct event **ep = &current_dc->events;
+		while (ep && *ep != event)
+			ep = &(*ep)->next;
+		if (ep) {
+			*ep = event->next;
+			free(event);
+		}
+		mark_divelist_changed(TRUE);
+		plot(current_dive, TRUE);
+	}
+}
+
 
 void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
 {
@@ -828,7 +942,7 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	int x = SCALEXGC(ev->time.seconds);
 	int y = SCALEYGC(entry->depth);
 
-	EventItem *item = new EventItem(0, isGrayscale);
+	EventItem *item = new EventItem(ev, 0, isGrayscale);
 	item->setPos(x, y);
 	scene()->addItem(item);
 
@@ -850,7 +964,7 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 			name += QString(":%1").arg(ev->value);
 		}
 	} else if (ev->name && name == "SP change") {
-		name += tr("Bailing out to OC");
+		name += "\n" + tr("Bailing out to OC");
 	} else {
 		name += ev->flags == SAMPLE_FLAGS_BEGIN ? tr(" begin", "Starts with space!") :
 				ev->flags == SAMPLE_FLAGS_END ? tr(" end", "Starts with space!") : "";
@@ -1443,7 +1557,6 @@ void ToolTipItem::persistPos()
 	s.beginGroup("ProfileMap");
 	s.setValue("tooltip_position", currentPos);
 	s.endGroup();
-	s.sync();
 }
 
 void ToolTipItem::readPos()
@@ -1461,9 +1574,8 @@ QColor EventItem::getColor(const color_indice_t i)
 	return profile_color[i].at((isGrayscale) ? 1 : 0);
 }
 
-EventItem::EventItem(QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent)
+EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent), isGrayscale(grayscale), ev(ev)
 {
-	isGrayscale = grayscale;
 	setFlag(ItemIgnoresTransformations);
 	setFlag(ItemIsFocusable);
 	setAcceptHoverEvents(true);
