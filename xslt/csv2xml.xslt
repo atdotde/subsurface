@@ -5,6 +5,9 @@
   <xsl:param name="timeField" select="timeField"/>
   <xsl:param name="depthField" select="depthField"/>
   <xsl:param name="tempField" select="tempField"/>
+  <xsl:param name="po2Field" select="po2Field"/>
+  <xsl:param name="cnsField" select="cnsField"/>
+  <xsl:param name="otuField" select="otuField"/>
   <xsl:param name="date" select="date"/>
   <xsl:param name="time" select="time"/>
   <xsl:output method="xml" indent="yes"/>
@@ -96,10 +99,47 @@
         </xsl:attribute>
 
         <xsl:attribute name="temp">
-          <xsl:call-template name="getFieldByIndex">
-            <xsl:with-param name="index" select="$tempField"/>
-            <xsl:with-param name="line" select="$line"/>
-          </xsl:call-template>
+          <xsl:choose>
+            <xsl:when test="$tempField >= 0">
+              <xsl:call-template name="getFieldByIndex">
+                <xsl:with-param name="index" select="$tempField"/>
+                <xsl:with-param name="line" select="$line"/>
+              </xsl:call-template>
+            </xsl:when>
+          </xsl:choose>
+        </xsl:attribute>
+
+        <xsl:attribute name="po2">
+          <xsl:choose>
+              <xsl:when test="$po2Field >= 0">
+                <xsl:call-template name="getFieldByIndex">
+                  <xsl:with-param name="index" select="$po2Field"/>
+                  <xsl:with-param name="line" select="$line"/>
+                </xsl:call-template>
+              </xsl:when>
+          </xsl:choose>
+        </xsl:attribute>
+
+        <xsl:attribute name="cns">
+          <xsl:choose>
+              <xsl:when test="$cnsField >= 0">
+                <xsl:call-template name="getFieldByIndex">
+                  <xsl:with-param name="index" select="$cnsField"/>
+                  <xsl:with-param name="line" select="$line"/>
+                </xsl:call-template>
+              </xsl:when>
+          </xsl:choose>
+        </xsl:attribute>
+
+        <xsl:attribute name="otu">
+          <xsl:choose>
+              <xsl:when test="$otuField >= 0">
+                <xsl:call-template name="getFieldByIndex">
+                  <xsl:with-param name="index" select="$otuField"/>
+                  <xsl:with-param name="line" select="$line"/>
+                </xsl:call-template>
+              </xsl:when>
+          </xsl:choose>
         </xsl:attribute>
       </sample>
     </xsl:if>

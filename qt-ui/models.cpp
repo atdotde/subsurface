@@ -92,21 +92,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	case Qt::FontRole: {
 		QFont font = defaultModelFont();
 		switch (index.column()) {
-		case START:
-			if (!cyl->start.mbar)
-				font.setItalic(true);
-			break;
-		case END:
-			if (!cyl->end.mbar)
-				font.setItalic(true);
-			break;
+		case START: font.setItalic(!cyl->start.mbar); break;
+		case END: font.setItalic(!cyl->end.mbar); break;
 		}
 		ret = font;
 		break;
 	}
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignHCenter;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
@@ -162,6 +156,11 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this cylinder.");
 		break;
 	}
 
@@ -442,8 +441,8 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 		ret = defaultModelFont();
 		break;
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignRight;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
@@ -458,6 +457,10 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this weigthsystem.");
 		break;
 	}
 	return ret;
@@ -1255,8 +1258,11 @@ QVariant DiveComputerModel::data(const QModelIndex& index, int role) const
 		}
 	}
 
-	if (role ==  Qt::DecorationRole && index.column() == REMOVE){
-		ret = QIcon(":trash");
+	if (index.column() == REMOVE){
+		switch(role){
+			case Qt::DecorationRole : ret = QIcon(":trash"); break;
+			case Qt::ToolTipRole : ret = tr("Clicking here will remove this divecomputer."); break;
+		}
 	}
 	return ret;
 }
