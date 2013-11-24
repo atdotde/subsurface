@@ -92,21 +92,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	case Qt::FontRole: {
 		QFont font = defaultModelFont();
 		switch (index.column()) {
-		case START:
-			if (!cyl->start.mbar)
-				font.setItalic(true);
-			break;
-		case END:
-			if (!cyl->end.mbar)
-				font.setItalic(true);
-			break;
+		case START: font.setItalic(!cyl->start.mbar); break;
+		case END: font.setItalic(!cyl->end.mbar); break;
 		}
 		ret = font;
 		break;
 	}
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignHCenter;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
@@ -162,6 +156,11 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this cylinder.");
 		break;
 	}
 
@@ -442,8 +441,8 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 		ret = defaultModelFont();
 		break;
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignRight;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
@@ -458,6 +457,10 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this weigthsystem.");
 		break;
 	}
 	return ret;
@@ -1255,8 +1258,11 @@ QVariant DiveComputerModel::data(const QModelIndex& index, int role) const
 		}
 	}
 
-	if (role ==  Qt::DecorationRole && index.column() == REMOVE){
-		ret = QIcon(":trash");
+	if (index.column() == REMOVE){
+		switch(role){
+			case Qt::DecorationRole : ret = QIcon(":trash"); break;
+			case Qt::ToolTipRole : ret = tr("Clicking here will remove this divecomputer."); break;
+		}
 	}
 	return ret;
 }
@@ -1358,7 +1364,13 @@ QVariant YearStatisticsItem::data(int column, int role) const
 		return ret;
 	}
 	switch(column) {
-	case YEAR:		ret =  stats_interval.period; break;
+	case YEAR:
+		if (stats_interval.is_trip) {
+			ret = stats_interval.location;
+		} else {
+			ret =  stats_interval.period;
+		}
+		break;
 	case DIVES:		ret =  stats_interval.selection_size; break;
 	case TOTAL_TIME:	ret = get_time_string(stats_interval.total_time.seconds, 0); break;
 	case AVERAGE_TIME:	ret = get_minutes(stats_interval.total_time.seconds / stats_interval.selection_size); break;
@@ -1403,7 +1415,7 @@ QVariant YearlyStatisticsModel::headerData(int section, Qt::Orientation orientat
 
 	if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
 		switch(section) {
-		case YEAR:		val = tr("Year \n > Month"); break;
+		case YEAR:		val = tr("Year \n > Month / Trip"); break;
 		case DIVES:		val = tr("#"); break;
 		case TOTAL_TIME:	val = tr("Duration \n Total"); break;
 		case AVERAGE_TIME:	val = tr("\nAverage"); break;
@@ -1437,6 +1449,18 @@ void YearlyStatisticsModel::update_yearly_stats()
 			item->children.append(iChild);
 			iChild->parent = item;
 			month++;
+		}
+		rootItem->children.append(item);
+		item->parent = rootItem;
+	}
+
+
+	if (stats_by_trip != NULL ) {
+		YearStatisticsItem *item = new YearStatisticsItem(stats_by_trip[0]);
+		for (i = 1; stats_by_trip != NULL && stats_by_trip[i].is_trip; ++i) {
+			YearStatisticsItem *iChild = new YearStatisticsItem(stats_by_trip[i]);
+			item->children.append(iChild);
+			iChild->parent = item;
 		}
 		rootItem->children.append(item);
 		item->parent = rootItem;

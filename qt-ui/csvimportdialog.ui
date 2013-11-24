@@ -16,9 +16,9 @@
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>30</x>
+     <x>200</x>
      <y>240</y>
-     <width>341</width>
+     <width>171</width>
      <height>32</height>
     </rect>
    </property>
@@ -32,9 +32,9 @@
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
-     <x>40</x>
+     <x>20</x>
      <y>10</y>
-     <width>331</width>
+     <width>351</width>
      <height>71</height>
     </rect>
    </property>
@@ -91,102 +91,128 @@
   <widget class="QGroupBox" name="groupBox_3">
    <property name="geometry">
     <rect>
-     <x>40</x>
+     <x>20</x>
      <y>80</y>
-     <width>151</width>
-     <height>151</height>
+     <width>171</width>
+     <height>221</height>
     </rect>
    </property>
    <property name="title">
     <string>Field Configuration</string>
    </property>
-   <widget class="QSpinBox" name="CSVTime">
-    <property name="geometry">
-     <rect>
-      <x>60</x>
-      <y>30</y>
-      <width>56</width>
-      <height>29</height>
-     </rect>
-    </property>
-    <property name="minimum">
-     <number>0</number>
-    </property>
-    <property name="value">
-     <number>0</number>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="CSVDepth">
-    <property name="geometry">
-     <rect>
-      <x>60</x>
-      <y>70</y>
-      <width>56</width>
-      <height>29</height>
-     </rect>
-    </property>
-    <property name="minimum">
-     <number>0</number>
-    </property>
-    <property name="value">
-     <number>1</number>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="CSVTemperature">
-    <property name="geometry">
-     <rect>
-      <x>60</x>
-      <y>110</y>
-      <width>56</width>
-      <height>29</height>
-     </rect>
-    </property>
-    <property name="minimum">
-     <number>0</number>
-    </property>
-    <property name="value">
-     <number>15</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>30</y>
-      <width>41</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Time</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_2">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>70</y>
-      <width>51</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Depth</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>110</y>
-      <width>41</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Temp</string>
-    </property>
-   </widget>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="1">
+     <widget class="QSpinBox" name="CSVTime">
+      <property name="minimum">
+       <number>0</number>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>Time</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QSpinBox" name="CSVDepth">
+      <property name="minimum">
+       <number>0</number>
+      </property>
+      <property name="value">
+       <number>1</number>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Depth</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QSpinBox" name="CSVTemperature">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QCheckBox" name="temperatureCheckBox">
+      <property name="text">
+       <string>Temp</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QSpinBox" name="CSVpo2">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="po2CheckBox">
+      <property name="text">
+       <string>Po2</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QSpinBox" name="CSVcns">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QCheckBox" name="cnsCheckBox">
+      <property name="text">
+       <string>Cns</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="1">
+     <widget class="QSpinBox" name="CSVstopdepth">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="0">
+     <widget class="QCheckBox" name="stopdepthCheckBox">
+      <property name="text">
+       <string>Stopdepth</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+   <zorder>label</zorder>
+   <zorder>label_2</zorder>
+   <zorder>CSVTime</zorder>
+   <zorder>CSVDepth</zorder>
+   <zorder>temperatureCheckBox</zorder>
+   <zorder>CSVTemperature</zorder>
+   <zorder>po2CheckBox</zorder>
+   <zorder>CSVpo2</zorder>
+   <zorder>cnsCheckBox</zorder>
+   <zorder>CSVcns</zorder>
+   <zorder>stopdepthCheckBox</zorder>
+   <zorder>CSVstopdepth</zorder>
   </widget>
   <widget class="QGroupBox" name="groupBox_4">
    <property name="geometry">
@@ -248,6 +274,30 @@
      <y>274</y>
     </hint>
    </hints>
+  </connection>
+  <connection>
+   <sender>temperatureCheckBox</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>CSVTemperature</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>po2CheckBox</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>CSVpo2</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>cnsCheckBox</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>CSVcns</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>stopdepthCheckBox</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>CSVstopdepth</receiver>
+   <slot>setEnabled(bool)</slot>
   </connection>
  </connections>
 </ui>

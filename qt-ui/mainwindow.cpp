@@ -396,26 +396,41 @@ void MainWindow::on_actionViewGlobe_triggered()
 void MainWindow::on_actionViewAll_triggered()
 {
 	beginChangeState(VIEWALL);
+	static QList<int> mainSizes;
+	const int appH = qApp->desktop()->size().height();
+	const int appW = qApp->desktop()->size().width();
+	if (mainSizes.empty()){
+		mainSizes.append( appH * 0.7 );
+		mainSizes.append( appH * 0.3 );
+	}
+	static QList<int> infoProfileSizes;
+	if (infoProfileSizes.empty()){
+		infoProfileSizes.append( appW * 0.3 );
+		infoProfileSizes.append( appW * 0.7 );
+	}
+
+	static QList<int> listGlobeSizes;
+	if(listGlobeSizes.empty()){
+		listGlobeSizes.append( appW * 0.7 );
+		listGlobeSizes.append( appW * 0.3 );
+	}
+
 	QSettings settings;
 	settings.beginGroup("MainWindow");
 	if (settings.value("mainSplitter").isValid()){
 		ui.mainSplitter->restoreState(settings.value("mainSplitter").toByteArray());
 		ui.infoProfileSplitter->restoreState(settings.value("infoProfileSplitter").toByteArray());
 		ui.listGlobeSplitter->restoreState(settings.value("listGlobeSplitter").toByteArray());
+		if(ui.mainSplitter->sizes().first() == 0 || ui.mainSplitter->sizes().last() == 0)
+			ui.mainSplitter->setSizes(mainSizes);
+		if(ui.infoProfileSplitter->sizes().first() == 0 || ui.infoProfileSplitter->sizes().last() == 0)
+			ui.infoProfileSplitter->setSizes(infoProfileSizes);
+		if(ui.listGlobeSplitter->sizes().first() == 0 || ui.listGlobeSplitter->sizes().last() == 0)
+			ui.listGlobeSplitter->setSizes(listGlobeSizes);
+
 	} else {
-		QList<int> mainSizes;
-		mainSizes.append( qApp->desktop()->size().height() * 0.7 );
-		mainSizes.append( qApp->desktop()->size().height() * 0.3 );
 		ui.mainSplitter->setSizes( mainSizes );
-
-		QList<int> infoProfileSizes;
-		infoProfileSizes.append( qApp->desktop()->size().width() * 0.3 );
-		infoProfileSizes.append( qApp->desktop()->size().width() * 0.7 );
 		ui.infoProfileSplitter->setSizes(infoProfileSizes);
-
-		QList<int> listGlobeSizes;
-		listGlobeSizes.append( qApp->desktop()->size().width() * 0.7 );
-		listGlobeSizes.append( qApp->desktop()->size().width() * 0.3 );
 		ui.listGlobeSplitter->setSizes(listGlobeSizes);
 	}
 	redrawProfile();
@@ -637,6 +652,7 @@ void MainWindow::readSettings()
 
 	s.beginGroup("GeneralSettings");
 	GET_TXT("default_filename", default_filename);
+	GET_TXT("default_cylinder", default_cylinder);
 	s.endGroup();
 
 	s.beginGroup("Display");
@@ -706,6 +722,10 @@ void MainWindow::file_save_as(void)
 	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), default_filename,
 						tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
 	if (!filename.isNull() && !filename.isEmpty()) {
+
+		if(ui.InfoWidget->isEditing())
+			ui.InfoWidget->acceptChanges();
+
 		save_dives(filename.toUtf8().data());
 		set_filename(filename.toUtf8().data(), TRUE);
 		setTitle(MWTF_FILENAME);
@@ -719,6 +739,9 @@ void MainWindow::file_save(void)
 
 	if (!existing_filename)
 		return file_save_as();
+
+	if(ui.InfoWidget->isEditing())
+		ui.InfoWidget->acceptChanges();
 
 	current_default = prefs.default_filename;
 	if (strcmp(existing_filename, current_default) ==  0) {
