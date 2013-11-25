@@ -78,6 +78,12 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.font->setFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
 	ui.defaultfilename->setText(prefs.default_filename);
+	ui.default_cylinder->clear();
+	for(int i=0; tank_info[i].name != NULL; i++) {
+		ui.default_cylinder->addItem(tank_info[i].name);
+		if (prefs.default_cylinder && strcmp(tank_info[i].name, prefs.default_cylinder) == 0)
+			ui.default_cylinder->setCurrentIndex(i);
+	}
 	ui.displayinvalid->setChecked(prefs.display_invalid_dives);
 	ui.show_sac->setChecked(prefs.show_sac);
 	ui.vertical_speed_minutes->setChecked(prefs.units.vertical_speed_time == units::MINUTES);
@@ -138,7 +144,8 @@ void PreferencesDialog::syncSettings()
 	s.endGroup();
 	// Defaults
 	s.beginGroup("GeneralSettings");
-	s.value("default_filename", ui.defaultfilename->text());
+	s.setValue("default_filename", ui.defaultfilename->text());
+	s.setValue("default_cylinder", ui.default_cylinder->currentText());
 	s.endGroup();
 
 	s.beginGroup("Display");
