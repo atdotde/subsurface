@@ -353,19 +353,16 @@ void CylindersModel::setDive(dive* d)
 		clear();
 	if (!d)
 		return;
-	int amount = MAX_CYLINDERS;
+	rows = 0;
 	for(int i = 0; i < MAX_CYLINDERS; i++) {
-		cylinder_t *cylinder = &d->cylinder[i];
-		if (cylinder_none(cylinder)) {
-			amount = i;
-			break;
+		if (!cylinder_none(&d->cylinder[i])) {
+			rows = i+1;
 		}
 	}
-	rows = amount;
 	current = d;
 	changed = false;
-	if (amount > 0) {
-		beginInsertRows(QModelIndex(), 0, amount - 1);
+	if (rows > 0) {
+		beginInsertRows(QModelIndex(), 0, rows-1);
 		endInsertRows();
 	}
 }
@@ -546,20 +543,16 @@ void WeightModel::setDive(dive* d)
 {
 	if (current)
 		clear();
-
-	int amount = MAX_WEIGHTSYSTEMS;
+	rows = 0;
 	for(int i = 0; i < MAX_WEIGHTSYSTEMS; i++) {
-		weightsystem_t *weightsystem = &d->weightsystem[i];
-		if (weightsystem_none(weightsystem)) {
-			amount = i;
-			break;
+		if (!weightsystem_none(&d->weightsystem[i])) {
+			rows = i+1;
 		}
 	}
-	rows = amount;
 	current = d;
 	changed = false;
-	if (amount > 0) {
-		beginInsertRows(QModelIndex(), 0, amount - 1);
+	if (rows > 0) {
+		beginInsertRows(QModelIndex(), 0, rows-1);
 		endInsertRows();
 	}
 }
