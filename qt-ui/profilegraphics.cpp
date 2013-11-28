@@ -47,6 +47,10 @@ extern struct ev_select *ev_namelist;
 extern int evn_allocated;
 extern int evn_used;
 
+#define TOOLBAR_POS \
+QPoint(viewport()->geometry().width() - toolBarProxy->boundingRect().width(), \
+viewport()->geometry().height() - toolBarProxy->boundingRect().height() )
+
 ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , dive(0), diveDC(0), rulerItem(0), toolBarProxy(0)
 {
 	printMode = false;
@@ -110,8 +114,15 @@ void ProfileGraphicsView::wheelEvent(QWheelEvent* event)
 		scale(1.0 / scaleFactor, 1.0 / scaleFactor);
 		zoomLevel--;
 	}
+
 	scrollViewTo(event->pos());
-	toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
+	toolTip->setPos(mapToScene(toolTipPos));
+	toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	if(zoomLevel != 0){
+		toolBarProxy->hide();
+	}else{
+		toolBarProxy->show();
+	}
 }
 
 void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
@@ -232,15 +243,16 @@ void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
 		return;
 
 	toolTip->refresh(&gc,  mapToScene(event->pos()));
-
 	QPoint toolTipPos = mapFromScene(toolTip->pos());
-
+	QPoint toolBarPos = mapFromScene(toolBarProxy->pos());
 	scrollViewTo(event->pos());
 
 	if (zoomLevel == 0)
 		QGraphicsView::mouseMoveEvent(event);
-	else
-		toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
+	else{
+		toolTip->setPos(mapToScene(toolTipPos));
+		toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	}
 }
 
 bool ProfileGraphicsView::eventFilter(QObject* obj, QEvent* event)
@@ -286,6 +298,8 @@ void ProfileGraphicsView::showEvent(QShowEvent* event)
 		dive = 0;
 		plot(get_dive(selected_dive));
 	}
+	if (toolBarProxy)
+		toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
 }
 
 void ProfileGraphicsView::clear()
@@ -499,7 +513,7 @@ void ProfileGraphicsView::addControlItems(struct dive *d)
 	QAction *scaleAction = new QAction(QIcon(":scale"), tr("Scale"), this);
 	QAction *rulerAction = new QAction(QIcon(":ruler"), tr("Ruler"), this);
 	QToolBar *toolBar = new QToolBar("", 0);
-	rulerAction->setToolTip(tr("Show a ruler to nit pecking your dive"));
+	rulerAction->setToolTip(tr("Measure properties of dive segments"));
 	scaleAction->setToolTip(tr("Scale your dive to screen size"));
 	toolBar->addAction(rulerAction);
 	toolBar->addAction(scaleAction);
@@ -518,7 +532,8 @@ void ProfileGraphicsView::addControlItems(struct dive *d)
 		connect(editAction, SIGNAL(triggered()), mainWindow(), SLOT(editCurrentDive()));
 	}
 	toolBarProxy = scene()->addWidget(toolBar);
-	toolBarProxy->setPos(gc.maxx-toolBar->width(), gc.maxy-toolBar->height());
+	toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	toolBarProxy->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 }
 
 void ProfileGraphicsView::plot_pp_text()
@@ -898,9 +913,9 @@ void ProfileGraphicsView::plot_events(struct divecomputer *dc)
 {
 	struct event *event = dc->events;
 
-// 	if (gc->printer) {
-// 		return;
-// 	}
+//	if (gc->printer) {
+//		return;
+//	}
 
 	while (event) {
 		plot_one_event(event);
@@ -1569,6 +1584,9 @@ void ToolTipItem::readPos()
 	QPointF value = scene()->views().at(0)->mapToScene(
 		s.value("tooltip_position").toPoint()
 	);
+	if (!scene()->sceneRect().contains(value)){
+		value = QPointF(0,0);
+	}
 	setPos(value);
 }
 

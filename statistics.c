@@ -155,21 +155,23 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 		stats_yearly[year_iter].selection_size++;
 		stats_yearly[year_iter].period = current_year;
 
-		if (trip_ptr != dp->divetrip) {
-			trip_ptr = dp->divetrip;
-			trip_iter++;
+		if (dp->divetrip != NULL) {
+			if (trip_ptr != dp->divetrip) {
+				trip_ptr = dp->divetrip;
+				trip_iter++;
+			}
+
+			/* stats_by_trip[0] is all the dives combined */
+			stats_by_trip[0].selection_size++;
+			process_dive(dp, &(stats_by_trip[0]));
+			stats_by_trip[0].is_trip = TRUE;
+			stats_by_trip[0].location = strdup("All (by trip stats)");
+
+			process_dive(dp, &(stats_by_trip[trip_iter]));
+			stats_by_trip[trip_iter].selection_size++;
+			stats_by_trip[trip_iter].is_trip = TRUE;
+			stats_by_trip[trip_iter].location = dp->divetrip->location;
 		}
-
-		/* stats_by_trip[0] is all the dives combined */
-		stats_by_trip[0].selection_size++;
-		process_dive(dp, &(stats_by_trip[0]));
-		stats_by_trip[0].is_trip = TRUE;
-		stats_by_trip[0].location = strdup("All (by trip stats)");
-
-		process_dive(dp, &(stats_by_trip[trip_iter]));
-		stats_by_trip[trip_iter].selection_size++;
-		stats_by_trip[trip_iter].is_trip = TRUE;
-		stats_by_trip[trip_iter].location = dp->divetrip->location;
 
 		/* monthly statistics */
 		if (current_month == 0) {
@@ -291,20 +293,6 @@ void get_selected_dives_text(char *buffer, int size)
 	}
 }
 
-void get_gas_used(struct dive *dive, volume_t gases[MAX_CYLINDERS])
-{
-	int idx;
-	for (idx = 0; idx < MAX_CYLINDERS; idx++) {
-		cylinder_t *cyl = &dive->cylinder[idx];
-		pressure_t start, end;
-
-		start = cyl->start.mbar ? cyl->start : cyl->sample_start;
-		end = cyl->end.mbar ? cyl->end : cyl->sample_end;
-		if (start.mbar && end.mbar)
-			gases[idx].mliter = gas_volume(cyl, start) - gas_volume(cyl, end);
-	}
-}
-
 bool is_gas_used(struct dive *dive, int idx)
 {
 	cylinder_t *cyl = &dive->cylinder[idx];
@@ -350,6 +338,23 @@ bool is_gas_used(struct dive *dive, int idx)
 	if (idx == 0 && !firstGasExplicit)
 		used = TRUE;
 	return used;
+}
+
+void get_gas_used(struct dive *dive, volume_t gases[MAX_CYLINDERS])
+{
+	int idx;
+	for (idx = 0; idx < MAX_CYLINDERS; idx++) {
+		cylinder_t *cyl = &dive->cylinder[idx];
+		pressure_t start, end;
+
+		if (!is_gas_used(dive, idx))
+			continue;
+
+		start = cyl->start.mbar ? cyl->start : cyl->sample_start;
+		end = cyl->end.mbar ? cyl->end : cyl->sample_end;
+		if (start.mbar && end.mbar)
+			gases[idx].mliter = gas_volume(cyl, start) - gas_volume(cyl, end);
+	}
 }
 
 #define MAXBUF 80
