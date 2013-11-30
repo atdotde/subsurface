@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Preferences</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
@@ -638,7 +638,7 @@
                  <bool>false</bool>
                 </property>
                 <property name="text">
-                 <string>max PP02</string>
+                 <string>max PPO2</string>
                 </property>
                </widget>
               </item>
@@ -751,7 +751,7 @@
               <item>
                <widget class="QCheckBox" name="show_sac">
                 <property name="text">
-                 <string>Show SAC</string>
+                 <string>SAC</string>
                 </property>
                </widget>
               </item>

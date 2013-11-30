@@ -130,7 +130,7 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 	if(selected_dive == -1)
 		return;
 	QMenu m;
-	QMenu *gasChange = m.addMenu("Add Gas Change");
+	QMenu *gasChange = m.addMenu(tr("Add Gas Change"));
 	GasSelectionModel *model = GasSelectionModel::instance();
 	model->repopulate();
 	int rowCount = model->rowCount();
@@ -141,7 +141,7 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 		action->setData(event->globalPos());
 		gasChange->addAction(action);
 	}
-	QAction *action = m.addAction("Add Bookmark", this, SLOT(addBookmark()));
+	QAction *action = m.addAction(tr("Add Bookmark"), this, SLOT(addBookmark()));
 	action->setData(event->globalPos());
 	QList<QGraphicsItem*> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
 	Q_FOREACH(QGraphicsItem *i, itemsAtPos){
@@ -149,12 +149,12 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 		if(!item)
 			continue;
 		QAction *action = new QAction(&m);
-		action->setText("Remove Event");
+		action->setText(tr("Remove Event"));
 		action->setData(QVariant::fromValue<void*>(item)); // so we know what to remove.
 		connect(action, SIGNAL(triggered(bool)), this, SLOT(removeEvent()));
 		m.addAction(action);
 		action = new QAction(&m);
-		action->setText("Hide similar events");
+		action->setText(tr("Hide similar events"));
 		action->setData(QVariant::fromValue<void*>(item));
 		connect(action, SIGNAL(triggered(bool)), this, SLOT(hideEvents()));
 		m.addAction(action);
@@ -244,7 +244,6 @@ void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
 
 	toolTip->refresh(&gc,  mapToScene(event->pos()));
 	QPoint toolTipPos = mapFromScene(toolTip->pos());
-	QPoint toolBarPos = mapFromScene(toolBarProxy->pos());
 	scrollViewTo(event->pos());
 
 	if (zoomLevel == 0)
@@ -545,17 +544,26 @@ void ProfileGraphicsView::plot_pp_text()
 
 	setup_pp_limits(&gc);
 	pp = floor(gc.pi.maxpp * 10.0) / 10.0 + 0.2;
-	dpp = pp > 4 ? 1.0 : 0.5;
+	dpp = pp > 4 ? 0.5 : 0.2;
 	hpos = gc.pi.entry[gc.pi.nr - 1].sec;
 	QColor c = getColor(PP_LINES);
 
+	bool alt = false;
 	for (m = 0.0; m <= pp; m += dpp) {
 		QGraphicsLineItem *item = new QGraphicsLineItem(SCALEGC(0, m), SCALEGC(hpos, m));
 		QPen pen(defaultPen);
 		pen.setColor(c);
+		if ( QString::number(m).toDouble() != QString::number(m).toInt()){
+			pen.setStyle(Qt::DashLine);
+			pen.setWidthF(1.2);
+		}
 		item->setPen(pen);
 		scene()->addItem(item);
-		plot_text(&tro, QPointF(hpos, m), QString::number(m), pressureMarkers);
+		qreal textPos = hpos;
+		if (alt)
+			textPos += 30;
+		alt = !alt;
+		plot_text(&tro, QPointF(textPos, m), QString::number(m), pressureMarkers);
 	}
 	scene()->addItem(pressureMarkers);
 	pressureMarkers->setPos(pressureMarkers->pos().x() + 10, 0);
@@ -1518,7 +1526,7 @@ ToolTipItem::ToolTipItem(QGraphicsItem* parent): QGraphicsPathItem(parent), back
 {
 	title = new QGraphicsSimpleTextItem(tr("Information"), this);
 	separator = new QGraphicsLineItem(this);
-	setFlags(ItemIgnoresTransformations | ItemIsMovable);
+	setFlags(ItemIgnoresTransformations | ItemIsMovable | ItemClipsChildrenToShape);
 	status = COLLAPSED;
 	updateTitlePosition();
 	setZValue(99);
@@ -1595,7 +1603,7 @@ QColor EventItem::getColor(const color_indice_t i)
 	return profile_color[i].at((isGrayscale) ? 1 : 0);
 }
 
-EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent), isGrayscale(grayscale), ev(ev)
+EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent), ev(ev), isGrayscale(grayscale)
 {
 	setFlag(ItemIgnoresTransformations);
 	setFlag(ItemIsFocusable);

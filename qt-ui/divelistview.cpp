@@ -575,7 +575,7 @@ void DiveListView::addToTripAbove()
 
 void DiveListView::deleteDive()
 {
-	int i, nr;
+	int i;
 	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
 	if (!d)
 		return;
@@ -592,10 +592,7 @@ void DiveListView::deleteDive()
 		lastDiveNr = i;
 	}
 	if (amount_selected == 0) {
-		if (i > 0)
-			select_dive(nr - 1);
-		else
-			mainWindow()->cleanUpEmpty();
+		mainWindow()->cleanUpEmpty();
 	}
 	mark_divelist_changed(TRUE);
 	mainWindow()->refreshDisplay();
@@ -637,7 +634,7 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		if (d) {
 			popup.addAction(tr("remove dive(s) from trip"), this, SLOT(removeFromTrip()));
 			popup.addAction(tr("create new trip above"), this, SLOT(newTripAbove()));
-			popup.addAction(tr("add dive(s) to trip immideately above"), this, SLOT(addToTripAbove()));
+			popup.addAction(tr("add dive(s) to trip immediately above"), this, SLOT(addToTripAbove()));
 		}
 		if (trip) {
 			popup.addAction(tr("merge trip with trip above"), this, SLOT(mergeTripAbove()));

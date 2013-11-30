@@ -38,9 +38,13 @@ GlobeGPS::GlobeGPS(QWidget* parent) : MarbleWidget(parent), loadedDives(0)
 			foundGoogleMap = true;
 	if (!foundGoogleMap) {
 		subsurfaceDataPath = getSubsurfaceDataPath("marbledata");
-		qDebug() << subsurfaceDataPath;
-		if (subsurfaceDataPath != "")
+		if (subsurfaceDataPath != "") {
 			MarbleDirs::setMarbleDataPath(subsurfaceDataPath);
+		} else {
+			subsurfaceDataPath = getSubsurfaceDataPath("data");
+			if (subsurfaceDataPath != "")
+				MarbleDirs::setMarbleDataPath(subsurfaceDataPath);
+		}
 	}
 	messageWidget = new KMessageWidget(this);
 	messageWidget->setCloseButtonVisible(false);
@@ -181,11 +185,11 @@ void GlobeGPS::repopulateLabels()
 
 void GlobeGPS::reload()
 {
-	if (editingDiveCoords) {
-		editingDiveCoords = 0;
-		if (messageWidget->isVisible())
-			messageWidget->animatedHide();
-	}
+	editingDiveCoords = 0;
+
+	if (messageWidget->isVisible())
+		messageWidget->animatedHide();
+
 	repopulateLabels();
 }
 

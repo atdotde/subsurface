@@ -20,6 +20,7 @@
 #include <QCompleter>
 #include <QDebug>
 #include <QSet>
+#include <QSettings>
 #include <QTableView>
 #include <QPalette>
 
@@ -109,6 +110,48 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 		ui.scrollArea_3->viewport()->setPalette(p);
 		ui.scrollArea_4->viewport()->setPalette(p);
 	}
+	ui.cylinders->view()->horizontalHeader()->setContextMenuPolicy(Qt::ActionsContextMenu);
+
+	QSettings s;
+	s.beginGroup("cylinders_dialog");
+	for(int i = 0; i < CylindersModel::COLUMNS; i++){
+		if ((i == CylindersModel::REMOVE) || (i == CylindersModel::TYPE))
+			  continue;
+		bool checked = s.value(QString("column%1_hidden").arg(i)).toBool();
+		QAction *action = new QAction(cylindersModel->headerData(i, Qt::Horizontal, Qt::DisplayRole).toString(), ui.cylinders->view());
+		action->setCheckable(true);
+		action->setData(i);
+		action->setChecked(!checked);
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(toggleTriggeredColumn()));
+		ui.cylinders->view()->setColumnHidden(i, checked);
+		ui.cylinders->view()->horizontalHeader()->addAction(action);
+	}
+}
+
+MainTab::~MainTab()
+{
+	QSettings s;
+	s.beginGroup("cylinders_dialog");
+	for(int i = 0; i < CylindersModel::COLUMNS; i++){
+		if ((i == CylindersModel::REMOVE) || (i == CylindersModel::TYPE))
+			  continue;
+		s.setValue(QString("column%1_hidden").arg(i), ui.cylinders->view()->isColumnHidden(i));
+	}
+}
+
+void MainTab::toggleTriggeredColumn()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	int col = action->data().toInt();
+	QTableView *view = ui.cylinders->view();
+
+	if(action->isChecked()){
+		view->showColumn(col);
+		if(view->columnWidth(col) <= 15)
+			view->setColumnWidth(col, 80);
+	}
+	else
+		view->hideColumn(col);
 }
 
 void MainTab::addDiveStarted()
@@ -170,7 +213,7 @@ void MainTab::enableEdition(EditMode newEditMode)
 			notesBackup[mydive].coordinates  = ui.coordinates->text();
 			notesBackup[mydive].airtemp = get_temperature_string(mydive->airtemp, true);
 			notesBackup[mydive].watertemp = get_temperature_string(mydive->watertemp, true);
-			notesBackup[mydive].datetime = QDateTime::fromTime_t(mydive->when - gettimezoneoffset()).toString();
+			notesBackup[mydive].datetime = QDateTime::fromTime_t(mydive->when).toUTC().toString();
 			char buf[1024];
 			taglist_get_tagstring(mydive->tag_list, buf, 1024);
 			notesBackup[mydive].tags = QString(buf);
@@ -291,7 +334,7 @@ void MainTab::updateDiveInfo(int dive)
 	UPDATE_TEMP(d, watertemp);
 	if (d) {
 		updateGpsCoordinates(d);
-		ui.dateTimeEdit->setDateTime(QDateTime::fromTime_t(d->when - gettimezoneoffset()));
+		ui.dateTimeEdit->setDateTime(QDateTime::fromTime_t(d->when).toUTC());
 		if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1) {
 			setTabText(0, tr("Trip Notes"));
 			// only use trip relevant fields
@@ -309,8 +352,9 @@ void MainTab::updateDiveInfo(int dive)
 			ui.visibilityLabel->setVisible(false);
 			ui.tagWidget->setVisible(false);
 			ui.TagLabel->setVisible(false);
-			ui.TemperaturesLabel->setVisible(false);
+			ui.airTempLabel->setVisible(false);
 			ui.airtemp->setVisible(false);
+			ui.waterTempLabel->setVisible(false);
 			ui.watertemp->setVisible(false);
 			// rename the remaining fields and fill data from selected trip
 			dive_trip_t *currentTrip = *mainWindow()->dive_list()->selectedTrips().begin();
@@ -335,8 +379,9 @@ void MainTab::updateDiveInfo(int dive)
 			ui.DivemasterLabel->setVisible(true);
 			ui.TagLabel->setVisible(true);
 			ui.tagWidget->setVisible(true);
-			ui.TemperaturesLabel->setVisible(true);
+			ui.airTempLabel->setVisible(true);
 			ui.airtemp->setVisible(true);
+			ui.waterTempLabel->setVisible(true);
 			ui.watertemp->setVisible(true);
 			/* and fill them from the dive */
 			ui.rating->setCurrentStars(d->rating);
@@ -670,6 +715,7 @@ void MainTab::rejectChanges()
 	notesBackup.clear();
 	resetPallete();
 	editMode = NONE;
+	mainWindow()->globe()->reload();
 	if (lastMode == ADD || lastMode == MANUALLY_ADDED_DIVE) {
 		// more clean up
 		updateDiveInfo(selected_dive);
@@ -716,19 +762,21 @@ void MainTab::on_divemaster_textChanged(const QString& text)
 
 void MainTab::on_airtemp_textChanged(const QString& text)
 {
-	EDIT_SELECTED_DIVES( mydive->airtemp.mkelvin = parseTemperatureToMkelvin(text) );
+	EDIT_SELECTED_DIVES( select_dc(&mydive->dc)->airtemp.mkelvin = parseTemperatureToMkelvin(text) );
 	markChangedWidget(ui.airtemp);
 }
 
 void MainTab::on_watertemp_textChanged(const QString& text)
 {
-	EDIT_SELECTED_DIVES( mydive->watertemp.mkelvin = parseTemperatureToMkelvin(text) );
+	EDIT_SELECTED_DIVES( select_dc(&mydive->dc)->watertemp.mkelvin = parseTemperatureToMkelvin(text) );
 	markChangedWidget(ui.watertemp);
 }
 
 void MainTab::on_dateTimeEdit_dateTimeChanged(const QDateTime& datetime)
 {
-	EDIT_SELECTED_DIVES( mydive->when = datetime.toTime_t() + gettimezoneoffset() );
+	QDateTime dateTimeUtc(datetime);
+	dateTimeUtc.setTimeSpec(Qt::UTC);
+	EDIT_SELECTED_DIVES( mydive->when = dateTimeUtc.toTime_t() );
 	markChangedWidget(ui.dateTimeEdit);
 }
 
