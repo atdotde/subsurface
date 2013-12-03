@@ -1,5 +1,6 @@
 #include "subsurfacewebservices.h"
 #include "../webservice.h"
+#include "mainwindow.h"
 
 #include <libxml/parser.h>
 
@@ -44,7 +45,7 @@ void WebServices::hideUpload()
 
 SubsurfaceWebServices* SubsurfaceWebServices::instance()
 {
-	static SubsurfaceWebServices *self = new SubsurfaceWebServices();
+	static SubsurfaceWebServices *self = new SubsurfaceWebServices(mainWindow());
 	self->setAttribute(Qt::WA_QuitOnClose, false);
 	return self;
 }
@@ -52,7 +53,7 @@ SubsurfaceWebServices* SubsurfaceWebServices::instance()
 SubsurfaceWebServices::SubsurfaceWebServices(QWidget* parent, Qt::WindowFlags f)
 {
 	QSettings s;
-	ui.userID->setText(s.value("subsurface_webservice_uid").toString());
+	ui.userID->setText(s.value("subsurface_webservice_uid").toString().toUpper());
 	hidePassword();
 	hideUpload();
 }
@@ -81,7 +82,7 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 
 			/* store last entered uid in config */
 			QSettings s;
-			s.setValue("subsurface_webservice_uid", ui.userID->text());
+			s.setValue("subsurface_webservice_uid", ui.userID->text().toUpper());
 			s.sync();
 			hide();
 			close();
@@ -91,7 +92,7 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 			// we may want to clean up after ourselves, but this
 			// makes Subsurface throw a SIGSEGV...
 			// manager->deleteLater();
-			reply->deleteLater();
+			// reply->deleteLater();
 			ui.progressBar->setMaximum(1);
 			break;
 		case QDialogButtonBox::HelpRole:
@@ -105,14 +106,14 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 void SubsurfaceWebServices::startDownload()
 {
 	QUrl url("http://api.hohndel.org/api/dive/get/");
-	url.setQueryItems( QList<QPair<QString,QString> >() << qMakePair(QString("login"), ui.userID->text()));
+	url.setQueryItems( QList<QPair<QString,QString> >() << qMakePair(QString("login"), ui.userID->text().toUpper()));
 
 	manager = new QNetworkAccessManager(this);
 	QNetworkRequest request;
 	request.setUrl(url);
 	request.setRawHeader("Accept", "text/xml");
 	reply = manager->get(request);
-	ui.status->setText(tr("Wait a bit untill we have something..."));
+	ui.status->setText(tr("Wait a bit until we have something..."));
 	ui.progressBar->setRange(0,0); // this makes the progressbar do an 'infinite spin'
 	ui.download->setEnabled(false);
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
@@ -269,7 +270,7 @@ static bool merge_locations_into_dives(void)
 
 DivelogsDeWebServices* DivelogsDeWebServices::instance()
 {
-	static DivelogsDeWebServices *self = new DivelogsDeWebServices();
+	static DivelogsDeWebServices *self = new DivelogsDeWebServices(mainWindow());
 	self->setAttribute(Qt::WA_QuitOnClose, false);
 	return self;
 }

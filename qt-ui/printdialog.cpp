@@ -1,4 +1,5 @@
 #include "printdialog.h"
+#include "mainwindow.h"
 
 #include <QDebug>
 #include <QPushButton>
@@ -7,7 +8,7 @@
 
 PrintDialog *PrintDialog::instance()
 {
-	static PrintDialog *self = new PrintDialog();
+	static PrintDialog *self = new PrintDialog(mainWindow());
 	self->setAttribute(Qt::WA_QuitOnClose, false);
 	return self;
 }
@@ -27,14 +28,16 @@ PrintDialog::PrintDialog(QWidget *parent, Qt::WindowFlags f)
 
 	QVBoxLayout *layout = new QVBoxLayout(this);
 	setLayout(layout);
-	layout->addWidget(optionsWidget);
 
 	QPushButton *printButton = new QPushButton(tr("&Print"));
 	connect(printButton, SIGNAL(clicked(bool)), this, SLOT(printClicked()));
 	layout->addWidget(printButton);
 
-	setFixedSize(520, 500);
-	setWindowTitle("Print");
+	layout->addWidget(optionsWidget);
+
+	setFixedSize(520, 320);
+	setWindowTitle(tr("Print"));
+	setWindowIcon(QIcon(":subsurface-icon"));
 }
 
 void PrintDialog::runDialog()
