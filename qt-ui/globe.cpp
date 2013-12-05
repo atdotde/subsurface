@@ -132,9 +132,7 @@ void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 
 	int idx;
 	struct dive *dive;
-	bool clear = !(QApplication::keyboardModifiers() && Qt::ControlModifier);
-	bool toggle = !clear;
-	bool first = true;
+	bool clear = !(QApplication::keyboardModifiers() & Qt::ControlModifier);
 	QList<int> selectedDiveIds;
 	for_each_dive(idx, dive) {
 		long lat_diff, lon_diff;
@@ -150,8 +148,9 @@ void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 			continue;
 
 		selectedDiveIds.push_back(idx);
-		first = false;
 	}
+	if(selectedDiveIds.empty())
+		return;
 	if (clear) {
 		mainWindow()->dive_list()->unselectDives();
 		clear = false;
@@ -198,23 +197,21 @@ void GlobeGPS::reload()
 {
 	editingDiveLocation = false;
 	if (messageWidget->isVisible())
-		messageWidget->animatedHide();
+		messageWidget->hide();
 	repopulateLabels();
 }
 
 void GlobeGPS::centerOn(dive* dive)
 {
 	// dive has changed, if we had the 'editingDive', hide it.
-	if (messageWidget->isVisible() && (!dive || dive_has_gps_location(dive))) {
-		messageWidget->animatedHide();
-	}
+	if (messageWidget->isVisible() && (!dive || dive_has_gps_location(dive)))
+		messageWidget->hide();
 	if (!dive)
 		return;
-
 	qreal longitude = dive->longitude.udeg / 1000000.0;
 	qreal latitude = dive->latitude.udeg / 1000000.0;
 
-	if (!longitude || !latitude) {
+	if (!longitude || !latitude || mainWindow()->information()->isEditing()) {
 		prepareForGetDiveCoordinates();
 		return;
 	}
@@ -242,7 +239,7 @@ void GlobeGPS::prepareForGetDiveCoordinates()
 {
 	if (!messageWidget->isVisible()) {
 		messageWidget->setMessageType(KMessageWidget::Warning);
-		messageWidget->setText(QObject::tr("No location data - move the map and double-click to set the dive location"));
+		messageWidget->setText(QObject::tr("Move the map and double-click to set the dive location"));
 		messageWidget->setWordWrap(true);
 		messageWidget->animatedShow();
 		editingDiveLocation = true;
@@ -251,6 +248,8 @@ void GlobeGPS::prepareForGetDiveCoordinates()
 
 void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 {
+	messageWidget->hide();
+
 	if (mainWindow()->dive_list()->selectionModel()->selection().isEmpty())
 		return;
 
@@ -272,7 +271,6 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 	centerOn(lon, lat, true);
 	editingDiveLocation = false;
 	mark_divelist_changed(TRUE);
-	messageWidget->animatedHide();
 	mainWindow()->refreshDisplay();
 }
 

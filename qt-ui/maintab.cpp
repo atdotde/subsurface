@@ -32,20 +32,15 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	ui.setupUi(this);
 	ui.cylinders->setModel(cylindersModel);
 	ui.weights->setModel(weightModel);
-	ui.diveNotesMessage->hide();
-	ui.diveEquipmentMessage->hide();
-	ui.diveNotesMessage->setCloseButtonVisible(false);
-	ui.diveEquipmentMessage->setCloseButtonVisible(false);
+	closeMessage();
 
 	QAction *action = new QAction(tr("Save"), this);
 	connect(action, SIGNAL(triggered(bool)), this, SLOT(acceptChanges()));
-	ui.diveEquipmentMessage->addAction(action);
-	ui.diveNotesMessage->addAction(action);
+	addMessageAction(action);
 
 	action = new QAction(tr("Cancel"), this);
 	connect(action, SIGNAL(triggered(bool)), this, SLOT(rejectChanges()));
-	ui.diveEquipmentMessage->addAction(action);
-	ui.diveNotesMessage->addAction(action);
+	addMessageAction(action);
 
 	if (qApp->style()->objectName() == "oxygen")
 		setDocumentMode(true);
@@ -113,6 +108,27 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 		ui.scrollArea_2->viewport()->setPalette(p);
 		ui.scrollArea_3->viewport()->setPalette(p);
 		ui.scrollArea_4->viewport()->setPalette(p);
+
+		// GroupBoxes in Gnome3 looks like I'v drawn them...
+		static const QString gnomeCss(
+			"QGroupBox {"
+			"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
+			"    stop: 0 #E0E0E0, stop: 1 #FFFFFF);"
+			"    border: 2px solid gray;"
+			"    border-radius: 5px;"
+			"    margin-top: 1ex;"
+			"}"
+			"QGroupBox::title {"
+			"    subcontrol-origin: margin;"
+			"    subcontrol-position: top center;"
+			"    padding: 0 3px;"
+			"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
+			"    stop: 0 #0E0E0, stop: 1 #FFFFFF);"
+			"}");
+		Q_FOREACH(QGroupBox *box, findChildren<QGroupBox*>()){
+			box->setStyleSheet(gnomeCss);
+		}
+
 	}
 	ui.cylinders->view()->horizontalHeader()->setContextMenuPolicy(Qt::ActionsContextMenu);
 
@@ -164,6 +180,43 @@ void MainTab::addDiveStarted()
 	editMode = ADD;
 }
 
+void MainTab::addMessageAction(QAction* action)
+{
+	ui.diveEquipmentMessage->addAction(action);
+	ui.diveNotesMessage->addAction(action);
+	ui.diveInfoMessage->addAction(action);
+	ui.diveStatisticsMessage->addAction(action);
+}
+
+void MainTab::hideMessage()
+{
+	ui.diveNotesMessage->animatedHide();
+	ui.diveEquipmentMessage->animatedHide();
+	ui.diveInfoMessage->animatedHide();
+	ui.diveStatisticsMessage->animatedHide();
+}
+
+void MainTab::closeMessage()
+{
+	hideMessage();
+	ui.diveNotesMessage->setCloseButtonVisible(false);
+	ui.diveEquipmentMessage->setCloseButtonVisible(false);
+	ui.diveInfoMessage->setCloseButtonVisible(false);
+	ui.diveStatisticsMessage->setCloseButtonVisible(false);
+}
+
+void MainTab::displayMessage(QString str)
+{
+	ui.diveNotesMessage->setText(str);
+	ui.diveNotesMessage->animatedShow();
+	ui.diveEquipmentMessage->setText(str);
+	ui.diveEquipmentMessage->animatedShow();
+	ui.diveInfoMessage->setText(str);
+	ui.diveInfoMessage->animatedShow();
+	ui.diveStatisticsMessage->setText(str);
+	ui.diveStatisticsMessage->animatedShow();
+}
+
 void MainTab::enableEdition(EditMode newEditMode)
 {
 	if (selected_dive < 0 || editMode != NONE)
@@ -175,23 +228,16 @@ void MainTab::enableEdition(EditMode newEditMode)
 	notesBackup.clear();
 	if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1) {
 		// we are editing trip location and notes
-		ui.diveNotesMessage->setText(tr("This trip is being edited."));
-		ui.diveNotesMessage->animatedShow();
-		ui.diveEquipmentMessage->setText(tr("This trip is being edited."));
-		ui.diveEquipmentMessage->animatedShow();
+		displayMessage(tr("This trip is being edited."));
 		notesBackup[NULL].notes = ui.notes->toPlainText();
 		notesBackup[NULL].location = ui.location->text();
 		editMode = TRIP;
 	} else {
 		if (amount_selected > 1) {
-			ui.diveNotesMessage->setText(tr("Multiple dives are being edited."));
-			ui.diveEquipmentMessage->setText(tr("Multiple dives are being edited."));
+			displayMessage(tr("Multiple dives are being edited."));
 		} else {
-			ui.diveNotesMessage->setText(tr("This dive is being edited."));
-			ui.diveEquipmentMessage->setText(tr("This dive is being edited."));
+			displayMessage(tr("This dive is being edited."));
 		}
-		ui.diveNotesMessage->animatedShow();
-		ui.diveEquipmentMessage->animatedShow();
 
 		// We may be editing one or more dives here. backup everything.
 		struct dive *mydive;
@@ -513,8 +559,7 @@ void MainTab::acceptChanges()
 	mainWindow()->dive_list()->setEnabled(true);
 	tabBar()->setTabIcon(0, QIcon()); // Notes
 	tabBar()->setTabIcon(1, QIcon()); // Equipment
-	ui.diveNotesMessage->animatedHide();
-	ui.diveEquipmentMessage->animatedHide();
+	hideMessage();
 	/* now figure out if things have changed */
 	if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1) {
 		if (notesBackup[NULL].notes != ui.notes->toPlainText() ||
@@ -578,11 +623,6 @@ void MainTab::acceptChanges()
 		else if (selected_dive == dive_table.nr - 1 && get_dive(dive_table.nr - 2)->number)
 			current_dive->number = get_dive(dive_table.nr - 2)->number + 1;
 		DivePlannerPointsModel::instance()->cancelPlan();
-		// now make sure the selection logic is in a sane state
-		// it's ok to hold on to the dive pointer for this short stretch of code
-		// unselectDives() doesn't mess with the dive_table at all
-		mainWindow()->dive_list()->unselectDives();
-		mainWindow()->dive_list()->selectDive(selected_dive, true, true);
 		mainWindow()->showProfile();
 		mark_divelist_changed(TRUE);
 		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
@@ -590,19 +630,32 @@ void MainTab::acceptChanges()
 	// each dive that was selected might have had the temperatures in its active divecomputer changed
 	// so re-populate the temperatures - easiest way to do this is by calling fixup_dive
 	Q_FOREACH(dive *d, notesBackup.keys()) {
-		fixup_dive(d);
+		if (d)
+			fixup_dive(d);
 	}
 
-	editMode = NONE;
-
 	resetPallete();
-	// now comes the scary moment... we need to re-sort dive table in case this dive wasn't the last
-	// so now all pointers become invalid
-	// fingers crossed that we aren't holding on to anything here
-	mainWindow()->dive_list()->rememberSelection();
-	sort_table(&dive_table);
-	mainWindow()->refreshDisplay();
-	mainWindow()->dive_list()->restoreSelection();
+	if(editMode == ADD || editMode == MANUALLY_ADDED_DIVE){
+		mainWindow()->dive_list()->unselectDives();
+		struct dive *d = get_dive(dive_table.nr -1 );
+		// HACK. this shouldn't be here. but apparently it's
+		// how we can know what was the newly added dive.
+		d->selected = true;
+		sort_table(&dive_table);
+		int i = 0;
+		for_each_dive(i,d){
+			if (d->selected) break;
+		}
+		editMode = NONE;
+		mainWindow()->refreshDisplay();
+		mainWindow()->dive_list()->selectDive( i, true );
+	}else{
+		editMode = NONE;
+		mainWindow()->dive_list()->rememberSelection();
+		sort_table(&dive_table);
+		mainWindow()->refreshDisplay();
+		mainWindow()->dive_list()->restoreSelection();
+	}
 }
 
 void MainTab::resetPallete()
@@ -712,8 +765,7 @@ void MainTab::rejectChanges()
 		}
 	}
 
-	ui.diveNotesMessage->animatedHide();
-	ui.diveEquipmentMessage->animatedHide();
+	hideMessage();
 	mainWindow()->dive_list()->setEnabled(true);
 	notesBackup.clear();
 	resetPallete();
