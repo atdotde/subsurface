@@ -7,9 +7,10 @@
 #include <QHeaderView>
 #include "mainwindow.h"
 #include "profilegraphics.h"
-#include "printlayout.h"
 #include "../dive.h"
 #include "../display.h"
+#include "printdialog.h"
+#include "printlayout.h"
 #include "models.h"
 #include "modeldelegates.h"
 
@@ -91,6 +92,19 @@ void PrintLayout::setup()
 	scaledPageH = pageRect.height() / scaleY;
 }
 
+// go trought the dive table and find how many dives we are a going to print
+int PrintLayout::estimateTotalDives() const
+{
+	int total = 0, i = 0;
+	struct dive *dive;
+	for_each_dive(i, dive) {
+		if (!dive->selected && printOptions->print_selected)
+			continue;
+		total++;
+	}
+	return total;
+}
+
 /* the used formula here is:
  * s = (S - (n - 1) * p) / n
  * where:
@@ -104,6 +118,11 @@ void PrintLayout::setup()
 
 void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 {
+	int i, row = 0, col = 0, printed = 0, total = estimateTotalDives();
+	struct dive *dive;
+	if (!total)
+		return;
+
 	// setup a painter
 	QPainter painter;
 	painter.begin(printer);
@@ -148,8 +167,6 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 		yOffsetTable = scaledH - tableH;
 
 	// plot the dives at specific rows and columns on the page
-	int i, row = 0, col = 0;
-	struct dive *dive;
 	for_each_dive(i, dive) {
 		if (!dive->selected && printOptions->print_selected)
 			continue;
@@ -175,6 +192,8 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 		table->render(&painter);
 		painter.setTransform(origTransform);
 		col++;
+		printed++;
+		emit signalProgress((printed * 100) / total);
 	}
 
 	// cleanup
@@ -253,6 +272,12 @@ QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int 
 
 void PrintLayout::printTable()
 {
+	struct dive *dive;
+	int done = 0; // percents done
+	int i, row = 0, progress, total = estimateTotalDives();
+	if (!total)
+		return;
+
 	// create and setup a table
 	QTableView table;
 	table.setAttribute(Qt::WA_DontShowOnScreen);
@@ -274,16 +299,18 @@ void PrintLayout::printTable()
 
 	// create and fill a table model
 	TablePrintModel model;
-	struct dive *dive;
-	int i, row = 0;
 	addTablePrintHeadingRow(&model, row); // add one heading row
 	row++;
+	progress = 0;
 	for_each_dive(i, dive) {
 		if (!dive->selected && printOptions->print_selected)
 			continue;
 		addTablePrintDataRow(&model, row, dive);
 		row++;
+		progress++;
+		emit signalProgress((progress * 10) / total);
 	}
+	done = 10;
 	table.setModel(&model); // set model to table
 	// resize columns to percentages from page width
 	int accW = 0;
@@ -302,22 +329,44 @@ void PrintLayout::printTable()
 	// a list of vertical offsets where pages begin and some helpers
 	QList<unsigned int> pageIndexes;
 	pageIndexes.append(0);
-	int tableHeight = 0, rowH = 0, accH = 0;
 
-	// process all rows
-	for (int i = 0; i < model.rows; i++) {
-		rowH = table.rowHeight(i);
-		accH += rowH;
-		if (accH > scaledPageH) { // push a new page index and add a heading
-			pageIndexes.append(pageIndexes.last() + (accH - rowH));
-			addTablePrintHeadingRow(&model, i);
-			accH = 0;
-			i--;
+	/* the algorithm bellow processes the table rows in multiple passes,
+	 * compensating for loss of space due to moving rows on a new page instead
+	 * of truncating them.
+	 * there is a 'passes' array defining how much percents of the total
+	 * progress each will take. given, the first and last stage of this function
+	 * use 10% each, then the sum of passes[] here should be 80%.
+	 * two should be enough! */
+	const int passes[] = { 70, 10 };
+	int tableHeight = 0, lastAccIndex = 0, rowH, accH, headings;
+	bool isHeading = false;
+
+	for (unsigned int pass = 0; pass < sizeof(passes) / sizeof(passes[0]); pass++) {
+		progress = headings = accH = 0;
+		total = model.rows - lastAccIndex;
+		for (int i = lastAccIndex; i < model.rows; i++) {
+			rowH = table.rowHeight(i);
+			accH += rowH;
+			if (isHeading) {
+				headings += rowH;
+				isHeading = false;
+			}
+			if (accH > scaledPageH) {
+				lastAccIndex = i;
+				pageIndexes.append(pageIndexes.last() + (accH - rowH));
+				addTablePrintHeadingRow(&model, i);
+				isHeading = true;
+				accH = 0;
+				i--;
+			}
+			tableHeight += table.rowHeight(i);
+			progress++;
+			emit signalProgress(done + (progress * passes[pass]) / total);
 		}
-		tableHeight += rowH;
+		done += passes[pass];
 	}
-	pageIndexes.append(pageIndexes.last() + accH);
-	// resize the whole widget so that it can be rendered
+	done = 90;
+	pageIndexes.append(pageIndexes.last() + accH + headings);
 	table.resize(scaledPageW, tableHeight);
 
 	// attach a painter and render pages by using pageIndexes
@@ -325,13 +374,17 @@ void PrintLayout::printTable()
 	painter.setRenderHint(QPainter::Antialiasing);
 	painter.setRenderHint(QPainter::SmoothPixmapTransform);
 	painter.scale(scaleX, scaleY);
-	for (int i = 0; i < pageIndexes.size() - 1; i++) {
+	total = pageIndexes.size() - 1;
+	progress = 0;
+	for (int i = 0; i < total; i++) {
 		if (i > 0)
 			printer->newPage();
 		QRegion region(0, pageIndexes.at(i) - 1,
 			       table.width(),
 			       pageIndexes.at(i + 1) - pageIndexes.at(i) + 1);
 		table.render(&painter, QPoint(0, 0), region);
+		progress++;
+		emit signalProgress(done + (progress * 10) / total);
 	}
 }
 

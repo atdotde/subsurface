@@ -158,6 +158,7 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget* parent): QGraphicsView(parent)
 	scene()->addItem(depthHandler);
 
 	minMinutes = TIME_INITIAL_MAX;
+	minDepth = M_OR_FT(40,120);
 	QAction *action = NULL;
 
 #define ADD_ACTION( SHORTCUT, Slot ) \
@@ -360,7 +361,8 @@ void DivePlannerGraphics::increaseDepth()
 {
 	if (depthLine->maximum() + M_OR_FT(10,30) > MAX_DEPTH)
 		return;
-	depthLine->setMaximum( depthLine->maximum() + M_OR_FT(10,30));
+	minDepth += M_OR_FT(10,30);
+	depthLine->setMaximum( minDepth );
 	depthLine->updateTicks();
 	drawProfile();
 }
@@ -387,7 +389,8 @@ void DivePlannerGraphics::decreaseDepth()
 			return;
 		}
 	}
-	depthLine->setMaximum(depthLine->maximum() - M_OR_FT(10,30));
+	minDepth -= M_OR_FT(10,30);
+	depthLine->setMaximum( minDepth );
 	depthLine->updateTicks();
 	drawProfile();
 }
@@ -438,7 +441,7 @@ void DivePlannerPointsModel::loadFromDive(dive* d)
 	// we start with the first gas and see if it was changed
 	int o2 = backupDive.cylinder[0].gasmix.o2.permille;
 	int he = backupDive.cylinder[0].gasmix.he.permille;
-	for (int i = 0; i < backupDive.dc.samples; i++) {
+	for (int i = 0; i < backupDive.dc.samples - 1; i++) {
 		const sample &s = backupDive.dc.sample[i];
 		if (s.time.seconds == 0)
 			continue;
@@ -484,17 +487,27 @@ void DivePlannerGraphics::drawProfile()
 	plannerModel->createTemporaryPlan();
 	struct diveplan diveplan = plannerModel->getDiveplan();
 	struct divedatapoint *dp = diveplan.dp;
+	unsigned int max_depth = 0;
+
 	if (!dp) {
 		plannerModel->deleteTemporaryPlan();
 		return;
 	}
-	while(dp->next)
+	while(dp->next) {
+		if (dp->depth > max_depth)
+			max_depth = dp->depth;
 		dp = dp->next;
+	}
 
 	if (!activeDraggedHandler && (timeLine->maximum() < dp->time / 60.0 + 5 || dp->time / 60.0 + 15 < timeLine->maximum())) {
 		double newMax = fmax(dp->time / 60.0 + 5, minMinutes);
 		timeLine->setMaximum(newMax);
 		timeLine->updateTicks();
+	}
+	if (!activeDraggedHandler && (depthLine->maximum() < max_depth + M_OR_FT(10,30) || max_depth + M_OR_FT(10,30) < depthLine->maximum())) {
+		double newMax = fmax(max_depth + M_OR_FT(10,30), minDepth);
+		depthLine->setMaximum(newMax);
+		depthLine->updateTicks();
 	}
 
 	// Re-position the user generated dive handlers
@@ -770,8 +783,21 @@ void Ruler::setTextColor(const QColor& color)
 	textColor = color;
 }
 
+void Ruler::eraseAll()
+{
+	qDeleteAll(ticks);
+	ticks.clear();
+	qDeleteAll(labels);
+	labels.clear();
+}
+
 Ruler::Ruler() : orientation(Qt::Horizontal)
 {
+}
+
+Ruler::~Ruler()
+{
+	eraseAll();
 }
 
 void Ruler::setOrientation(Qt::Orientation o)
@@ -784,10 +810,7 @@ void Ruler::setOrientation(Qt::Orientation o)
 
 void Ruler::updateTicks()
 {
-	qDeleteAll(ticks);
-	ticks.clear();
-	qDeleteAll(labels);
-	labels.clear();
+	eraseAll();
 
 	QLineF m = line();
 	QGraphicsLineItem *item = NULL;
@@ -1019,7 +1042,7 @@ QVariant DivePlannerPointsModel::data(const QModelIndex& index, int role) const
 	if(role == Qt::DisplayRole) {
 		divedatapoint p = divepoints.at(index.row());
 		switch(index.column()) {
-		case CCSETPOINT: return p.po2;
+		case CCSETPOINT: return (double) p.po2 / 1000;
 		case DEPTH: return rint(get_depth_units(p.depth, NULL, NULL));
 		case DURATION: return p.time / 60;
 		case GAS: return dpGasToStr(p);
@@ -1094,8 +1117,8 @@ DivePlannerPointsModel::DivePlannerPointsModel(QObject* parent): QAbstractTableM
 
 DivePlannerPointsModel* DivePlannerPointsModel::instance()
 {
-	static DivePlannerPointsModel* self = new DivePlannerPointsModel();
-	return self;
+	static QScopedPointer<DivePlannerPointsModel> self(new DivePlannerPointsModel());
+	return self.data();
 }
 
 void DivePlannerPointsModel::setBottomSac(int sac)
@@ -1166,17 +1189,26 @@ bool DivePlannerPointsModel::addGas(int o2, int he)
 	return false;
 }
 
-int DivePlannerPointsModel::addStop(int milimeters, int minutes, int o2, int he, int ccpoint)
+int DivePlannerPointsModel::addStop(int milimeters, int seconds, int o2, int he, int ccpoint)
 {
 	int row = divepoints.count();
-	if (minutes == 0 && milimeters == 0 && row != 0){
+	if (seconds == 0 && milimeters == 0 && row != 0){
 		/* this is only possible if the user clicked on the 'plus' sign on the DivePoints Table */
 		struct divedatapoint& t = divepoints.last();
 		milimeters = t.depth;
-		minutes = t.time + 600; // 10 minutes.
-	} else if (minutes == 0 && milimeters == 0 && row == 0) {
+		seconds = t.time + 600; // 10 minutes.
+		o2 = t.o2;
+		he = t.he;
+		ccpoint = t.po2;
+	} else if (seconds == 0 && milimeters == 0 && row == 0) {
 		milimeters = M_OR_FT(5, 15); // 5m / 15ft
-		minutes = 600; // 10 min
+		seconds = 600; // 10 min
+		//Default to the first defined gas, if we got one.
+		cylinder_t *cyl = &stagingDive->cylinder[0];
+		if (cyl) {
+			o2 = cyl->gasmix.o2.permille;
+			he = cyl->gasmix.he.permille;
+		}
 	}
 	if (o2 != -1)
 		if (!addGas(o2, he))
@@ -1185,14 +1217,14 @@ int DivePlannerPointsModel::addStop(int milimeters, int minutes, int o2, int he,
 	// check if there's already a new stop before this one:
 	for (int i = 0; i < row; i++) {
 		const divedatapoint& dp = divepoints.at(i);
-		if (dp.time == minutes) {
+		if (dp.time == seconds) {
 			row = i;
 			beginRemoveRows(QModelIndex(), row, row);
 			divepoints.remove(row);
 			endRemoveRows();
 			break;
 		}
-		if (dp.time > minutes ) {
+		if (dp.time > seconds ) {
 			row = i;
 			break;
 		}
@@ -1220,7 +1252,7 @@ int DivePlannerPointsModel::addStop(int milimeters, int minutes, int o2, int he,
 	beginInsertRows(QModelIndex(), row, row);
 	divedatapoint point;
 	point.depth = milimeters;
-	point.time = minutes;
+	point.time = seconds;
 	point.o2 = o2;
 	point.he = he;
 	point.po2 = ccpoint;
@@ -1370,19 +1402,18 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	// Get the user-input and calculate the dive info
 	// Not sure if this is the place to create the diveplan...
 	// We just start with a surface node at time = 0
-	struct divedatapoint *dp = create_dp(0, 0, 209, 0, 0);
-	dp->entered = TRUE;
-	diveplan.dp = dp;
+	diveplan.dp = NULL;
 	int lastIndex = -1;
 	for (int i = 0; i < rowCount(); i++) {
 		divedatapoint p = at(i);
 		int deltaT = lastIndex != -1 ? p.time - at(lastIndex).time : p.time;
 		lastIndex = i;
-		dp = plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2);
+		plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2);
 	}
 	char *cache = NULL;
 	tempDive = NULL;
 	const char *errorString = NULL;
+	struct divedatapoint *dp = NULL;
 	for (int i = 0; i < MAX_CYLINDERS; i++) {
 		cylinder_t *cyl = &stagingDive->cylinder[i];
 		if (cyl->depth.mm) {
@@ -1432,6 +1463,20 @@ void DivePlannerPointsModel::createPlan()
 
 	createTemporaryPlan();
 	plan(&diveplan, &cache, &tempDive, isPlanner(), &errorString);
+	copy_cylinders(stagingDive, tempDive);
+	int mean[MAX_CYLINDERS], duration[MAX_CYLINDERS];
+	per_cylinder_mean_depth(tempDive, select_dc(&tempDive->dc), mean, duration);
+	for (int i = 0; i < MAX_CYLINDERS; i++) {
+		cylinder_t *cyl = tempDive->cylinder+i;
+		if (cylinder_none(cyl))
+			continue;
+		// FIXME: The epic assumption that all the cylinders after the first is deco
+		int sac = i ? diveplan.decosac : diveplan.bottomsac;
+		cyl->start.mbar = cyl->type.workingpressure.mbar;
+		int consumption = ((depth_to_mbar(mean[i], tempDive) * duration[i] / 60) * sac) / ( cyl->type.size.mliter / 1000);
+		cyl->end.mbar = cyl->start.mbar - consumption;
+	}
+
 	mark_divelist_changed(TRUE);
 
 	// Remove and clean the diveplan, so we don't delete

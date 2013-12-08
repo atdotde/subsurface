@@ -97,7 +97,7 @@ private:
 	int paint_direction;
 };
 
-class EventItem : public QGraphicsPolygonItem
+class EventItem : public QGraphicsPixmapItem
 {
 public:
 	explicit EventItem(struct event *ev, QGraphicsItem* parent = 0, bool grayscale = FALSE);
@@ -106,7 +106,6 @@ public:
 private:
 	ToolTipItem *controller;
 	QString text;
-	QIcon icon;
 	bool isGrayscale;
 
 	QColor getColor(const color_indice_t i);
@@ -185,6 +184,7 @@ private:
 	QColor getColor(const color_indice_t i);
 	QColor get_sac_color(int sac, int avg_sac);
 	void scrollViewTo(const QPoint pos);
+	void createPPLegend(QString tr, const QColor& c, QPointF& legendPos);
 
 	QPen defaultPen;
 	QBrush defaultBrush;

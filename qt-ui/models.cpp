@@ -12,9 +12,12 @@
 #include "../device.h"
 #include "../statistics.h"
 #include "../qthelper.h"
+#include "../gettextfromc.h"
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QSettings>
 #include <QColor>
 #include <QBrush>
 #include <QFont>
@@ -62,13 +65,13 @@ void CleanerTableModel::setHeaderDataStrings(const QStringList& newHeaders)
 CylindersModel::CylindersModel(QObject* parent): current(0), rows(0)
 {
 	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, DEPTH};
-	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  tr("O2%") << tr("He%") << tr("Switch at"));
+	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  trUtf8("O" UTF8_SUBSCRIPT_2 "%") << tr("He%") << tr("Switch at"));
 }
 
 CylindersModel *CylindersModel::instance()
 {
-	static CylindersModel *self = new CylindersModel();
-	return self;
+	static QScopedPointer<CylindersModel> self(new CylindersModel());
+	return self.data();
 }
 
 static QVariant percent_string(fraction_t fraction)
@@ -111,16 +114,7 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			// we can't use get_volume_string because the idiotic imperial tank
 			// sizes take working pressure into account...
 			if (cyl->type.size.mliter) {
-				double volume;
-				int mbar = cyl->type.workingpressure.mbar;
-
-				if (mbar && prefs.units.volume == prefs.units.CUFT) {
-					volume = ml_to_cuft(cyl->type.size.mliter);
-					volume *= bar_to_atm(mbar / 1000.0);
-				} else {
-					volume = cyl->type.size.mliter / 1000.0;
-				}
-				ret = QString("%1").arg(volume, 0, 'f', 1);
+				ret = get_volume_string(cyl->type.size, TRUE);
 			}
 			break;
 		case WORKINGPRESS:
@@ -129,15 +123,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			break;
 		case START:
 			if (cyl->start.mbar)
-				ret = get_pressure_string(cyl->start, FALSE);
+				ret = get_pressure_string(cyl->start, TRUE);
 			else if (cyl->sample_start.mbar)
-				ret = get_pressure_string(cyl->sample_start, FALSE);
+				ret = get_pressure_string(cyl->sample_start, TRUE);
 			break;
 		case END:
 			if (cyl->end.mbar)
-				ret = get_pressure_string(cyl->end, FALSE);
+				ret = get_pressure_string(cyl->end, TRUE);
 			else if (cyl->sample_end.mbar)
-				ret = get_pressure_string(cyl->sample_end, FALSE);
+				ret = get_pressure_string(cyl->sample_end, TRUE);
 			break;
 		case O2:
 			ret = percent_string(cyl->gasmix.o2);
@@ -146,10 +140,7 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			ret = percent_string(cyl->gasmix.he);
 			break;
 		case DEPTH:
-			if (prefs.units.length == prefs.units.FEET)
-				ret = mm_to_feet(cyl->depth.mm);
-			else
-				ret = cyl->depth.mm / 1000;
+			ret = get_depth_string(cyl->depth, TRUE);
 			break;
 		}
 		break;
@@ -317,7 +308,7 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 
 int CylindersModel::rowCount(const QModelIndex& parent) const
 {
-	return 	rows;
+	return	rows;
 }
 
 void CylindersModel::add()
@@ -444,7 +435,7 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 	case Qt::EditRole:
 		switch(index.column()) {
 		case TYPE:
-			ret = QString(ws->description);
+			ret = gettextFromC::instance()->tr(ws->description);
 			break;
 		case WEIGHT:
 			ret = get_weight_string(ws->weight, TRUE);
@@ -483,10 +474,17 @@ bool WeightModel::setData(const QModelIndex& index, const QVariant& value, int r
 	switch(index.column()) {
 	case TYPE:
 		if (!value.isNull()) {
-			QByteArray ba = value.toString().toUtf8();
-			const char *text = ba.constData();
-			if (!ws->description || strcmp(ws->description, text)) {
-				ws->description = strdup(text);
+			if (!ws->description || gettextFromC::instance()->tr(ws->description) != value.toString()) {
+				// loop over translations to see if one matches
+				int i = -1;
+				while(ws_info[++i].name) {
+					if (gettextFromC::instance()->tr(ws_info[i].name) == value.toString()) {
+						ws->description = ws_info[i].name;
+						break;
+					}
+				}
+				if (ws_info[i].name == NULL) // didn't find a match
+					ws->description = strdup(value.toString().toUtf8().constData());
 				changed = true;
 			}
 		}
@@ -500,7 +498,7 @@ bool WeightModel::setData(const QModelIndex& index, const QVariant& value, int r
 			// now update the ws_info
 			changed = true;
 			WSInfoModel *wsim = WSInfoModel::instance();
-			QModelIndexList matches = wsim->match(wsim->index(0,0), Qt::DisplayRole, ws->description);
+			QModelIndexList matches = wsim->match(wsim->index(0,0), Qt::DisplayRole, gettextFromC::instance()->tr(ws->description));
 			if (!matches.isEmpty())
 				wsim->setData(wsim->index(matches.first().row(), WSInfoModel::GR), ws->weight.grams);
 		}
@@ -559,8 +557,8 @@ void WeightModel::setDive(dive* d)
 
 WSInfoModel* WSInfoModel::instance()
 {
-	static WSInfoModel *self = new WSInfoModel();
-	return self;
+	static QScopedPointer<WSInfoModel> self(new WSInfoModel());
+	return self.data();
 }
 
 bool WSInfoModel::insertRows(int row, int count, const QModelIndex& parent)
@@ -610,7 +608,7 @@ QVariant WSInfoModel::data(const QModelIndex& index, int role) const
 					ret = gr;
 					break;
 				case DESCRIPTION:
-					ret = QString(info->name);
+					ret = gettextFromC::instance()->tr(info->name);
 					break;
 			}
 			break;
@@ -633,7 +631,7 @@ WSInfoModel::WSInfoModel() : rows(-1)
 	setHeaderDataStrings( QStringList() << tr("Description") << tr("kg"));
 	struct ws_info_t *info = ws_info;
 	for (info = ws_info; info->name; info++, rows++){
-		QString wsInfoName(info->name);
+		QString wsInfoName = gettextFromC::instance()->tr(info->name);
 		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
 	}
@@ -651,7 +649,7 @@ void WSInfoModel::updateInfo()
 	endRemoveRows();
 	rows = -1;
 	for (info = ws_info; info->name; info++, rows++){
-		QString wsInfoName(info->name);
+		QString wsInfoName = gettextFromC::instance()->tr(info->name);
 		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
 	}
@@ -680,8 +678,8 @@ void WSInfoModel::update()
 
 TankInfoModel* TankInfoModel::instance()
 {
-	static TankInfoModel *self = new TankInfoModel();
-	return self;
+	static QScopedPointer<TankInfoModel> self(new TankInfoModel());
+	return self.data();
 }
 
 const QString& TankInfoModel::biggerString() const
@@ -761,7 +759,7 @@ TankInfoModel::TankInfoModel() :  rows(-1)
 	setHeaderDataStrings( QStringList() << tr("Description") << tr("ml") << tr("bar"));
 	struct tank_info_t *info = tank_info;
 	for (info = tank_info; info->name; info++, rows++){
-		QString infoName(info->name);
+		QString infoName = gettextFromC::instance()->tr(info->name);
 		if (infoName.count() > biggerEntry.count())
 			biggerEntry = infoName;
 	}
@@ -1528,7 +1526,23 @@ bool TablePrintModel::setData(const QModelIndex &index, const QVariant &value, i
 			case 3: list.at(index.row())->duration = value.toString();
 			case 4: list.at(index.row())->divemaster = value.toString();
 			case 5: list.at(index.row())->buddy = value.toString();
-			case 6: list.at(index.row())->location = value.toString();
+			case 6: {
+				/* truncate if there are more than N lines of text,
+				 * we don't want a row to be larger that a single page! */
+				QString s = value.toString();
+				const int maxLines = 15;
+				int count = 0;
+				for (int i = 0; i < s.length(); i++) {
+					if (s.at(i) != QChar('\n'))
+						continue;
+					count++;
+					if (count > maxLines) {
+						s = s.left(i - 1);
+						break;
+					}
+				}
+				list.at(index.row())->location = s;
+			}
 			}
 			return true;
 		}
@@ -1588,7 +1602,6 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 	case Qt::DisplayRole: {
 		struct DiveItem di;
 		di.dive = dive;
-		char buf[80];
 
 		const QString unknown = tr("unknown");
 
@@ -1657,9 +1670,9 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 				return gases;
 			}
 			if (col == 2)
-				return QString::number(dive->maxcns);
-			if (col == 3)
 				return di.displaySac();
+			if (col == 3)
+				return QString::number(dive->maxcns);
 			if (col == 4) {
 				weight_t tw = { total_weight(dive) };
 				return get_weight_string(tw, true);
@@ -1711,8 +1724,8 @@ Qt::ItemFlags GasSelectionModel::flags(const QModelIndex& index) const
 
 GasSelectionModel* GasSelectionModel::instance()
 {
-	static GasSelectionModel* self = new GasSelectionModel();
-	return self;
+	static QScopedPointer<GasSelectionModel> self(new GasSelectionModel());
+	return self.data();
 }
 
 void GasSelectionModel::repopulate()
@@ -1726,4 +1739,49 @@ QVariant GasSelectionModel::data(const QModelIndex& index, int role) const
 		return defaultModelFont();
 	}
 	return QStringListModel::data(index, role);
+}
+
+// Language Model, The Model to populate the list of possible Languages.
+
+LanguageModel* LanguageModel::instance()
+{
+	static LanguageModel *self = new LanguageModel();
+	QLocale l;
+	return self;
+}
+
+LanguageModel::LanguageModel(QObject* parent): QAbstractListModel(parent)
+{
+	QSettings s;
+	QDir d(getSubsurfaceDataPath("translations"));
+	QStringList result = d.entryList();
+	Q_FOREACH(const QString& s, result){
+		if ( s.startsWith("subsurface_") && s.endsWith(".qm") ){
+			languages.push_back( (s == "subsurface_source.qm") ? "English" : s);
+		}
+	}
+}
+
+QVariant LanguageModel::data(const QModelIndex& index, int role) const
+{
+	QLocale loc;
+	QString currentString = languages.at(index.row());
+	if(!index.isValid())
+		return QVariant();
+	switch(role){
+		case Qt::DisplayRole:{
+			QLocale l( currentString.remove("subsurface_"));
+			return currentString == "English" ? currentString : QString("%1 (%2)").arg(l.languageToString(l.language())).arg(l.countryToString(l.country()));
+		}break;
+	case Qt::UserRole:{
+			QString currentString = languages.at(index.row());
+			return currentString == "English" ? "en_US" : currentString.remove("subsurface_");
+		}break;
+	}
+	return QVariant();
+}
+
+int LanguageModel::rowCount(const QModelIndex& parent) const
+{
+	return languages.count();
 }

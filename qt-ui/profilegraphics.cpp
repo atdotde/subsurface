@@ -27,6 +27,7 @@
 #include "../device.h"
 #include "../helpers.h"
 #include "../planner.h"
+#include "../gettextfromc.h"
 
 #include <libdivecomputer/parser.h>
 #include <libdivecomputer/version.h>
@@ -402,7 +403,7 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	gc.maxy = (profile_grid_area.height() - 2 * profile_grid_area.y());
 
 	/* This is per-dive-computer */
-	gc.pi = *create_plot_info(dive, dc, &gc);
+	gc.pi = *create_plot_info(dive, dc, &gc, printMode);
 
 	/* Bounding box */
 	QPen pen = defaultPen;
@@ -539,16 +540,16 @@ void ProfileGraphicsView::plot_pp_text()
 {
 	double pp, dpp, m;
 	int hpos;
-	static text_render_options_t tro = {PP_TEXT_SIZE, PP_LINES, LEFT, MIDDLE};
+	static text_render_options_t tro = {PP_TEXT_SIZE, PP_LINES, LEFT, -0.75};
 	QGraphicsRectItem *pressureMarkers = new QGraphicsRectItem();
 
 	setup_pp_limits(&gc);
 	pp = floor(gc.pi.maxpp * 10.0) / 10.0 + 0.2;
-	dpp = pp > 4 ? 0.5 : 0.2;
+	dpp = pp > 4 ? 0.5 : 0.25;
 	hpos = gc.pi.entry[gc.pi.nr - 1].sec;
 	QColor c = getColor(PP_LINES);
 
-	bool alt = false;
+	bool alt = true;
 	for (m = 0.0; m <= pp; m += dpp) {
 		QGraphicsLineItem *item = new QGraphicsLineItem(SCALEGC(0, m), SCALEGC(hpos, m));
 		QPen pen(defaultPen);
@@ -561,9 +562,8 @@ void ProfileGraphicsView::plot_pp_text()
 		scene()->addItem(item);
 		qreal textPos = hpos;
 		if (alt)
-			textPos += 30;
+			plot_text(&tro, QPointF(textPos, m), QString::number(m), pressureMarkers);
 		alt = !alt;
-		plot_text(&tro, QPointF(textPos, m), QString::number(m), pressureMarkers);
 	}
 	scene()->addItem(pressureMarkers);
 	pressureMarkers->setPos(pressureMarkers->pos().x() + 10, 0);
@@ -589,6 +589,8 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 	setup_pp_limits(&gc);
 	QColor c;
 	QPointF from, to;
+	QPointF legendPos = QPointF(scene()->sceneRect().width() * 0.4, scene()->sceneRect().height() - scene()->sceneRect().height()*0.02);
+
 	if (prefs.pp_graphs.pn2) {
 		c = getColor(PN2);
 		entry = pi->entry;
@@ -611,6 +613,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			else
 				from = QPointF(SCALEGC(entry->sec, entry->pn2));
 		}
+		createPPLegend(trUtf8("pN" UTF8_SUBSCRIPT_2),getColor(PN2), legendPos);
 	}
 
 	if (prefs.pp_graphs.phe) {
@@ -636,6 +639,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			else
 				from = QPointF(SCALEGC(entry->sec, entry->phe));
 		}
+		createPPLegend(trUtf8("pHe"),getColor(PHE), legendPos);
 	}
 	if (prefs.pp_graphs.po2) {
 		c = getColor(PO2);
@@ -659,6 +663,25 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			 else
 				from = QPointF(SCALEGC(entry->sec, entry->po2));
 		}
+		createPPLegend(trUtf8("pO" UTF8_SUBSCRIPT_2),getColor(PO2), legendPos);
+	}
+}
+
+void ProfileGraphicsView::createPPLegend(QString title, const QColor& c, QPointF& legendPos)
+{
+	QGraphicsRectItem *rect = new QGraphicsRectItem(0, 0, scene()->sceneRect().width() * 0.01, scene()->sceneRect().width() * 0.01);
+	rect->setBrush(QBrush(c));
+	rect->setPos(legendPos);
+	rect->setPen(QPen(QColor(Qt::transparent)));
+	QGraphicsSimpleTextItem *text = new QGraphicsSimpleTextItem(title);
+	text->setPos(legendPos.x() + rect->boundingRect().width() + 5, legendPos.y() );
+	scene()->addItem(rect);
+	scene()->addItem(text);
+	legendPos.setX(text->pos().x() + text->boundingRect().width() + 20);
+	if(printMode){
+		QFont f = text->font();
+		f.setPointSizeF( f.pointSizeF() * 0.7);
+		text->setFont(f);
 	}
 }
 
@@ -969,10 +992,10 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	item->setPos(x, y);
 	scene()->addItem(item);
 
-	/* we display the event on screen - so translate */
-	QString name = tr(ev->name);
+	/* we display the event on screen - so translate (with the correct context for events) */
+	QString name = gettextFromC::instance()->tr(ev->name);
 	if (ev->value) {
-		if (ev->name && name == "gaschange") {
+		if (ev->name && strcmp(ev->name, "gaschange") == 0) {
 			int he = get_he(&dive->cylinder[entry->cylinderindex].gasmix);
 			int o2 = get_o2(&dive->cylinder[entry->cylinderindex].gasmix);
 
@@ -1603,37 +1626,13 @@ QColor EventItem::getColor(const color_indice_t i)
 	return profile_color[i].at((isGrayscale) ? 1 : 0);
 }
 
-EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent), ev(ev), isGrayscale(grayscale)
+EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPixmapItem(parent), ev(ev), isGrayscale(grayscale)
 {
-	setFlag(ItemIgnoresTransformations);
-	setFlag(ItemIsFocusable);
-	setAcceptHoverEvents(true);
-
-	QPolygonF poly;
-	poly.push_back(QPointF(-8, 16));
-	poly.push_back(QPointF(8, 16));
-	poly.push_back(QPointF(0, 0));
-	poly.push_back(QPointF(-8, 16));
-
-	QPen defaultPen ;
-	defaultPen.setJoinStyle(Qt::RoundJoin);
-	defaultPen.setCapStyle(Qt::RoundCap);
-	defaultPen.setWidth(2);
-	defaultPen.setCosmetic(true);
-
-	QPen pen = defaultPen;
-	pen.setBrush(QBrush(getColor(ALERT_BG)));
-
-	setPolygon(poly);
-	setBrush(QBrush(getColor(ALERT_BG)));
-	setPen(pen);
-
-	QGraphicsLineItem *line = new QGraphicsLineItem(0, 5, 0, 10, this);
-	line->setPen(QPen(getColor(ALERT_FG), 2));
-
-	QGraphicsEllipseItem *ball = new QGraphicsEllipseItem(-1, 12, 2, 2, this);
-	ball->setBrush(QBrush(getColor(ALERT_FG)));
-	ball->setPen(QPen(getColor(ALERT_FG)));
+	if(ev->name && strcmp(ev->name, "bookmark") == 0) {
+		setPixmap( QPixmap(QString(":flag")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	} else {
+		setPixmap( QPixmap(QString(":warning")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	}
 }
 
 RulerNodeItem::RulerNodeItem(QGraphicsItem *parent, graphics_context context) : QGraphicsEllipseItem(parent), gc(context), entry(NULL) , ruler(NULL)

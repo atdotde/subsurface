@@ -46,7 +46,7 @@ public:
 	QList<QPair<int, int> > collectGases(dive *d);
 
 public slots:
-	int addStop(int meters = 0, int minutes = 0, int o2 = 0, int he = 0, int ccpoint = 0 );
+	int addStop(int millimeters = 0, int seconds = 0, int o2 = 0, int he = 0, int ccpoint = 0 );
 	void addCylinder_clicked();
 	void setGFHigh(const int gfhigh);
 	void setGFLow(const int ghflow);
@@ -125,6 +125,7 @@ public slots:
 class Ruler : public QGraphicsLineItem{
 public:
 	Ruler();
+	~Ruler();
 	void setMinimum(double minimum);
 	void setMaximum(double maximum);
 	void setTickInterval(double interval);
@@ -141,6 +142,8 @@ public:
 	int unitSystem;
 
 private:
+	void eraseAll();
+
 	Qt::Orientation orientation;
 	QList<QGraphicsLineItem*> ticks;
 	QList<QGraphicsSimpleTextItem*> labels;
@@ -218,7 +221,8 @@ private:
 	ExpanderGraphics *depthHandler;
 	ExpanderGraphics *timeHandler;
 
-	int minMinutes; // this holds the minimum duration of the dive.
+	int minMinutes; // this holds the minimum requested window time
+	int minDepth; // this holds the minimum requested window depth
 	int dpMaxTime; // this is the time of the dive calculated by the deco.
 
 	friend class DiveHandler;

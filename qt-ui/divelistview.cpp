@@ -210,6 +210,58 @@ void DiveListView::selectDive(int i, bool scrollto, bool toggle)
 	if (scrollto)
 		scrollTo(idx, PositionAtCenter);
 }
+
+void DiveListView::selectDives(const QList< int >& newDiveSelection)
+{
+	if(!newDiveSelection.count())
+		return;
+
+	disconnect(selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+		   this, SLOT(selectionChanged(QItemSelection,QItemSelection)));
+	disconnect(selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)),
+		   this, SLOT(currentChanged(QModelIndex,QModelIndex)));
+
+	setAnimated(false);
+	collapseAll();
+	QSortFilterProxyModel *m = qobject_cast<QSortFilterProxyModel*>(model());
+	QItemSelectionModel::SelectionFlags flags = QItemSelectionModel::Select | QItemSelectionModel::Rows;
+
+	QItemSelection newDeselected = selectionModel()->selection();
+	QModelIndexList diveList;
+
+	int firstSelectedDive = -1;
+	/* context for temp. variables. */{
+		int i = 0;
+		struct dive *dive;
+		for_each_dive(i, dive){
+			dive->selected = newDiveSelection.contains(i) == true;
+			if(firstSelectedDive == -1 && dive->selected ){
+				firstSelectedDive = i;
+			}
+		}
+	}
+	select_dive(firstSelectedDive);
+	Q_FOREACH(int i, newDiveSelection){
+		diveList.append(m->match(m->index(0,0), DiveTripModel::DIVE_IDX,
+			i, 2, Qt::MatchRecursive).first());
+	}
+	Q_FOREACH(const QModelIndex& idx, diveList){
+		selectionModel()->select(idx, flags);
+		if(idx.parent().isValid() && !isExpanded(idx.parent())){
+			expand(idx.parent());
+		}
+	}
+	setAnimated(true);
+	QTreeView::selectionChanged(selectionModel()->selection(), newDeselected);
+	connect(selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+		this, SLOT(selectionChanged(QItemSelection,QItemSelection)));
+	connect(selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)),
+		this, SLOT(currentChanged(QModelIndex,QModelIndex)));
+	Q_EMIT currentDiveChanged(selected_dive);
+	const QModelIndex& idx = m->match(m->index(0,0), DiveTripModel::DIVE_IDX,selected_dive, 2, Qt::MatchRecursive).first();
+	scrollTo(idx);
+}
+
 void DiveListView::showSearchEdit()
 {
 	searchBox->show();
@@ -313,8 +365,6 @@ void DiveListView::reloadHeaderActions()
 	// Populate the context menu of the headers that will show
 	// the menu to show / hide columns.
 	if (!header()->actions().size()) {
-		QAction *visibleAction = new QAction("Visible:", header());
-		header()->addAction(visibleAction);
 		QSettings s;
 		s.beginGroup("DiveListColumnState");
 		for(int i = 0; i < model()->columnCount(); i++) {
@@ -341,10 +391,9 @@ void DiveListView::reloadHeaderActions()
 		}
 		s.endGroup();
 	} else {
-		// Skip first QAction item ( static text Visible )
 		for(int i = 0; i < model()->columnCount(); i++) {
 			QString title = QString("%1").arg(model()->headerData(i, Qt::Horizontal).toString());
-			header()->actions()[i+1]->setText( title );
+			header()->actions()[i]->setText(title);
 		}
 	}
 }
@@ -494,9 +543,7 @@ void DiveListView::mergeTripBelow()
 void DiveListView::removeFromTrip()
 {
 	int i;
-	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
-	if (!d) // shouldn't happen as we only are setting up this action if this is a dive
-		return;
+	struct dive *d;
 	for_each_dive(i, d) {
 		if (d->selected)
 			remove_dive_from_trip(d);
@@ -573,6 +620,31 @@ void DiveListView::addToTripAbove()
 	fixMessyQtModelBehaviour();
 }
 
+void DiveListView::markDiveInvalid()
+{
+	int i;
+	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
+	if (!d)
+		return;
+	for_each_dive (i, d) {
+		if (!d->selected)
+			continue;
+		// now mark the dive invalid... how do we do THAT?
+		// d->invalid = true;
+	}
+	if (amount_selected == 0) {
+		mainWindow()->cleanUpEmpty();
+	}
+	mark_divelist_changed(TRUE);
+	mainWindow()->refreshDisplay();
+	if(prefs.display_invalid_dives == FALSE) {
+		clearSelection();
+		// select top dive that isn't marked invalid
+		rememberSelection();
+	}
+	fixMessyQtModelBehaviour();
+}
+
 void DiveListView::deleteDive()
 {
 	int i;
@@ -641,8 +713,12 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 			popup.addAction(tr("merge trip with trip below"), this, SLOT(mergeTripBelow()));
 		}
 	}
-	if (d)
+	if (d) {
 		popup.addAction(tr("delete dive(s)"), this, SLOT(deleteDive()));
+#if 0
+		popup.addAction(tr("mark dive(s) invalid", this, SLOT(markDiveInvalid())));
+#endif
+	}
 	if (amount_selected > 1 && consecutive_selected())
 		popup.addAction(tr("merge selected dives"), this, SLOT(mergeDives()));
 	if (amount_selected >= 1) {

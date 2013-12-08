@@ -1,12 +1,16 @@
 #include "preferences.h"
+#include "mainwindow.h"
 #include <QSettings>
 #include <QDebug>
 #include <QFileDialog>
+#include <QMessageBox>
+#include <QSortFilterProxyModel>
 
 PreferencesDialog* PreferencesDialog::instance()
 {
-	static PreferencesDialog *dialog = new PreferencesDialog();
+	static PreferencesDialog *dialog = new PreferencesDialog(mainWindow());
 	dialog->setAttribute(Qt::WA_QuitOnClose, false);
+	LanguageModel::instance();
 	return dialog;
 }
 
@@ -14,9 +18,22 @@ PreferencesDialog::PreferencesDialog(QWidget* parent, Qt::WindowFlags f) : QDial
 {
 	ui.setupUi(this);
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+	connect(ui.gflow, SIGNAL(valueChanged(int)), this, SLOT(gflowChanged(int)));
+	connect(ui.gfhigh, SIGNAL(valueChanged(int)), this, SLOT(gfhighChanged(int)));
 	setUiFromPrefs();
 	rememberPrefs();
 }
+
+#define DANGER_GF ( gf > 100 ) ? "* { color: red; }" : ""
+void PreferencesDialog::gflowChanged(int gf)
+{
+	ui.gflow->setStyleSheet(DANGER_GF);
+}
+void PreferencesDialog::gfhighChanged(int gf)
+{
+	ui.gfhigh->setStyleSheet(DANGER_GF);
+}
+#undef DANGER_GF
 
 void PreferencesDialog::showEvent(QShowEvent *event)
 {
@@ -51,7 +68,7 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.all_tissues->setChecked(prefs.calc_all_tissues);
 	ui.calc_ndl_tts->setEnabled(ui.calculated_ceiling->isChecked());
 	ui.calc_ndl_tts->setChecked(prefs.calc_ndl_tts);
-	ui.groupBox->setEnabled(ui.personalize->isChecked());
+	ui.units_group->setEnabled(ui.personalize->isChecked());
 
 	ui.gflow->setValue(prefs.gflow);
 	ui.gfhigh->setValue(prefs.gfhigh);
@@ -73,8 +90,9 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.psi->setChecked(prefs.units.pressure == units::PSI);
 	ui.liter->setChecked(prefs.units.volume == units::LITER);
 	ui.cuft->setChecked(prefs.units.volume == units::CUFT);
-	ui.kgs->setChecked(prefs.units.weight == units::KG);
+	ui.kg->setChecked(prefs.units.weight == units::KG);
 	ui.lbs->setChecked(prefs.units.weight == units::LBS);
+
 	ui.font->setFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
 	ui.defaultfilename->setText(prefs.default_filename);
@@ -88,6 +106,21 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.show_sac->setChecked(prefs.show_sac);
 	ui.vertical_speed_minutes->setChecked(prefs.units.vertical_speed_time == units::MINUTES);
 	ui.vertical_speed_seconds->setChecked(prefs.units.vertical_speed_time == units::SECONDS);
+
+	QSortFilterProxyModel *filterModel = new QSortFilterProxyModel();
+	filterModel->setSourceModel(LanguageModel::instance());
+	filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+	ui.languageView->setModel(filterModel);
+	filterModel->sort(0);
+	connect(ui.languageFilter, SIGNAL(textChanged(QString)), filterModel, SLOT(setFilterFixedString(QString)));
+
+	QSettings s;
+	s.beginGroup("Language");
+	ui.languageSystemDefault->setChecked(s.value("UseSystemLanguage").toBool());
+	  QAbstractItemModel *m = ui.languageView->model();
+	  QModelIndexList languages = m->match( m->index(0,0), Qt::UserRole, s.value("UiLanguage").toString());
+	  if (languages.count())
+		  ui.languageView->setCurrentIndex(languages.first());
 }
 
 void PreferencesDialog::restorePrefs()
@@ -149,11 +182,21 @@ void PreferencesDialog::syncSettings()
 	s.endGroup();
 
 	s.beginGroup("Display");
-	s.value("divelist_font", ui.font->font().family());
-	s.value("font_size", ui.fontsize->value());
-	s.value("displayinvalid", ui.displayinvalid->isChecked());
+	s.setValue("divelist_font", ui.font->font().family());
+	s.setValue("font_size", ui.fontsize->value());
+	s.setValue("displayinvalid", ui.displayinvalid->isChecked());
 	s.endGroup();
 	s.sync();
+
+	QLocale loc;
+	s.beginGroup("Language");
+	if (s.value("UiLanguage").toString() != ui.languageView->currentIndex().data(Qt::UserRole) ||
+	    s.value("UseSystemLanguage").toBool() != ui.languageSystemDefault->isChecked()) {
+		QMessageBox::warning(mainWindow(), tr("Restart required"),
+				     tr("To correctly load a new language you must restart Subsurface."));
+	}
+	s.setValue("UseSystemLanguage", ui.languageSystemDefault->isChecked());
+	s.setValue("UiLanguage", ui.languageView->currentIndex().data(Qt::UserRole));
 
 	emit settingsChanged();
 }

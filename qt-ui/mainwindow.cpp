@@ -17,6 +17,7 @@
 #include <QWebView>
 #include <QTableView>
 #include <QDesktopWidget>
+#include <QDesktopServices>
 #include "divelistview.h"
 #include "starwidget.h"
 
@@ -85,8 +86,8 @@ void MainWindow::current_dive_changed(int divenr)
 	if (divenr >= 0) {
 		select_dive(divenr);
 		ui.globe->centerOn(get_dive(selected_dive));
-		redrawProfile();
 	}
+	redrawProfile();
 	ui.InfoWidget->updateDiveInfo(divenr);
 }
 
@@ -104,7 +105,7 @@ void MainWindow::on_actionOpen_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before opening a new file." );
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before opening a new file."));
 		return;
 	}
 	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
@@ -134,14 +135,15 @@ void MainWindow::cleanUpEmpty()
 	ui.ProfileWidget->clear();
 	ui.ListWidget->reload(DiveTripModel::TREE);
 	ui.globe->reload();
-	setTitle(MWTF_DEFAULT);
+	if (!existing_filename)
+		setTitle(MWTF_DEFAULT);
 }
 
 void MainWindow::on_actionClose_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
 		return;
 	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
@@ -220,7 +222,7 @@ void MainWindow::on_actionDivePlanner_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to plan a dive." );
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before trying to plan a dive."));
 		return;
 	}
 	disableDcShortcuts();
@@ -247,7 +249,7 @@ void MainWindow::on_actionQuit_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before closing the file." );
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
 		return;
 	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
@@ -269,7 +271,7 @@ void MainWindow::on_actionDownloadWeb_triggered()
 
 void MainWindow::on_actionDivelogs_de_triggered()
 {
-	DivelogsDeWebServices::instance()->exec();
+	DivelogsDeWebServices::instance()->downloadDives();
 }
 
 void MainWindow::on_actionEditDeviceNames_triggered()
@@ -283,7 +285,7 @@ void MainWindow::on_actionAddDive_triggered()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
 	   ui.InfoWidget->isEditing()) {
-		QMessageBox::warning(this, tr("Warning"), "Please save or cancel the current dive edit before trying to add a dive." );
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before trying to add a dive."));
 		return;
 	}
 	dive_list()->rememberSelection();
@@ -295,6 +297,9 @@ void MainWindow::on_actionAddDive_triggered()
 	struct dive *dive = alloc_dive();
 	dive->when = QDateTime::currentMSecsSinceEpoch() / 1000L + gettimezoneoffset();
 	dive->dc.model = "manually added dive"; // don't translate! this is stored in the XML file
+
+	dive->latitude.udeg = 0;
+	dive->longitude.udeg = 0;
 	record_dive(dive);
 	// this isn't in the UI yet, so let's call the C helper function - we'll fix this up when
 	// accepting the dive
@@ -306,7 +311,7 @@ void MainWindow::on_actionAddDive_triggered()
 	ui.infoPane->setCurrentIndex(MAINTAB);
 	DivePlannerPointsModel::instance()->clear();
 	DivePlannerPointsModel::instance()->createSimpleDive();
-	refreshDisplay();
+	ui.ListWidget->reload(DiveTripModel::CURRENT);
 }
 
 void MainWindow::on_actionRenumber_triggered()
@@ -486,15 +491,24 @@ void MainWindow::on_actionUserManual_triggered()
 {
 	if(!helpView){
 		helpView = new QWebView();
+		helpView->page()->setLinkDelegationPolicy(QWebPage::DelegateExternalLinks);
+		connect(helpView, SIGNAL(linkClicked(QUrl)), this, SLOT(linkClickedSlot(QUrl)));
 	}
 	QString searchPath = getSubsurfaceDataPath("Documentation");
 	if (searchPath != "") {
 		QUrl url(searchPath.append("/user-manual.html"));
+		helpView->setWindowTitle(tr("User Manual"));
+		helpView->setWindowIcon(QIcon(":/subsurface-icon"));
 		helpView->setUrl(url);
 	} else {
 		helpView->setHtml(tr("Cannot find the Subsurface manual"));
 	}
 	helpView->show();
+}
+
+void MainWindow::linkClickedSlot(QUrl url)
+{
+	QDesktopServices::openUrl(url);
 }
 
 QString MainWindow::filter()
@@ -594,7 +608,10 @@ void MainWindow::initialUiSetup()
 	QSettings settings;
 	settings.beginGroup("MainWindow");
 	QSize sz = settings.value("size", qApp->desktop()->size()).value<QSize>();
-	resize(sz);
+	if (settings.value("maximized", isMaximized()).value<bool>())
+		showMaximized();
+	else
+		resize(sz);
 
 	state = (CurrentState) settings.value("lastState", 0).toInt();
 	switch(state){
@@ -670,7 +687,9 @@ void MainWindow::writeSettings()
 
 	settings.beginGroup("MainWindow");
 	settings.setValue("lastState", (int) state);
-	settings.setValue("size",size());
+	settings.setValue("maximized", isMaximized());
+	if (!isMaximized())
+		settings.setValue("size", size());
 	if (state == VIEWALL){
 		saveSplitterSizes();
 	}
@@ -774,6 +793,10 @@ void MainWindow::setTitle(enum MainWindowTitleFormat format)
 		setWindowTitle("Subsurface");
 		break;
 	case MWTF_FILENAME:
+		if (!existing_filename) {
+			setTitle(MWTF_DEFAULT);
+			return;
+		}
 		QFile f(existing_filename);
 		QFileInfo fileInfo(f);
 		QString fileName(fileInfo.fileName());
@@ -839,7 +862,7 @@ void MainWindow::on_actionImportCSV_triggered()
 void MainWindow::editCurrentDive()
 {
 	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
-		QMessageBox::warning(this, tr("Warning"), "First finish the current edition before trying to do another." );
+		QMessageBox::warning(this, tr("Warning"), tr("First finish the current edition before trying to do another."));
 		return;
 	}
 
@@ -855,6 +878,11 @@ void MainWindow::editCurrentDive()
 		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
 	}
 	else if (defaultDC == "planned dive"){
-		// this looks like something is missing here
+		disableDcShortcuts();
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::PLAN);
+		ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
+		ui.infoPane->setCurrentIndex(PLANNERWIDGET);
+		DivePlannerPointsModel::instance()->loadFromDive(d);
+		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
 	}
 }

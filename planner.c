@@ -4,6 +4,7 @@
  *
  * (c) Dirk Hohndel 2013
  */
+#include <assert.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
@@ -172,26 +173,31 @@ static int time_at_last_depth(struct dive *dive, int o2, int he, unsigned int ne
 
 void fill_default_cylinder(cylinder_t *cyl)
 {
-	if (prefs.default_cylinder) {
-		struct tank_info_t *ti = tank_info;
-		while (ti->name != NULL) {
-			if (strcmp(ti->name, prefs.default_cylinder) == 0) {
-				cyl->type.description = strdup(prefs.default_cylinder);
-				if (ti->ml) {
-					cyl->type.size.mliter = ti->ml;
-					cyl->type.workingpressure.mbar = ti->bar * 1000;
-				} else {
-					cyl->type.workingpressure.mbar = psi_to_mbar(ti->psi);
-					cyl->type.size.mliter = cuft_to_l(ti->cuft) * 1000 / bar_to_atm(psi_to_bar(ti->psi));
-				}
-				return;
-			}
-			ti++;
-		}
+	const char *cyl_name = prefs.default_cylinder != NULL ? prefs.default_cylinder : "AL80";
+	struct tank_info_t *ti = tank_info;
+	struct tank_info_t *al80 = NULL;
+
+	while (ti->name != NULL) {
+		if (strcmp(ti->name, cyl_name) == 0)
+			break;
+		if (strcmp(ti->name, "AL80") == 0)
+			al80 = ti;
+		ti++;
+	}
+	if (ti->name == NULL)
+		ti = al80;
+	cyl->type.description = strdup(ti->name);
+	if (ti->ml) {
+		cyl->type.size.mliter = ti->ml;
+		cyl->type.workingpressure.mbar = ti->bar * 1000;
+	} else {
+		cyl->type.workingpressure.mbar = psi_to_mbar(ti->psi);
+		if (ti->psi)
+			cyl->type.size.mliter = cuft_to_l(ti->cuft) * 1000 / bar_to_atm(psi_to_bar(ti->psi));
 	}
 }
 
-int add_gas(struct dive *dive, int o2, int he)
+static int add_gas(struct dive *dive, int o2, int he)
 {
 	int i;
 	struct gasmix *mix;
@@ -404,6 +410,7 @@ static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive
 				i++;
 			}
 			gaschanges[i].depth = dp->depth;
+			gaschanges[i].gasidx = -1;
 			do {
 				if (dive->cylinder[j].gasmix.o2.permille == dp->o2 &&
 				    dive->cylinder[j].gasmix.he.permille == dp->he) {
@@ -412,6 +419,7 @@ static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive
 				}
 				j++;
 			} while (j < MAX_CYLINDERS);
+			assert(gaschanges[i].gasidx != -1);
 		}
 		dp = dp->next;
 	}
@@ -635,7 +643,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	if (depth == 0 && ceiling == 0) /* we are done here */
 		goto done;
 	for (stopidx = 0; stopidx < sizeof(decostoplevels) / sizeof(int); stopidx++)
-		if (decostoplevels[stopidx] >= depth)
+		if (decostoplevels[stopidx] >= ceiling)
 			break;
 	if (stopidx > 0)
 		stopidx--;
