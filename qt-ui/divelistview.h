@@ -38,11 +38,8 @@ public slots:
 	void showSearchEdit();
 	void removeFromTrip();
 	void deleteDive();
-<<<<<<< HEAD
 	void exportTeX();
-=======
 	void markDiveInvalid();
->>>>>>> master
 	void testSlot();
 	void fixMessyQtModelBehaviour();
 	void mergeTripAbove();
