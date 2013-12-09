@@ -6,7 +6,7 @@ INCLUDEPATH += qt-ui $$PWD
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 3.9
+VERSION = 3.9.2
 
 HEADERS = \
 	color.h \
@@ -150,7 +150,11 @@ TRANSLATIONS = \
 	translations/subsurface_pt_PT.ts \
 	translations/subsurface_ru_RU.ts \
 	translations/subsurface_sk_SK.ts \
-	translations/subsurface_sv_SE.ts
+	translations/subsurface_sv_SE.ts \
+	translations/subsurface_zh_TW.ts \
+	translations/subsurface_he.ts \
+	translations/subsurface_vi.ts \
+	translations/subsurface_id.ts
 
 QTTRANSLATIONS = \
 	qt_da.qm \

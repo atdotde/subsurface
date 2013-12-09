@@ -87,8 +87,17 @@ void init_ui(int *argcp, char ***argvp)
 	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
 	xslt_path = strdup(getSubsurfaceDataPath("xslt").toAscii().data());
 
+	QSettings s;
+	s.beginGroup("Language");
 	QLocale loc;
+
+	if (!s.value("UseSystemLanguage", true).toBool()){
+	    loc = QLocale(s.value("UiLanguage", QLocale().uiLanguages().first()).toString());
+	}
+
 	QString uiLang = loc.uiLanguages().first();
+	s.endGroup();
+
 	// there's a stupid Qt bug on MacOS where uiLanguages doesn't give us the country info
 	if (!uiLang.contains('-') && uiLang != loc.bcp47Name()) {
 		QLocale loc2(loc.bcp47Name());
@@ -117,7 +126,6 @@ void init_ui(int *argcp, char ***argvp)
 		}
 	}
 
-	QSettings s;
 	s.beginGroup("DiveComputer");
 	default_dive_computer_vendor = getSetting(s, "dive_computer_vendor");
 	default_dive_computer_product = getSetting(s,"dive_computer_product");
@@ -395,10 +403,11 @@ QString getSubsurfaceDataPath(QString folderToFind)
 
 	// next check for the Linux typical $(prefix)/share/subsurface
 	execdir = QCoreApplication::applicationDirPath();
-	folder = QDir(execdir.replace("bin", "share/subsurface/").append(folderToFind));
-	if (folder.exists())
-		return folder.absolutePath();
-
+	if (execdir.contains("bin")) {
+		folder = QDir(execdir.replace("bin", "share/subsurface/").append(folderToFind));
+		if (folder.exists())
+			return folder.absolutePath();
+	}
 	// then look for the usual location on a Mac
 	execdir = QCoreApplication::applicationDirPath();
 	folder = QDir(execdir.append("/../Resources/share/").append(folderToFind));

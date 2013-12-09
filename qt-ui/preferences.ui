@@ -110,6 +110,16 @@
          </iconset>
         </property>
        </item>
+       <item>
+        <property name="text">
+         <string>Language</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normalon>:/advanced</normalon>
+         </iconset>
+        </property>
+       </item>
       </widget>
      </item>
      <item>
@@ -280,7 +290,7 @@
           </layout>
          </item>
          <item>
-          <widget class="QGroupBox" name="groupBox11">
+          <widget class="QGroupBox" name="units_group">
            <property name="title">
             <string/>
            </property>
@@ -301,7 +311,7 @@
             <item row="0" column="1">
              <widget class="QRadioButton" name="meter">
               <property name="text">
-	       <string>meter</string>
+               <string>meter</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup</string>
@@ -311,7 +321,7 @@
             <item row="0" column="2">
              <widget class="QRadioButton" name="feet">
               <property name="text">
-	       <string>feet</string>
+               <string>feet</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup</string>
@@ -328,7 +338,7 @@
             <item row="1" column="1">
              <widget class="QRadioButton" name="bar">
               <property name="text">
-	       <string>bar</string>
+               <string>bar</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_2</string>
@@ -338,7 +348,7 @@
             <item row="1" column="2">
              <widget class="QRadioButton" name="psi">
               <property name="text">
-	       <string>psi</string>
+               <string>psi</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_2</string>
@@ -355,7 +365,7 @@
             <item row="2" column="1">
              <widget class="QRadioButton" name="liter">
               <property name="text">
-	       <string>liter</string>
+               <string>liter</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_3</string>
@@ -365,7 +375,7 @@
             <item row="2" column="2">
              <widget class="QRadioButton" name="cuft">
               <property name="text">
-	       <string>cu ft</string>
+               <string>cu ft</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_3</string>
@@ -382,7 +392,7 @@
             <item row="3" column="1">
              <widget class="QRadioButton" name="celsius">
               <property name="text">
-	       <string>celsius</string>
+               <string>celsius</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_4</string>
@@ -392,7 +402,7 @@
             <item row="3" column="2">
              <widget class="QRadioButton" name="fahrenheit">
               <property name="text">
-	       <string>fahrenheit</string>
+               <string>fahrenheit</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_4</string>
@@ -407,9 +417,9 @@
              </widget>
             </item>
             <item row="4" column="1">
-             <widget class="QRadioButton" name="kgs">
+             <widget class="QRadioButton" name="kg">
               <property name="text">
-	       <string>kg</string>
+               <string>kg</string>
               </property>
               <attribute name="buttonGroup">
                <string notr="true">buttonGroup_5</string>
@@ -497,7 +507,7 @@
               <item>
                <widget class="QCheckBox" name="po2">
                 <property name="text">
-		 <string>pO₂</string>
+                 <string>pO₂</string>
                 </property>
                </widget>
               </item>
@@ -538,7 +548,7 @@
               <item>
                <widget class="QCheckBox" name="pn2">
                 <property name="text">
-		 <string>pN₂</string>
+                 <string>pN₂</string>
                 </property>
                </widget>
               </item>
@@ -643,7 +653,7 @@
                  <bool>false</bool>
                 </property>
                 <property name="text">
-		 <string>max ppO₂</string>
+                 <string>max ppO₂</string>
                 </property>
                </widget>
               </item>
@@ -817,6 +827,47 @@
          </item>
         </layout>
        </widget>
+       <widget class="QWidget" name="page_4">
+        <layout class="QVBoxLayout" name="verticalLayout_6">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_6">
+           <item>
+            <widget class="QCheckBox" name="languageSystemDefault">
+             <property name="text">
+              <string>System Default</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_14">
+             <property name="text">
+              <string>Filter</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="languageFilter"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QListView" name="languageView"/>
+         </item>
+        </layout>
+       </widget>
       </widget>
      </item>
     </layout>
@@ -892,12 +943,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>187</x>
-     <y>77</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>581</x>
-     <y>80</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -908,12 +959,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>187</x>
-     <y>77</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>80</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -924,12 +975,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>186</x>
-     <y>121</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>581</x>
-     <y>124</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -940,12 +991,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>186</x>
-     <y>121</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>124</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -956,12 +1007,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>184</x>
-     <y>165</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>581</x>
-     <y>168</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -972,12 +1023,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>184</x>
-     <y>165</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>168</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -989,11 +1040,11 @@
    <hints>
     <hint type="sourcelabel">
      <x>195</x>
-     <y>209</y>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>591</x>
-     <y>212</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -1005,11 +1056,11 @@
    <hints>
     <hint type="sourcelabel">
      <x>195</x>
-     <y>209</y>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>212</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -1020,12 +1071,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>298</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>512</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -1036,12 +1087,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>298</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -1052,12 +1103,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>298</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>668</x>
-     <y>327</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
@@ -1068,39 +1119,131 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>362</x>
-     <y>275</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>586</x>
-     <y>270</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>personalize</sender>
    <signal>toggled(bool)</signal>
-   <receiver>groupBox</receiver>
+   <receiver>units_group</receiver>
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>613</x>
-     <y>41</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
     <hint type="destinationlabel">
-     <x>634</x>
-     <y>72</y>
+     <x>195</x>
+     <y>39</y>
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>languageSystemDefault</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>languageView</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>176</x>
+     <y>30</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>171</x>
+     <y>79</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>languageSystemDefault</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>languageFilter</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>209</x>
+     <y>34</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>599</x>
+     <y>33</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>imperial</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>feet</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>metric</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>meter</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>imperial</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>psi</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>metric</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>bar</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>imperial</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cuft</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>metric</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>liter</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>imperial</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>fahrenheit</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>metric</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>celsius</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>imperial</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>lbs</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
+  <connection>
+   <sender>metric</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>kg</receiver>
+   <slot>setChecked(bool)</slot>
+  </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="verticalSpeed"/>
+  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup_3"/>
   <buttongroup name="buttonGroup_4"/>
   <buttongroup name="buttonGroup_5"/>
   <buttongroup name="buttonGroup_6"/>
-  <buttongroup name="buttonGroup"/>
+  <buttongroup name="verticalSpeed"/>
  </buttongroups>
 </ui>

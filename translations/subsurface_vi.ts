@@ -1,4 +1,4 @@
-<?xml version="1.0" ?><!DOCTYPE TS><TS language="hr_HR" version="2.0">
+<?xml version="1.0" ?><!DOCTYPE TS><TS language="vi" version="2.0">
 <context>
     <name>CSVImportDialog</name>
     <message>
@@ -34,17 +34,17 @@
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="81"/>
         <source>Time</source>
-        <translation>Vrijeme</translation>
+        <translation>Thời gian</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="98"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>Độ sâu</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="112"/>
         <source>Temp</source>
-        <translation>Temp</translation>
+        <translation>Nhiệt độ</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="146"/>
@@ -77,12 +77,12 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
         <source>Type</source>
-        <translation>Vrsta</translation>
+        <translation>Loại</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
         <source>Size</source>
-        <translation>Veličina</translation>
+        <translation>Kích thước</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
@@ -135,7 +135,7 @@
     <message>
         <location filename="../qt-ui/divecomputermanagementdialog.ui" line="14"/>
         <source>Edit Dive Computer Nicknames</source>
-        <translation>Promijeni nazive računala</translation>
+        <translation>Chỉnh sửa tên thiết bị lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/divecomputermanagementdialog.cpp" line="46"/>
@@ -154,7 +154,7 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
         <source>Model</source>
-        <translation>Model</translation>
+        <translation>Mô hình</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
@@ -164,7 +164,7 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
         <source>Nickname</source>
-        <translation>Naziv uređaja</translation>
+        <translation>Tên</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1267"/>
@@ -340,7 +340,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="467"/>
         <source>AIR</source>
-        <translation>Zrak</translation>
+        <translation>KHÔNG KHÍ</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1080"/>
@@ -350,7 +350,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1081"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>Độ dài</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1082"/>
@@ -396,7 +396,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1149"/>
         <source>#</source>
-        <translation>Br.</translation>
+        <translation>#</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1150"/>
@@ -416,12 +416,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1153"/>
         <source>min</source>
-        <translation>min</translation>
+        <translation>nhỏ nhất</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1155"/>
         <source>kg</source>
-        <translation>kg</translation>
+        <translation>ký</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1155"/>
@@ -456,7 +456,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1161"/>
         <source>maxCNS</source>
-        <translation>maxCNS</translation>
+        <translation>CNS tối đa</translation>
     </message>
 </context>
 <context>
@@ -541,12 +541,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="140"/>
         <source>Error</source>
-        <translation>Greška</translation>
+        <translation>Lỗi</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="144"/>
         <source>Retry</source>
-        <translation>Pokušaj ponovo</translation>
+        <translation>Thử lại</translation>
     </message>
 </context>
 <context>
@@ -554,7 +554,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="14"/>
         <source>Download From Dive Computer</source>
-        <translation>Preuzmi s ronilačkog računala</translation>
+        <translation>Tải về từ Thiết Bị Lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="25"/>
@@ -579,7 +579,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="66"/>
         <source>Force download of all dives</source>
-        <translation>Prisilno preuzimanje svih urona</translation>
+        <translation>Buộc tải về tất cả các lần lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="73"/>
@@ -611,13 +611,13 @@ Please, remove them first.</source>
         <location filename="../qt-ui/maintab.ui" line="18"/>
         <location filename="../qt-ui/maintab.cpp" line="413"/>
         <source>Dive Notes</source>
-        <translation>Bilješke</translation>
+        <translation>Ghi chú về lần lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="120"/>
         <location filename="../qt-ui/maintab.cpp" line="437"/>
         <source>Location</source>
-        <translation>Lokacija</translation>
+        <translation>Địa điểm</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="148"/>
@@ -627,12 +627,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="169"/>
         <source>Divemaster</source>
-        <translation>Voditelj</translation>
+        <translation>Người lặn giỏi nhất</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="155"/>
         <source>Buddy</source>
-        <translation>Buddy</translation>
+        <translation>Bạn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="63"/>
@@ -657,38 +657,38 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="192"/>
         <source>Rating</source>
-        <translation>Ocjena</translation>
+        <translation>Xếp hạng</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="199"/>
         <source>Visibility</source>
-        <translation>Vidljivost</translation>
+        <translation>Tầm nhìn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="215"/>
         <source>Suit</source>
-        <translation>Odijelo</translation>
+        <translation>Đồ lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="208"/>
         <location filename="../qt-ui/maintab.cpp" line="438"/>
         <source>Notes</source>
-        <translation>Bilješke</translation>
+        <translation>Ghi chú</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="262"/>
         <source>Equipment</source>
-        <translation>Oprema</translation>
+        <translation>Dụng cụ</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="342"/>
         <source>Dive Info</source>
-        <translation>Informacije o uronu</translation>
+        <translation>Thông tin lần lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="387"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Ngày tháng</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="406"/>
@@ -744,7 +744,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="596"/>
         <source>Dive Time</source>
-        <translation>Trajanje</translation>
+        <translation>Thời gian lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="615"/>
@@ -754,37 +754,37 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="652"/>
         <source>Stats</source>
-        <translation>Statistike</translation>
+        <translation>Trạng thái</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="697"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>Độ sâu</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="709"/>
         <source>Temperature</source>
-        <translation>Temperatura</translation>
+        <translation>Nhiệt độ</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="733"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>Độ dài</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="745"/>
         <source>Total Time</source>
-        <translation>Ukupno trajanje</translation>
+        <translation>Tổng số thời gian</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="764"/>
         <source>Dives</source>
-        <translation>Uroni</translation>
+        <translation>Lần lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="73"/>
         <source>Cylinders</source>
-        <translation>Boce</translation>
+        <translation>Xilanh</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="74"/>
@@ -815,7 +815,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="37"/>
         <source>Save</source>
-        <translation type="unfinished"/>
+        <translation>Lưu lại</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="41"/>
@@ -849,7 +849,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="456"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>chưa rõ</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="957"/>
@@ -877,7 +877,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="215"/>
         <source>Filter</source>
-        <translation>Filter</translation>
+        <translation>Bộ lọc</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="174"/>
@@ -912,7 +912,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="248"/>
         <source>New</source>
-        <translation>Novi</translation>
+        <translation>Mới</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="251"/>
@@ -942,7 +942,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="270"/>
         <source>Save</source>
-        <translation type="unfinished"/>
+        <translation>Lưu lại</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="273"/>
@@ -953,7 +953,7 @@ Please, remove them first.</source>
         <location filename="../qt-ui/mainwindow.ui" line="278"/>
         <location filename="../qt-ui/mainwindow.ui" line="281"/>
         <source>Save as</source>
-        <translation>Spremi kao</translation>
+        <translation>Lưu dưới dạng</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="284"/>
@@ -964,7 +964,7 @@ Please, remove them first.</source>
         <location filename="../qt-ui/mainwindow.ui" line="289"/>
         <location filename="../qt-ui/mainwindow.ui" line="292"/>
         <source>Close</source>
-        <translation>Zatvori</translation>
+        <translation>Đóng lại</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="295"/>
@@ -1066,12 +1066,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="409"/>
         <source>Profile</source>
-        <translation>Profil</translation>
+        <translation>Hồ sơ</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="417"/>
         <source>Info</source>
-        <translation>Informacije</translation>
+        <translation>Thông tin</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="425"/>
@@ -1121,7 +1121,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="327"/>
         <source>Preferences</source>
-        <translation>Postavke</translation>
+        <translation>Tùy biến</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="338"/>
@@ -1166,7 +1166,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="433"/>
         <source>Prev DC</source>
-        <translation>Prethodno računalo</translation>
+        <translation>DC trước</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="436"/>
@@ -1176,7 +1176,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="441"/>
         <source>Next DC</source>
-        <translation>Sljedeće računalo</translation>
+        <translation>DC tiếp theo</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="444"/>
@@ -1186,17 +1186,17 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="449"/>
         <source>Select Events</source>
-        <translation>Odaberi događaje</translation>
+        <translation>Chọn sự kiện</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="454"/>
         <source>Input Plan</source>
-        <translation>Unesi plan urona</translation>
+        <translation>Nhập vào kế hoạch</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="459"/>
         <source>About Subsurface</source>
-        <translation>O programu Subsurface</translation>
+        <translation>Thông tin</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="467"/>
@@ -1211,7 +1211,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="111"/>
         <source>Open File</source>
-        <translation>Otvori datoteku</translation>
+        <translation>Mở tập tin</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="146"/>
@@ -1232,7 +1232,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="500"/>
         <source>User Manual</source>
-        <translation>Korisnički priručnik</translation>
+        <translation>Hướng dẫn sử dụng</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="504"/>
@@ -1252,7 +1252,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="548"/>
         <source>Save Changes?</source>
-        <translation>Spremi promjene?</translation>
+        <translation>Lưu các thay đổi?</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="549"/>
@@ -1306,7 +1306,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="95"/>
         <source>Units</source>
-        <translation>Jedinice</translation>
+        <translation>Đơn vị</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="105"/>
@@ -1336,7 +1336,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="170"/>
         <source>Dives</source>
-        <translation>Uroni</translation>
+        <translation>Lần lặn</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="176"/>
@@ -1386,7 +1386,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="307"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>Độ sâu</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="314"/>
@@ -1431,7 +1431,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="422"/>
         <source>kg</source>
-        <translation>kg</translation>
+        <translation>ký</translation>
     </message>
     <message utf8="true">
         <location filename="../qt-ui/preferences.ui" line="510"/>
@@ -1451,12 +1451,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="857"/>
         <source>Filter</source>
-        <translation>Filter</translation>
+        <translation>Bộ lọc</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="334"/>
         <source>Pressure</source>
-        <translation>Pritisak</translation>
+        <translation>Áp suất</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="361"/>
@@ -1466,12 +1466,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="388"/>
         <source>Temperature</source>
-        <translation>Temperatura</translation>
+        <translation>Nhiệt độ</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="415"/>
         <source>Weight</source>
-        <translation>Težina</translation>
+        <translation>Cân nặng</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="432"/>
@@ -1573,7 +1573,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="14"/>
         <source>Preferences</source>
-        <translation>Postavke</translation>
+        <translation>Tùy biến</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="769"/>
@@ -1639,37 +1639,37 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="25"/>
         <source>Dive#</source>
-        <translation>Uron br.</translation>
+        <translation>Lần lặn#</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="26"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Ngày tháng</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="27"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>Độ sâu</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="28"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>Độ dài</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="29"/>
         <source>Master</source>
-        <translation>Master</translation>
+        <translation>Giỏi nhất</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="30"/>
         <source>Buddy</source>
-        <translation>Buddy</translation>
+        <translation>Bạn</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="31"/>
         <source>Location</source>
-        <translation>Lokacija</translation>
+        <translation>Địa điểm</translation>
     </message>
 </context>
 <context>
@@ -1682,47 +1682,47 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="41"/>
         <source>Print only selected dives</source>
-        <translation>Ispiši odabrane urone</translation>
+        <translation>Chỉ in những lần lặn được chọn</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="60"/>
         <source>Print in color</source>
-        <translation>Ispis u boji</translation>
+        <translation>In với màu</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="86"/>
         <source>Print type</source>
-        <translation>Vrsta ispisa</translation>
+        <translation>Loại in</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="116"/>
         <source>6 dives per page</source>
-        <translation>6 urona po stranici</translation>
+        <translation>6 lần lặn mỗi trang</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="132"/>
         <source>2 dives per page</source>
-        <translation>2 urona po stranici</translation>
+        <translation>2 lần lặn mỗi trang</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="145"/>
         <source>Table print</source>
-        <translation>Tablični ispis</translation>
+        <translation>In bảng</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="162"/>
         <source>Ordering</source>
-        <translation>Redosljed</translation>
+        <translation>Đang sắp trật tự</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="180"/>
         <source>Profile on top</source>
-        <translation>Profil na vrhu</translation>
+        <translation>Hồ sơ trên cùng</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="202"/>
         <source>Notes on top</source>
-        <translation>Bilješke na vrhu</translation>
+        <translation>Ghi chú trên cùng</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="219"/>
@@ -1828,7 +1828,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="530"/>
         <source>Edit</source>
-        <translation>Uredi</translation>
+        <translation>Chỉnh sửa</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="616"/>
@@ -1849,7 +1849,7 @@ Please, remove them first.</source>
         <location filename="../qt-ui/profilegraphics.cpp" line="754"/>
         <location filename="../qt-ui/profilegraphics.cpp" line="1006"/>
         <source>air</source>
-        <translation>zrak</translation>
+        <translation>không khí</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="756"/>
@@ -1860,19 +1860,19 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1016"/>
         <source>Bailing out to OC</source>
-        <translation>Neplanirani prelazak na OC sustav</translation>
+        <translation>Thoát đến OC</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1018"/>
         <source> begin</source>
         <comment>Starts with space!</comment>
-        <translation> započni</translation>
+        <translation>bắt đầu</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1019"/>
         <source> end</source>
         <comment>Starts with space!</comment>
-        <translation> završi</translation>
+        <translation>kết thúc</translation>
     </message>
 </context>
 <context>
@@ -1880,7 +1880,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1618"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>chưa rõ</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1623"/>
@@ -1953,7 +1953,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="37"/>
         <source>AIR</source>
-        <translation>Zrak</translation>
+        <translation>KHÔNG KHÍ</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="723"/>
@@ -1963,22 +1963,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/kmessagewidget.cpp" line="58"/>
         <source>Close</source>
-        <translation>Zatvori</translation>
+        <translation>Đóng lại</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="27"/>
         <source>Average</source>
-        <translation>Ø</translation>
+        <translation>Trung bình</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="30"/>
         <source>Minimum</source>
-        <translation>Min.</translation>
+        <translation>Nhỏ nhất</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="33"/>
         <source>Maximum</source>
-        <translation>Max.</translation>
+        <translation>Tối đa</translation>
     </message>
     <message>
         <location filename="../qt-ui/globe.cpp" line="242"/>
@@ -1991,12 +1991,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/renumber.ui" line="14"/>
         <source>Renumber</source>
-        <translation>Renumeriraj</translation>
+        <translation>Đánh số lại</translation>
     </message>
     <message>
         <location filename="../qt-ui/renumber.ui" line="31"/>
         <source>New starting number</source>
-        <translation>Novi početni broj</translation>
+        <translation>Số bắt đầu mới</translation>
     </message>
 </context>
 <context>
@@ -2032,7 +2032,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/about.ui" line="23"/>
         <source>About Subsurface</source>
-        <translation>O programu Subsurface</translation>
+        <translation>Thông tin</translation>
     </message>
     <message>
         <location filename="../qt-ui/about.cpp" line="19"/>
@@ -2055,12 +2055,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="220"/>
         <source>Webservice</source>
-        <translation>Web servis</translation>
+        <translation>Dịch vụ web</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="260"/>
         <source>Connecting...</source>
-        <translation>Spajanje...</translation>
+        <translation>Đang kết nối...</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="276"/>
@@ -2075,22 +2075,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="299"/>
         <source>Connection Error: </source>
-        <translation>Greška u komunikaciji: </translation>
+        <translation>Lỗi kết nối:</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="300"/>
         <source>Invalid user identifier!</source>
-        <translation>Neispravna korisnička oznaka</translation>
+        <translation>Nhận dạng người dùng không hợp lệ!</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="301"/>
         <source>Cannot parse response!</source>
-        <translation>Ne mogu obraditi odziv</translation>
+        <translation>Không nhận được trả lời!</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="302"/>
         <source>Download Success!</source>
-        <translation>Preuzimanje uspješno!</translation>
+        <translation>Tải về thành công!</translation>
     </message>
 </context>
 <context>
@@ -2137,7 +2137,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="643"/>
         <source>kg</source>
-        <translation>kg</translation>
+        <translation>ký</translation>
     </message>
 </context>
 <context>
@@ -2165,12 +2165,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/webservices.ui" line="63"/>
         <source>User ID</source>
-        <translation type="unfinished"/>
+        <translation>Số hiệu người dùng</translation>
     </message>
     <message>
         <location filename="../qt-ui/webservices.ui" line="80"/>
         <source>Password</source>
-        <translation>Lozinka</translation>
+        <translation>Mật khẩu</translation>
     </message>
     <message>
         <location filename="../qt-ui/webservices.ui" line="94"/>
@@ -2193,12 +2193,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="403"/>
         <source>Type</source>
-        <translation>Vrsta</translation>
+        <translation>Loại</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="403"/>
         <source>Weight</source>
-        <translation>Težina</translation>
+        <translation>Cân nặng</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="463"/>
@@ -2217,7 +2217,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1422"/>
         <source>#</source>
-        <translation>Br.</translation>
+        <translation>#</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1423"/>
@@ -2283,7 +2283,7 @@ Maximum</source>
     <message>
         <location filename="../dive.c" line="57"/>
         <source>pascal</source>
-        <translation>Pa</translation>
+        <translation>pascal</translation>
     </message>
     <message>
         <location filename="../dive.c" line="61"/>
@@ -2335,12 +2335,12 @@ Maximum</source>
         <location filename="../qt-gui.cpp" line="238"/>
         <location filename="../qt-gui.cpp" line="248"/>
         <source>kg</source>
-        <translation>kg</translation>
+        <translation>ký</translation>
     </message>
     <message>
         <location filename="../dive.c" line="1051"/>
         <source>(%s) or (%s)</source>
-        <translation>(%s) ili (%s)</translation>
+        <translation>(%s) hoặc (%s)</translation>
     </message>
     <message>
         <location filename="../divelist.c" line="488"/>
@@ -2350,27 +2350,27 @@ Maximum</source>
         <location filename="../statistics.c" line="356"/>
         <location filename="../statistics.c" line="367"/>
         <source>air</source>
-        <translation>zrak</translation>
+        <translation>không khí</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="161"/>
         <source>integrated</source>
-        <translation>integrirani</translation>
+        <translation>được tích hợp</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="162"/>
         <source>belt</source>
-        <translation>pojas</translation>
+        <translation>dây ràng</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="163"/>
         <source>ankle</source>
-        <translation>gležanj</translation>
+        <translation>mắt cá chân</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="164"/>
         <source>backplate weight</source>
-        <translation>backplate olova</translation>
+        <translation>cân nặng giáp che</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="165"/>
@@ -2385,7 +2385,7 @@ Maximum</source>
         <location filename="../file.c" line="394"/>
         <location filename="../file.c" line="396"/>
         <source>Failed to read &apos;%s&apos;</source>
-        <translation>Nije uspjelo čitanje &apos;%s&apos;</translation>
+        <translation>Thất bại khi đọc dữ liệu &apos;%s&apos;</translation>
     </message>
     <message>
         <location filename="../file.c" line="265"/>
@@ -2402,12 +2402,12 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>none</source>
-        <translation>nijedan</translation>
+        <translation>không</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>deco stop</source>
-        <translation>deko zastoj</translation>
+        <translation>dừng lại deco</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
@@ -2417,73 +2417,73 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>ascent</source>
-        <translation>izron</translation>
+        <translation>đường dốc</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>ceiling</source>
-        <translation>strop</translation>
+        <translation>trần</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>workload</source>
-        <translation>opterećenje</translation>
+        <translation>tải công việc</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>transmitter</source>
-        <translation>odašiljač</translation>
+        <translation>máy phát radio</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>violation</source>
-        <translation>povreda</translation>
+        <translation>độ xâm phạm</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>bookmark</source>
-        <translation>bookmark</translation>
+        <translation>đánh dấu</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>surface</source>
-        <translation>površina</translation>
+        <translation>bề mặt</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>safety stop</source>
-        <translation>sigurnosna stanka</translation>
+        <translation>dừng an toàn</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>gaschange</source>
-        <translation>promjena plina</translation>
+        <translation>thay đổi dưỡng khí</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <source>safety stop (voluntary)</source>
-        <translation>sigurnosna stanka (opcionalna)</translation>
+        <translation>dừng an toàn (tự nguyện)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <source>safety stop (mandatory)</source>
-        <translation>sigurnosna stanka (obavezna)</translation>
+        <translation>dừng an toàn (bắt buộc)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>deepstop</source>
-        <translation>dubinska stanka</translation>
+        <translation>deepstop</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>ceiling (safety stop)</source>
-        <translation>strop (sigurnosni zastoj)</translation>
+        <translation>trần (độ an toàn)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>divetime</source>
-        <translation>trajanje urona</translation>
+        <translation>thời gian lặn</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
@@ -2494,7 +2494,7 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>maxdepth</source>
-        <translation>Max dubina</translation>
+        <translation>độ sâu tối đa</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
@@ -2509,7 +2509,7 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>airtime</source>
-        <translation>preostalo trajanje zraka</translation>
+        <translation>thời gian không khí</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
@@ -2519,62 +2519,62 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>heading</source>
-        <translation>kurs</translation>
+        <translation>thẳng tiến</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>tissue level warning</source>
-        <translation>upozorenje tkivo</translation>
+        <translation>cảnh báo cấp độ mô</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>non stop time</source>
-        <translation>non stop vrijeme</translation>
+        <translation>không dừng lại thời gian</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="160"/>
         <source>invalid event number</source>
-        <translation>neispravan broj događaja</translation>
+        <translation>chỉ số sự kiện không hợp lệ</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="393"/>
         <source>Unable to create parser for %s %s</source>
-        <translation>Ne mogu kreirati parser za %s %s</translation>
+        <translation>Không thể tạo việc chuyển thông số cho %s %s</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="399"/>
         <source>Error registering the data</source>
-        <translation>Greška pri registraciji podataka</translation>
+        <translation>Lỗi khi đăng ký dữ liệu</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="408"/>
         <source>Error parsing the datetime</source>
-        <translation>Greška pri parsiranju datuma i vremena</translation>
+        <translation>Lỗi khi chuyển thông số thời gian</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="425"/>
         <source>Dive %d: %s %d %04d</source>
-        <translation>Uron #%d - %s %d %04d</translation>
+        <translation>Lần lặn %d: %s %d %04d</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="430"/>
         <source>Error parsing the divetime</source>
-        <translation>Greška pri parsiranju vremena urona</translation>
+        <translation>Lỗi khi chuyển thông số thời gian lặn</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="440"/>
         <source>Error parsing the maxdepth</source>
-        <translation>Greška pri parsiranju maksimalne dubine</translation>
+        <translation>Lỗi khi chuyển thông số độ sâu tối đa</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="450"/>
         <source>Error parsing the gas mix count</source>
-        <translation>Greška pri parsiranju broja mješavina</translation>
+        <translation>Lỗi khi chuyển tiếp thông số số lượng hỗn hợp dưỡng khí</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="463"/>
         <source>Error obtaining water salinity</source>
-        <translation>Greška pri dohvaćanju saliniteta vode</translation>
+        <translation>Lỗi khi thu nhận độ mặn của nước</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="472"/>
@@ -2584,92 +2584,92 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="481"/>
         <source>Error parsing the gas mix</source>
-        <translation>Greška pri parsiranju mješavine plinova</translation>
+        <translation>Lỗi khi chuyển thông số hỗn hợp dưỡng khí</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="489"/>
         <source>Error parsing the samples</source>
-        <translation>Greška pri parsiranju uzoraka</translation>
+        <translation>Lỗi khi chuyển thông số các mẫu</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="616"/>
         <source>Event: waiting for user action</source>
-        <translation>Događaj: čekanje na korisničku akciju</translation>
+        <translation>Sự kiện: đang đợi thao tác từ người dùng</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="624"/>
         <source>model=%u (0x%08x), firmware=%u (0x%08x), serial=%u (0x%08x)</source>
-        <translation>model=%u (0x%08x), firmware=%u (0x%08x), serial=%u (0x%08x)</translation>
+        <translation>mô hình=%u (0x%08x), firmware=%u (0x%08x), số hiệu=%u (0x%08x)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="666"/>
         <source>Error registering the event handler.</source>
-        <translation>Greška pri registraciji event handlera.</translation>
+        <translation>Lỗi khi đăng ký quản lý sự kiện.</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="671"/>
         <source>Error registering the cancellation handler.</source>
-        <translation>Greška pri registraciji cancellation handlera</translation>
+        <translation>Lỗi khi đăng ký việc hủy bỏ quản lý.</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="675"/>
         <source>Dive data import error</source>
-        <translation>Greška pri uvozu podataka</translation>
+        <translation>Lỗi khi nhập dữ liệu lặn</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="693"/>
         <source>Unable to create libdivecomputer context</source>
-        <translation>Ne mogu kreirati libdivecomputer kontekst</translation>
+        <translation>Không thể tạo nội dung cho thiết bị đo lặn</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="695"/>
         <source>Unable to open %s %s (%s)</source>
-        <translation>Nije uspjelo otvaranje %s %s (%s)</translation>
+        <translation>Không thể mở %s %s (%s)</translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="580"/>
         <source>Strange percentage reading %s
 </source>
-        <translation>Neobično očitanje postotka %s
+        <translation>Đang đọc tỉ lệ lạ %s
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1717"/>
         <source>Failed to parse '%s'.
 </source>
-        <translation>Nije uspjelo parsiranje &apos;%s&apos;.
+        <translation>Thất bại khi chuyển thông số &apos;%s&apos;.
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1718"/>
         <source>Failed to parse &apos;%s&apos;</source>
-        <translation>Nije uspjelo parsiranje &apos;%s&apos;</translation>
+        <translation>Thất bại khi chuyển thông số &apos;%s&apos;</translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1916"/>
         <source>Database query get_events failed.
 </source>
-        <translation>Neuspjeo get_events na bazi.
+        <translation>Thất bại khi truy vấn việc nhận_sự kiện từ cơ sở dữ liệu.
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1951"/>
         <source>Database connection failed '%s'.
 </source>
-        <translation>Neuspjelo spajanje na bazu &apos;%s&apos;.
+        <translation>Thất bại khi kết nối cơ sở dữ liệu &apos;%s&apos;.
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1958"/>
         <source>Database query failed '%s'.
 </source>
-        <translation>Neuspjeo upit na bazu &apos;%s&apos;.
+        <translation>Thất bại khi truy vấn dữ liệu &apos;%s&apos;.
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="2069"/>
         <source>Can&apos;t open stylesheet (%s)/%s</source>
-        <translation>Ne mogu otvoriti stylesheet (%s)/%s</translation>
+        <translation>Không thể mở bảng (%s)/%s</translation>
     </message>
     <message>
         <location filename="../planner.c" line="98"/>
@@ -2680,12 +2680,12 @@ Maximum</source>
     <message>
         <location filename="../planner.c" line="133"/>
         <source>Can&apos;t find gas %d/%d</source>
-        <translation>Ne mogu naći plin %d/%d</translation>
+        <translation>Không tìm thấy dưỡng khí %d%d</translation>
     </message>
     <message>
         <location filename="../planner.c" line="315"/>
         <source>Too many gas mixes</source>
-        <translation>Previše mješavina plinova</translation>
+        <translation>Quá nhiều dưỡng khí được trộn</translation>
     </message>
     <message>
         <location filename="../planner.c" line="493"/>
@@ -2695,8 +2695,8 @@ based on GFlow = %.0f and GFhigh = %.0f
 
 </source>
         <translation>%s
-Subsurface plan urona
-temeljen na GFlow = %.0f i GFhigh = %.0f
+Kế hoạch lặn dưới bề mặt
+dựa trên GFlow = %.0f và GFhigh = %.0f
 
 </translation>
     </message>
@@ -2704,35 +2704,35 @@ temeljen na GFlow = %.0f i GFhigh = %.0f
         <location filename="../planner.c" line="534"/>
         <source>Transition to %.*f %s in %d:%02d min - runtime %d:%02u on %s
 </source>
-        <translation>Prelazak na %.*f %s u %d:%02d min - ukupno vrijeme %d:%02u na %s
+        <translation>Chuyển đến %.*f %s trong %d:%02d phút - thời gian chạy %d:%02u tại %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="543"/>
         <source>Stay at %.*f %s for %d:%02d min - runtime %d:%02u on %s
 </source>
-        <translation>Stanka na %.*f %s u trajanju %d:%02d min - Ukupno vrijeme %d:%02u na %s
+        <translation>Ở %.*f %s đối với %d:%02d phút - thời gian chạy %d:%02u ở %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="554"/>
         <source>Switch gas to %s
 </source>
-        <translation>Prebaci plin na %s
+        <translation>Chuyển dưỡng khí sang %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="562"/>
         <source>Gas consumption:
 </source>
-        <translation>Potrošnja plina:
+        <translation>Dưỡng khí tiêu thụ:
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="573"/>
         <source>%.0f%s of %s
 </source>
-        <translation>%.0f%s %s
+        <translation>%.0f%s of %s
 </translation>
     </message>
     <message>
@@ -2745,7 +2745,7 @@ temeljen na GFlow = %.0f i GFhigh = %.0f
         <source>%s
 P:%d %s</source>
         <translation>%s
-D:%d %s</translation>
+P:%d %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1209"/>
@@ -2765,7 +2765,7 @@ V:%.2f %s</source>
         <source>%s
 Calculated ceiling %.0f %s</source>
         <translation>%s
-Izračunati strop %.0f %s</translation>
+Trần đã tính toán %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1309"/>
@@ -2778,7 +2778,7 @@ Tissue %.0fmin: %.0f %s</source>
         <source>%s
 Safetystop:%umin @ %.0f %s</source>
         <translation>%s
-Sigurnosni zastanak:%umin @ %.0f %s</translation>
+Dừng an toàn:%umin @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1200"/>
@@ -2797,28 +2797,28 @@ SAC:%2.1fl/min</source>
         <source>%s
 Safetystop:unkn time @ %.0f %s</source>
         <translation>%s
-Sigurnosni zastoj:nepoz.vrijeme @ %.0f %s</translation>
+Dừng an toàn:chưa rõ thời gian @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1264"/>
         <source>%s
 Deco:%umin @ %.0f %s</source>
         <translation>%s
-Deko:%umin @ %.0f %s</translation>
+Deco:%umin @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1267"/>
         <source>%s
 Deco:unkn time @ %.0f %s</source>
         <translation>%s
-Deko:nepoznato vrijeme @ %.0f %s</translation>
+Deco:chưa rõ thời gian @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1273"/>
         <source>%s
 In deco</source>
         <translation>%s
-U deko</translation>
+Trong deco</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1276"/>
@@ -2965,67 +2965,67 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>boat</source>
-        <translation>brod</translation>
+        <translation>thuyền</translation>
     </message>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>shore</source>
-        <translation>obala</translation>
+        <translation>bờ biển</translation>
     </message>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>drift</source>
-        <translation>drift</translation>
+        <translation>độ trôi</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>deep</source>
-        <translation>dubok</translation>
+        <translation>sâu</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>cavern</source>
-        <translation>pećina</translation>
+        <translation>hang lớn</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>ice</source>
-        <translation>led</translation>
+        <translation>băng</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>wreck</source>
-        <translation>olupina</translation>
+        <translation>vật trôi dạt</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>cave</source>
-        <translation>špilja</translation>
+        <translation>hang động</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>altitude</source>
-        <translation>nadmorska visina</translation>
+        <translation>độ cao so với mặt biển</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>pool</source>
-        <translation>bazen</translation>
+        <translation>ao</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>lake</source>
-        <translation>jezero</translation>
+        <translation>hồ</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>river</source>
-        <translation>rijeka</translation>
+        <translation>sông</translation>
     </message>
     <message>
         <location filename="../dive.c" line="17"/>
         <source>night</source>
-        <translation>noć</translation>
+        <translation>ban đêm</translation>
     </message>
     <message>
         <location filename="../dive.c" line="17"/>
@@ -3040,7 +3040,7 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="18"/>
         <source>photo</source>
-        <translation>fotografija</translation>
+        <translation>hình ảnh</translation>
     </message>
     <message>
         <location filename="../dive.c" line="18"/>
@@ -3055,12 +3055,12 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="19"/>
         <source>deco</source>
-        <translation>deko</translation>
+        <translation>deco</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="214"/>
         <source>more than %d days</source>
-        <translation>više od %d dana</translation>
+        <translation>đã hơn %d ngày</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="220"/>
@@ -3070,212 +3070,212 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../statistics.c" line="222"/>
         <source>%dh %dmin</source>
-        <translation>%dst %dmin</translation>
+        <translation>%dh %dmin</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="233"/>
         <source>for dives #</source>
-        <translation>za urone #</translation>
+        <translation>cho các lần lặn #</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="240"/>
         <source>for selected dives</source>
-        <translation>za odabrane urone</translation>
+        <translation>cho các lần lặn được chọn</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="275"/>
         <source>for dive #%d</source>
-        <translation>za uron #%d</translation>
+        <translation>cho lần lặn #%d</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="277"/>
         <source>for selected dive</source>
-        <translation>za odabrani uron</translation>
+        <translation>cho lần lặn được chọn</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="279"/>
         <source>for all dives</source>
-        <translation>za sve urone</translation>
+        <translation>cho mọi lần lặn</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="281"/>
         <source>(no dives)</source>
-        <translation>(nema urona)</translation>
+        <translation>(không có cuộc lặn nào)</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Sun</source>
-        <translation>Ned</translation>
+        <translation>CN</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Mon</source>
-        <translation>Pon</translation>
+        <translation>T2</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Tue</source>
-        <translation>Uto</translation>
+        <translation>T3</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Wed</source>
-        <translation>Sri</translation>
+        <translation>T4</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Thu</source>
-        <translation>Čet</translation>
+        <translation>T5</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Fri</source>
-        <translation>Pet</translation>
+        <translation>T6</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Sat</source>
-        <translation>Sub</translation>
+        <translation>T7</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Jan</source>
-        <translation>Sij</translation>
+        <translation>Th1</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Feb</source>
-        <translation>Velj</translation>
+        <translation>Th2</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Mar</source>
-        <translation>Ožu</translation>
+        <translation>Th3</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Apr</source>
-        <translation>Tra</translation>
+        <translation>Apr</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>May</source>
-        <translation>Svi</translation>
+        <translation>Th5</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Jun</source>
-        <translation>Lip</translation>
+        <translation>Th6</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Jul</source>
-        <translation>Srp</translation>
+        <translation>Th7</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Aug</source>
-        <translation>Kol</translation>
+        <translation>Th8</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Sep</source>
-        <translation>Ruj</translation>
+        <translation>Th9</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Oct</source>
-        <translation>Lis</translation>
+        <translation>Th10</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Nov</source>
-        <translation>Stu</translation>
+        <translation>Th11</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Dec</source>
-        <translation>Pro</translation>
+        <translation>Th12</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="24"/>
         <source>Uemis Zurich: File System is almost full
 Disconnect/reconnect the dive computer
 and click &apos;Retry&apos;</source>
-        <translation>Uemis Zurich: Datotečni sustav je skoro pun
-odspojite pa ponovo spojite ronilačko računalo
-i kliknite &apos;Retry&apos;</translation>
+        <translation>Uemis Zurich: Hệ thống tập tin đã quá tải
+Ngắt kết nối/kết nối lại thiết bị đo lặn
+và click &apos;Thử lại&apos;</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="25"/>
         <source>Uemis Zurich: File System is full
 Disconnect/reconnect the dive computer
 and try again</source>
-        <translation>Uemis Zurich: Datotečni sustav je pun
-Iskopčajte i ponovo ukopčajte ronilačko računalo
-i pokušajte ponovo.</translation>
+        <translation>Uemis Zurich: Hệ thống tập tin quá tải
+Ngắt kết nối/kết nối lại thiết bị đo lặn
+và thử lại lần nữa</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="26"/>
         <source>Short write to req.txt file
 Is the Uemis Zurich plugged in correctly?</source>
-        <translation>Greška pri pisanju u datoteku req.txt
-Je li Uemis Zurich ispravno priključen?</translation>
+        <translation>Ghi ngắn gọn vào tập tin req.txt
+Uemis Zurich đã được gắn vào đúng cách chưa?</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="106"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>chưa rõ</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="357"/>
         <source>Reading %s %s</source>
-        <translation>Čitanje %s %s</translation>
+        <translation>Đang đọc %s %s</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="377"/>
         <source>data</source>
-        <translation>podaci</translation>
+        <translation>dữ liệu</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="398"/>
         <source>divelog entry id</source>
-        <translation>ID unosa u dnevniku</translation>
+        <translation>số dòng nhật trình lặn</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="400"/>
         <source>divespot data id</source>
-        <translation>divespot data id</translation>
+        <translation>số dữ liệu điểm lặn</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="402"/>
         <source>more data dive id</source>
-        <translation>više podataka za ID urona</translation>
+        <translation>thêm dữ liệu về chỉ số lần lặn</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>wetsuit</source>
-        <translation>mokro odijelo</translation>
+        <translation>wetsuit</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>semidry</source>
-        <translation>polusuho</translation>
+        <translation>ít ướt</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>drysuit</source>
-        <translation>suho odijelo</translation>
+        <translation>đồ khô</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>shorty</source>
-        <translation>shorty</translation>
+        <translation>ngắn</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>vest</source>
-        <translation>jakna</translation>
+        <translation>áo khoác</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
@@ -3285,127 +3285,127 @@ Je li Uemis Zurich ispravno priključen?</translation>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>jacket</source>
-        <translation>kompenzator plovnosti</translation>
+        <translation>jacket</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>full suit</source>
-        <translation>puno odijelo</translation>
+        <translation>thiết bị đầy đủ</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>2 pcs full suit</source>
-        <translation>dvodjelno odijelo</translation>
+        <translation>2 bộ pcs đầy đủ</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="584"/>
         <source>membrane</source>
-        <translation>membrana</translation>
+        <translation>lớp màng</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="761"/>
         <source>Init Communication</source>
-        <translation>Uspostavljanje veze</translation>
+        <translation>Thiết lập giao tiếp</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="763"/>
         <source>Uemis init failed</source>
-        <translation>Uemis greška pri inicijalizaciji</translation>
+        <translation>Thất bại cho việc thiết lập Uemis</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="774"/>
         <source>Start download</source>
-        <translation>Započni preuzimanje</translation>
+        <translation>Bắt đầu tải xuống</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="194"/>
         <source>Safety Stop Violation</source>
-        <translation>Kršenje sigurnosne stanke</translation>
+        <translation>Dừng độ vi phạm an toàn</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="196"/>
         <source>Speed Alarm</source>
-        <translation>Alarm: Brzina</translation>
+        <translation>Báo động tốc độ</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="199"/>
         <source>Speed Warning</source>
-        <translation>Upozorenje: Brzina</translation>
+        <translation>Cảnh báo tốc độ</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="201"/>
         <source>PO2 Green Warning</source>
-        <translation>Upozorenje: PO2 Zeleno</translation>
+        <translation>Cảnh báo PO2 xanh</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="204"/>
         <source>PO2 Ascend Warning</source>
-        <translation>Upozorenje: Prebrzi izron / PO2</translation>
+        <translation>Cảnh báo PO2 cao</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="206"/>
         <source>PO2 Ascend Alarm</source>
-        <translation>Alarm: Prebrzi izron / PO2</translation>
+        <translation>Cảnh báo PO2 cao</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="210"/>
         <source>Tank Pressure Info</source>
-        <translation>Podaci od pritisku u boci</translation>
+        <translation>Thông tin áp suất bể nước</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="212"/>
         <source>RGT Warning</source>
-        <translation>RTG Upozorenje</translation>
+        <translation>Cảnh báo RGT</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="214"/>
         <source>RGT Alert</source>
-        <translation>RGT Alarm</translation>
+        <translation>Cảnh báo RGT</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="216"/>
         <source>Tank Change Suggested</source>
-        <translation>Preporučena izmjena boce</translation>
+        <translation>Đề nghị thay đổi bể nước</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="218"/>
         <source>Depth Limit Exceeded</source>
-        <translation>Premašeno ograničenje dubine</translation>
+        <translation>Giới hạn độ sâu cho phép</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="220"/>
         <source>Max Deco Time Warning</source>
-        <translation>Upozorenje: Max. vrijeme dekompresije</translation>
+        <translation>Cảnh báo thời gian tối đa Deco</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="222"/>
         <source>Dive Time Info</source>
-        <translation>Info: Trajanje urona</translation>
+        <translation>Thông tin về thời gian lặn</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="224"/>
         <source>Dive Time Alert</source>
-        <translation>Alarm: Trajanje urona</translation>
+        <translation>Cảnh báo thời gian lặn</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="226"/>
         <source>Marker</source>
-        <translation>Oznaka</translation>
+        <translation>Người đánh dấu</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="228"/>
         <source>No Tank Data</source>
-        <translation>Nema podatka o boci</translation>
+        <translation>Không có dữ liệu bồn nước</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="230"/>
         <source>Low Battery Warning</source>
-        <translation>Upozorenje: Baterija pri izmaku</translation>
+        <translation>Cảnh báo năng lượng yếu</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="232"/>
         <source>Low Battery Alert</source>
-        <translation>Alarm: Baterija pri izmaku</translation>
+        <translation>Cảnh báo năng lượng yếu</translation>
     </message>
 </context>
 </TS>

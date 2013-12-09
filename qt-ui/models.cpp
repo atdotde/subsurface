@@ -16,6 +16,8 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QSettings>
 #include <QColor>
 #include <QBrush>
 #include <QFont>
@@ -112,16 +114,7 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			// we can't use get_volume_string because the idiotic imperial tank
 			// sizes take working pressure into account...
 			if (cyl->type.size.mliter) {
-				double volume;
-				int mbar = cyl->type.workingpressure.mbar;
-
-				if (mbar && prefs.units.volume == prefs.units.CUFT) {
-					volume = ml_to_cuft(cyl->type.size.mliter);
-					volume *= bar_to_atm(mbar / 1000.0);
-				} else {
-					volume = cyl->type.size.mliter / 1000.0;
-				}
-				ret = QString("%1").arg(volume, 0, 'f', 1);
+				ret = get_volume_string(cyl->type.size, TRUE);
 			}
 			break;
 		case WORKINGPRESS:
@@ -130,15 +123,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			break;
 		case START:
 			if (cyl->start.mbar)
-				ret = get_pressure_string(cyl->start, FALSE);
+				ret = get_pressure_string(cyl->start, TRUE);
 			else if (cyl->sample_start.mbar)
-				ret = get_pressure_string(cyl->sample_start, FALSE);
+				ret = get_pressure_string(cyl->sample_start, TRUE);
 			break;
 		case END:
 			if (cyl->end.mbar)
-				ret = get_pressure_string(cyl->end, FALSE);
+				ret = get_pressure_string(cyl->end, TRUE);
 			else if (cyl->sample_end.mbar)
-				ret = get_pressure_string(cyl->sample_end, FALSE);
+				ret = get_pressure_string(cyl->sample_end, TRUE);
 			break;
 		case O2:
 			ret = percent_string(cyl->gasmix.o2);
@@ -147,10 +140,7 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			ret = percent_string(cyl->gasmix.he);
 			break;
 		case DEPTH:
-			if (prefs.units.length == prefs.units.FEET)
-				ret = mm_to_feet(cyl->depth.mm);
-			else
-				ret = cyl->depth.mm / 1000;
+			ret = get_depth_string(cyl->depth, TRUE);
 			break;
 		}
 		break;
@@ -318,7 +308,7 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 
 int CylindersModel::rowCount(const QModelIndex& parent) const
 {
-	return 	rows;
+	return	rows;
 }
 
 void CylindersModel::add()
@@ -1536,7 +1526,23 @@ bool TablePrintModel::setData(const QModelIndex &index, const QVariant &value, i
 			case 3: list.at(index.row())->duration = value.toString();
 			case 4: list.at(index.row())->divemaster = value.toString();
 			case 5: list.at(index.row())->buddy = value.toString();
-			case 6: list.at(index.row())->location = value.toString();
+			case 6: {
+				/* truncate if there are more than N lines of text,
+				 * we don't want a row to be larger that a single page! */
+				QString s = value.toString();
+				const int maxLines = 15;
+				int count = 0;
+				for (int i = 0; i < s.length(); i++) {
+					if (s.at(i) != QChar('\n'))
+						continue;
+					count++;
+					if (count > maxLines) {
+						s = s.left(i - 1);
+						break;
+					}
+				}
+				list.at(index.row())->location = s;
+			}
 			}
 			return true;
 		}
@@ -1733,4 +1739,49 @@ QVariant GasSelectionModel::data(const QModelIndex& index, int role) const
 		return defaultModelFont();
 	}
 	return QStringListModel::data(index, role);
+}
+
+// Language Model, The Model to populate the list of possible Languages.
+
+LanguageModel* LanguageModel::instance()
+{
+	static LanguageModel *self = new LanguageModel();
+	QLocale l;
+	return self;
+}
+
+LanguageModel::LanguageModel(QObject* parent): QAbstractListModel(parent)
+{
+	QSettings s;
+	QDir d(getSubsurfaceDataPath("translations"));
+	QStringList result = d.entryList();
+	Q_FOREACH(const QString& s, result){
+		if ( s.startsWith("subsurface_") && s.endsWith(".qm") ){
+			languages.push_back( (s == "subsurface_source.qm") ? "English" : s);
+		}
+	}
+}
+
+QVariant LanguageModel::data(const QModelIndex& index, int role) const
+{
+	QLocale loc;
+	QString currentString = languages.at(index.row());
+	if(!index.isValid())
+		return QVariant();
+	switch(role){
+		case Qt::DisplayRole:{
+			QLocale l( currentString.remove("subsurface_"));
+			return currentString == "English" ? currentString : QString("%1 (%2)").arg(l.languageToString(l.language())).arg(l.countryToString(l.country()));
+		}break;
+	case Qt::UserRole:{
+			QString currentString = languages.at(index.row());
+			return currentString == "English" ? "en_US" : currentString.remove("subsurface_");
+		}break;
+	}
+	return QVariant();
+}
+
+int LanguageModel::rowCount(const QModelIndex& parent) const
+{
+	return languages.count();
 }

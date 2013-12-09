@@ -1,9 +1,16 @@
-marbledirh.files = $$MARBLEDIR
+marbledir.files = $$MARBLEDIR
 xslt.files = $$XSLT_FILES
 icons.files = $$ICONS_FILES
 doc.files = $$DOC_FILES
 translation.files = $$replace(TRANSLATIONS, .ts, .qm)
-qttranslation.files = $$join(QTTRANSLATIONS," "$$[QT_INSTALL_TRANSLATIONS]/,$$[QT_INSTALL_TRANSLATIONS]/)
+exists($$[QT_INSTALL_TRANSLATIONS]) {
+	qt_translation_dir = $$[QT_INSTALL_TRANSLATIONS]/
+} else: exists(/usr/share/qt4/translations) {
+	# On some cross-compilation environments, the translations are either missing or not
+	# where they're expected to be. In such cases, try copying from the system.
+	qt_translation_dir = /usr/share/qt4/translations
+}
+qttranslation.files = $$join(QTTRANSLATIONS," "$$qt_translation_dir/,$$qt_translation_dir/)
 
 nltab = $$escape_expand(\\n\\t)
 
@@ -46,12 +53,18 @@ mac {
 	NSIINPUTFILE = $$PWD/$$WINDOWSSTAGING/subsurface.nsi.in
 	MAKENSIS = /usr/bin/makensis
 
+	doc.path = $$WINDOWSSTAGING/Documentation
+	CONFIG -= copy_dir_files
 	deploy.path = $$WINDOWSSTAGING
-	deploy.files += $$xslt.files $$doc.files $$icons.files
+	deploy.files += $$xslt.files $$icons.files
 	deploy.CONFIG += no_check_exist
 	target.path = $$WINDOWSSTAGING
 	marbledir.path = $$WINDOWSSTAGING/data
-	INSTALLS += deploy marbledir target
+	INSTALLS += deploy marbledir target doc
+
+	translation.path = $$WINDOWSSTAGING/translations
+	qttranslation.path = $$WINDOWSSTAGING/translations
+	INSTALLS += translation qttranslation
 
 	qt_conf.commands = echo \'[Paths]\' > $@
 	qt_conf.commands += $${nltab}echo \'Prefix=.\' >> $@
@@ -146,14 +159,10 @@ XSLTDIR = $(DATADIR)/subsurface
 
 	doc.CONFIG += no_check_exist
 
-	# FIXME: Linguist translations
-	#l10n_install.commands = for LOC in $$files(share/locale/*/LC_MESSAGES); do \
-	#	$(INSTALL_PROGRAM) -d $(INSTALL_ROOT)/$(prefix)/$$LOC; \
-	#	$(INSTALL_FILE) $$LOC/subsurface.mo $(INSTALL_ROOT)/$(prefix)/$$LOC/subsurface.mo; \
-	#done
-	#install.depends += l10n_install
+	translation.path = /$(DATADIR)/subsurface/translations
+	translation.CONFIG += no_check_exist
 
-	INSTALLS += target desktop icon manpage xslt doc marbledir
+	INSTALLS += target desktop icon manpage xslt doc marbledir translation
 	install.target = install
 }
 !isEmpty(TRANSLATIONS) {

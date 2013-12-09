@@ -150,7 +150,9 @@ void WebServices::updateProgress(qint64 current, qint64 total)
 {
 	if (!reply)
 		return;
-
+	if (total == -1) {
+		total = INT_MAX / 2 - 1;
+	}
 	if (total >= INT_MAX / 2) {
 		// over a gigabyte!
 		if (total >= Q_INT64_C(1) << 47) {
@@ -296,10 +298,10 @@ void SubsurfaceWebServices::setStatusText(int status)
 {
 	QString text;
 	switch (status)	{
-	case DD_STATUS_ERROR_CONNECT: text = tr("Connection Error: ");		break;
-	case DD_STATUS_ERROR_ID:	  text = tr("Invalid user identifier!"); break;
-	case DD_STATUS_ERROR_PARSE:	  text = tr("Cannot parse response!");	break;
-	case DD_STATUS_OK:			  text = tr("Download Success!"); break;
+	case DD_STATUS_ERROR_CONNECT:	text = tr("Connection Error: ");	break;
+	case DD_STATUS_ERROR_ID:	text = tr("Invalid user identifier!");	break;
+	case DD_STATUS_ERROR_PARSE:	text = tr("Cannot parse response!");	break;
+	case DD_STATUS_OK:		text = tr("Download Success!");		break;
 	}
 	ui.status->setText(text);
 }
@@ -356,80 +358,80 @@ struct DiveListResult
 
 static DiveListResult parseDiveLogsDeDiveList(const QByteArray &xmlData)
 {
-    /* XML format seems to be:
-     * <DiveDateReader version="1.0">
-     *   <DiveDates>
-     *     <date diveLogsId="nnn" lastModified="YYYY-MM-DD hh:mm:ss">DD.MM.YYYY hh:mm</date>
-     *     [repeat <date></date>]
-     *   </DiveDates>
-     * </DiveDateReader>
-     */
-    QXmlStreamReader reader(xmlData);
-    const QString invalidXmlError = DivelogsDeWebServices::tr("Invalid response from server");
-    bool seenDiveDates = false;
-    DiveListResult result;
-    result.idCount = 0;
+	/* XML format seems to be:
+	 * <DiveDateReader version="1.0">
+	 *   <DiveDates>
+	 *     <date diveLogsId="nnn" lastModified="YYYY-MM-DD hh:mm:ss">DD.MM.YYYY hh:mm</date>
+	 *     [repeat <date></date>]
+	 *   </DiveDates>
+	 * </DiveDateReader>
+	 */
+	QXmlStreamReader reader(xmlData);
+	const QString invalidXmlError = DivelogsDeWebServices::tr("Invalid response from server");
+	bool seenDiveDates = false;
+	DiveListResult result;
+	result.idCount = 0;
 
-    if (reader.readNextStartElement() && reader.name() != "DiveDateReader") {
-	    result.errorCondition = invalidXmlError;
-	    result.errorDetails =
-			    DivelogsDeWebServices::tr("Expected XML tag 'DiveDateReader', got instead '%1")
-			    .arg(reader.name().toString());
-	    goto out;
-    }
+	if (reader.readNextStartElement() && reader.name() != "DiveDateReader") {
+		result.errorCondition = invalidXmlError;
+		result.errorDetails =
+				DivelogsDeWebServices::tr("Expected XML tag 'DiveDateReader', got instead '%1")
+				.arg(reader.name().toString());
+		goto out;
+	}
 
-    while (reader.readNextStartElement()) {
-	    if (reader.name() != "DiveDates") {
-		    if (reader.name() == "Login") {
-			    QString status = reader.readElementText();
-			    // qDebug() << "Login status:" << status;
+	while (reader.readNextStartElement()) {
+		if (reader.name() != "DiveDates") {
+			if (reader.name() == "Login") {
+				QString status = reader.readElementText();
+				// qDebug() << "Login status:" << status;
 
-			    // Note: there has to be a better way to determine a successful login...
-			    if (status == "failed") {
-				    result.errorCondition = "Login failed";
-				    goto out;
-			    }
-		    } else {
-			    // qDebug() << "Skipping" << reader.name();
-		    }
-		    continue;
-	    }
+				// Note: there has to be a better way to determine a successful login...
+				if (status == "failed") {
+					result.errorCondition = "Login failed";
+					goto out;
+				}
+			} else {
+				// qDebug() << "Skipping" << reader.name();
+			}
+			continue;
+		}
 
-	    // process <DiveDates>
-	    seenDiveDates = true;
-	    while (reader.readNextStartElement()) {
-		    if (reader.name() != "date") {
-			    // qDebug() << "Skipping" << reader.name();
-			    continue;
-		    }
-		    QStringRef id = reader.attributes().value("divelogsId");
-		    // qDebug() << "Found" << reader.name() << "with id =" << id;
-		    if (!id.isEmpty()) {
-			    result.idList += id.toLatin1();
-			    result.idList += ',';
-			    ++result.idCount;
-		    }
+		// process <DiveDates>
+		seenDiveDates = true;
+		while (reader.readNextStartElement()) {
+			if (reader.name() != "date") {
+				// qDebug() << "Skipping" << reader.name();
+				continue;
+			}
+			QStringRef id = reader.attributes().value("divelogsId");
+			// qDebug() << "Found" << reader.name() << "with id =" << id;
+			if (!id.isEmpty()) {
+				result.idList += id.toLatin1();
+				result.idList += ',';
+				++result.idCount;
+			}
 
-		    reader.skipCurrentElement();
-	    }
-    }
+			reader.skipCurrentElement();
+		}
+	}
 
-    // chop the ending comma, if any
-    result.idList.chop(1);
+	// chop the ending comma, if any
+	result.idList.chop(1);
 
-    if (!seenDiveDates) {
-	    result.errorCondition = invalidXmlError;
-	    result.errorDetails = DivelogsDeWebServices::tr("Expected XML tag 'DiveDates' not found");
-    }
+	if (!seenDiveDates) {
+		result.errorCondition = invalidXmlError;
+		result.errorDetails = DivelogsDeWebServices::tr("Expected XML tag 'DiveDates' not found");
+	}
 
 out:
-    if (reader.hasError()) {
-	    // if there was an XML error, overwrite the result or other error conditions
-	    result.errorCondition = invalidXmlError;
-	    result.errorDetails = DivelogsDeWebServices::tr("Malformed XML response. Line %1: %2")
-				  .arg(reader.lineNumber()).arg(reader.errorString());
-    }
-    return result;
+	if (reader.hasError()) {
+		// if there was an XML error, overwrite the result or other error conditions
+		result.errorCondition = invalidXmlError;
+		result.errorDetails = DivelogsDeWebServices::tr("Malformed XML response. Line %1: %2")
+				.arg(reader.lineNumber()).arg(reader.errorString());
+	}
+	return result;
 }
 
 DivelogsDeWebServices* DivelogsDeWebServices::instance()
@@ -616,20 +618,8 @@ void DivelogsDeWebServices::downloadFinished()
 		zipFile.close();
 		return;
 	}
-
-	quint64 entries = zip_get_num_entries(zip, 0);
-	for (quint64 i = 0; i < entries; ++i) {
-		struct zip_file *zip_file = zip_fopen_index(zip, i, 0);
-		if (!zip_file) {
-			QMessageBox::critical(this, tr("Corrupted download"),
-					      tr("The archive contains corrupt data:\n%1").arg(QString::fromLocal8Bit(zip_strerror(zip))));
-			goto close_zip;
-		}
-
-		// ### FIXME: What do I do with this?
-
-		zip_fclose(zip_file);
-	}
+	// now allow the user to cancel or accept
+	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(true);
 
 close_zip:
 	zip_close(zip);
@@ -672,6 +662,23 @@ void DivelogsDeWebServices::uploadError(QNetworkReply::NetworkError error)
 
 void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 {
+	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 
+	switch(ui.buttonBox->buttonRole(button)){
+	case QDialogButtonBox::ApplyRole:{
+		char *errorptr = NULL;
+		parse_file(zipFile.fileName().toUtf8().constData(), &errorptr);
+		process_dives(TRUE, FALSE);
+		// ### FIXME: do something useful with the error - but there shouldn't be one, right?
+		if (errorptr)
+			qDebug() << errorptr;
+
+		hide();
+		close();
+		resetState();
+		mark_divelist_changed(TRUE);
+		mainWindow()->refreshDisplay();
+	}
+	}
 }
 

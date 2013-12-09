@@ -17,6 +17,7 @@
 #include <QWebView>
 #include <QTableView>
 #include <QDesktopWidget>
+#include <QDesktopServices>
 #include "divelistview.h"
 #include "starwidget.h"
 
@@ -85,8 +86,8 @@ void MainWindow::current_dive_changed(int divenr)
 	if (divenr >= 0) {
 		select_dive(divenr);
 		ui.globe->centerOn(get_dive(selected_dive));
-		redrawProfile();
 	}
+	redrawProfile();
 	ui.InfoWidget->updateDiveInfo(divenr);
 }
 
@@ -134,7 +135,8 @@ void MainWindow::cleanUpEmpty()
 	ui.ProfileWidget->clear();
 	ui.ListWidget->reload(DiveTripModel::TREE);
 	ui.globe->reload();
-	setTitle(MWTF_DEFAULT);
+	if (!existing_filename)
+		setTitle(MWTF_DEFAULT);
 }
 
 void MainWindow::on_actionClose_triggered()
@@ -489,15 +491,24 @@ void MainWindow::on_actionUserManual_triggered()
 {
 	if(!helpView){
 		helpView = new QWebView();
+		helpView->page()->setLinkDelegationPolicy(QWebPage::DelegateExternalLinks);
+		connect(helpView, SIGNAL(linkClicked(QUrl)), this, SLOT(linkClickedSlot(QUrl)));
 	}
 	QString searchPath = getSubsurfaceDataPath("Documentation");
 	if (searchPath != "") {
 		QUrl url(searchPath.append("/user-manual.html"));
+		helpView->setWindowTitle(tr("User Manual"));
+		helpView->setWindowIcon(QIcon(":/subsurface-icon"));
 		helpView->setUrl(url);
 	} else {
 		helpView->setHtml(tr("Cannot find the Subsurface manual"));
 	}
 	helpView->show();
+}
+
+void MainWindow::linkClickedSlot(QUrl url)
+{
+	QDesktopServices::openUrl(url);
 }
 
 QString MainWindow::filter()
@@ -782,6 +793,10 @@ void MainWindow::setTitle(enum MainWindowTitleFormat format)
 		setWindowTitle("Subsurface");
 		break;
 	case MWTF_FILENAME:
+		if (!existing_filename) {
+			setTitle(MWTF_DEFAULT);
+			return;
+		}
 		QFile f(existing_filename);
 		QFileInfo fileInfo(f);
 		QString fileName(fileInfo.fileName());
@@ -863,6 +878,11 @@ void MainWindow::editCurrentDive()
 		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
 	}
 	else if (defaultDC == "planned dive"){
-		// this looks like something is missing here
+		disableDcShortcuts();
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::PLAN);
+		ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
+		ui.infoPane->setCurrentIndex(PLANNERWIDGET);
+		DivePlannerPointsModel::instance()->loadFromDive(d);
+		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
 	}
 }

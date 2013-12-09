@@ -1,4 +1,4 @@
-<?xml version="1.0" ?><!DOCTYPE TS><TS language="hr_HR" version="2.0">
+<?xml version="1.0" ?><!DOCTYPE TS><TS language="zh_TW" version="2.0">
 <context>
     <name>CSVImportDialog</name>
     <message>
@@ -9,7 +9,7 @@
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="40"/>
         <source>...</source>
-        <translation type="unfinished"/>
+        <translation>...</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="129"/>
@@ -34,17 +34,17 @@
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="81"/>
         <source>Time</source>
-        <translation>Vrijeme</translation>
+        <translation>時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="98"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="112"/>
         <source>Temp</source>
-        <translation>Temp</translation>
+        <translation>溫度</translation>
     </message>
     <message>
         <location filename="../qt-ui/csvimportdialog.ui" line="146"/>
@@ -69,7 +69,7 @@
     <message>
         <location filename="../qt-ui/csvimportdialog.cpp" line="71"/>
         <source>CSV Files (*.csv)</source>
-        <translation type="unfinished"/>
+        <translation>CSV 檔案 (*.csv)</translation>
     </message>
 </context>
 <context>
@@ -77,12 +77,12 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
         <source>Type</source>
-        <translation>Vrsta</translation>
+        <translation>類型</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
         <source>Size</source>
-        <translation>Veličina</translation>
+        <translation>容量</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="68"/>
@@ -135,18 +135,19 @@
     <message>
         <location filename="../qt-ui/divecomputermanagementdialog.ui" line="14"/>
         <source>Edit Dive Computer Nicknames</source>
-        <translation>Promijeni nazive računala</translation>
+        <translation>編輯潛水電腦別名</translation>
     </message>
     <message>
         <location filename="../qt-ui/divecomputermanagementdialog.cpp" line="46"/>
         <source>Remove the selected Dive Computer?</source>
-        <translation type="unfinished"/>
+        <translation>移除選擇的潛水電腦？</translation>
     </message>
     <message>
         <location filename="../qt-ui/divecomputermanagementdialog.cpp" line="47"/>
         <source>Are you sure that you want to 
  remove the selected dive computer?</source>
-        <translation type="unfinished"/>
+        <translation>您確認要
+移除選擇的潛水電腦？</translation>
     </message>
 </context>
 <context>
@@ -154,17 +155,17 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
         <source>Model</source>
-        <translation>Model</translation>
+        <translation>模型</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
         <source>Device ID</source>
-        <translation type="unfinished"/>
+        <translation>裝置ID</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1245"/>
         <source>Nickname</source>
-        <translation>Naziv uređaja</translation>
+        <translation>別名</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1267"/>
@@ -177,12 +178,12 @@
     <message>
         <location filename="../qt-ui/models.cpp" line="1106"/>
         <source> l/min</source>
-        <translation type="unfinished"/>
+        <translation>l/min</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1108"/>
         <source> cuft/min</source>
-        <translation type="unfinished"/>
+        <translation>cuft/min</translation>
     </message>
 </context>
 <context>
@@ -195,12 +196,12 @@
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="680"/>
         <source>expand all</source>
-        <translation type="unfinished"/>
+        <translation>全部展開</translation>
     </message>
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="681"/>
         <source>collapse all</source>
-        <translation type="unfinished"/>
+        <translation>全部摺疊</translation>
     </message>
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="682"/>
@@ -235,7 +236,7 @@
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="694"/>
         <source>delete dive(s)</source>
-        <translation type="unfinished"/>
+        <translation>刪除潛水(s)</translation>
     </message>
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="698"/>
@@ -270,7 +271,7 @@
     <message>
         <location filename="../qt-ui/divelistview.cpp" line="696"/>
         <source>merge selected dives</source>
-        <translation type="unfinished"/>
+        <translation>合併所選擇的潛水</translation>
     </message>
 </context>
 <context>
@@ -298,12 +299,12 @@
     <message>
         <location filename="../qt-ui/diveplanner.ui" line="125"/>
         <source>Last Stop at 6m</source>
-        <translation type="unfinished"/>
+        <translation>最後於 6 米停留</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.ui" line="174"/>
         <source>Start Time</source>
-        <translation type="unfinished"/>
+        <translation>開始時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.ui" line="181"/>
@@ -316,12 +317,12 @@
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="134"/>
         <source>10m</source>
-        <translation type="unfinished"/>
+        <translation>10m</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="136"/>
         <source>30ft</source>
-        <translation type="unfinished"/>
+        <translation>30ft</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="384"/>
@@ -340,17 +341,17 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="467"/>
         <source>AIR</source>
-        <translation>Zrak</translation>
+        <translation>AIR</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1080"/>
         <source>Final Depth</source>
-        <translation type="unfinished"/>
+        <translation>最後深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1081"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="1082"/>
@@ -396,12 +397,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1149"/>
         <source>#</source>
-        <translation>Br.</translation>
+        <translation>#</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1150"/>
         <source>date</source>
-        <translation type="unfinished"/>
+        <translation>日期</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1152"/>
@@ -441,7 +442,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1162"/>
         <source>location</source>
-        <translation type="unfinished"/>
+        <translation>位置</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1159"/>
@@ -456,7 +457,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1161"/>
         <source>maxCNS</source>
-        <translation>maxCNS</translation>
+        <translation>最大 CNS</translation>
     </message>
 </context>
 <context>
@@ -536,17 +537,17 @@ Please, remove them first.</source>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="109"/>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="126"/>
         <source>OK</source>
-        <translation type="unfinished"/>
+        <translation>確認</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="140"/>
         <source>Error</source>
-        <translation>Greška</translation>
+        <translation>錯誤</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.cpp" line="144"/>
         <source>Retry</source>
-        <translation>Pokušaj ponovo</translation>
+        <translation>重試</translation>
     </message>
 </context>
 <context>
@@ -554,17 +555,17 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="14"/>
         <source>Download From Dive Computer</source>
-        <translation>Preuzmi s ronilačkog računala</translation>
+        <translation>從潛水電腦進行下載</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="25"/>
         <source>Vendor</source>
-        <translation type="unfinished"/>
+        <translation>廠牌</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="32"/>
         <source>Dive Computer</source>
-        <translation type="unfinished"/>
+        <translation>潛水電腦</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="45"/>
@@ -574,12 +575,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="59"/>
         <source>...</source>
-        <translation type="unfinished"/>
+        <translation>...</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="66"/>
         <source>Force download of all dives</source>
-        <translation>Prisilno preuzimanje svih urona</translation>
+        <translation>強制下載所有潛水記錄</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="73"/>
@@ -589,12 +590,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="95"/>
         <source>OK</source>
-        <translation type="unfinished"/>
+        <translation>確認</translation>
     </message>
     <message>
         <location filename="../qt-ui/downloadfromdivecomputer.ui" line="102"/>
         <source>Cancel</source>
-        <translation type="unfinished"/>
+        <translation>取消</translation>
     </message>
 </context>
 <context>
@@ -611,84 +612,84 @@ Please, remove them first.</source>
         <location filename="../qt-ui/maintab.ui" line="18"/>
         <location filename="../qt-ui/maintab.cpp" line="413"/>
         <source>Dive Notes</source>
-        <translation>Bilješke</translation>
+        <translation>潛水筆記</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="120"/>
         <location filename="../qt-ui/maintab.cpp" line="437"/>
         <source>Location</source>
-        <translation>Lokacija</translation>
+        <translation>位置</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="148"/>
         <source>Coordinates</source>
-        <translation type="unfinished"/>
+        <translation>座標</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="169"/>
         <source>Divemaster</source>
-        <translation>Voditelj</translation>
+        <translation>導潛</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="155"/>
         <source>Buddy</source>
-        <translation>Buddy</translation>
+        <translation>潛伴</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="63"/>
         <source>Start time</source>
-        <translation type="unfinished"/>
+        <translation>開始時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="72"/>
         <source>Air temp</source>
-        <translation type="unfinished"/>
+        <translation>陸上溫度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="79"/>
         <source>Water temp</source>
-        <translation type="unfinished"/>
+        <translation>水溫</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="127"/>
         <source>Tags</source>
-        <translation type="unfinished"/>
+        <translation>標籤</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="192"/>
         <source>Rating</source>
-        <translation>Ocjena</translation>
+        <translation>評分</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="199"/>
         <source>Visibility</source>
-        <translation>Vidljivost</translation>
+        <translation>能見度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="215"/>
         <source>Suit</source>
-        <translation>Odijelo</translation>
+        <translation>防寒衣</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="208"/>
         <location filename="../qt-ui/maintab.cpp" line="438"/>
         <source>Notes</source>
-        <translation>Bilješke</translation>
+        <translation>記錄</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="262"/>
         <source>Equipment</source>
-        <translation>Oprema</translation>
+        <translation>裝備</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="342"/>
         <source>Dive Info</source>
-        <translation>Informacije o uronu</translation>
+        <translation>潛水資訊</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="387"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>日期</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="406"/>
@@ -703,7 +704,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="444"/>
         <source>Gas Consumed</source>
-        <translation type="unfinished"/>
+        <translation>氣體消耗</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="463"/>
@@ -714,12 +715,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="482"/>
         <source>Max. Depth</source>
-        <translation type="unfinished"/>
+        <translation>最大深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="501"/>
         <source>Ave. Depth</source>
-        <translation type="unfinished"/>
+        <translation>平均深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="520"/>
@@ -729,22 +730,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="539"/>
         <source>Air Pressure</source>
-        <translation type="unfinished"/>
+        <translation>殘壓</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="558"/>
         <source>Air Temperature</source>
-        <translation type="unfinished"/>
+        <translation>陸上溫度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="577"/>
         <source>Water Temperature</source>
-        <translation type="unfinished"/>
+        <translation>水溫</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="596"/>
         <source>Dive Time</source>
-        <translation>Trajanje</translation>
+        <translation>潛水時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="615"/>
@@ -754,37 +755,37 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.ui" line="652"/>
         <source>Stats</source>
-        <translation>Statistike</translation>
+        <translation>統計</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="697"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="709"/>
         <source>Temperature</source>
-        <translation>Temperatura</translation>
+        <translation>溫度</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="733"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="745"/>
         <source>Total Time</source>
-        <translation>Ukupno trajanje</translation>
+        <translation>全部時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.ui" line="764"/>
         <source>Dives</source>
-        <translation>Uroni</translation>
+        <translation>潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="73"/>
         <source>Cylinders</source>
-        <translation>Boce</translation>
+        <translation>氣瓶</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="74"/>
@@ -804,7 +805,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="408"/>
         <source>Trip Location</source>
-        <translation type="unfinished"/>
+        <translation>旅程位置</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="386"/>
@@ -815,12 +816,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="37"/>
         <source>Save</source>
-        <translation type="unfinished"/>
+        <translation>儲存</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="41"/>
         <source>Cancel</source>
-        <translation type="unfinished"/>
+        <translation>取消</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="231"/>
@@ -844,12 +845,12 @@ Please, remove them first.</source>
         <location filename="../qt-ui/maintab.cpp" line="492"/>
         <location filename="../qt-ui/maintab.cpp" line="493"/>
         <source>/min</source>
-        <translation type="unfinished"/>
+        <translation>/min</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="456"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>未知</translation>
     </message>
     <message>
         <location filename="../qt-ui/maintab.cpp" line="957"/>
@@ -877,111 +878,111 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="215"/>
         <source>Filter</source>
-        <translation>Filter</translation>
+        <translation>篩選器</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="174"/>
         <source>&amp;File</source>
-        <translation type="unfinished"/>
+        <translation>檔案</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="189"/>
         <source>&amp;Log</source>
-        <translation type="unfinished"/>
+        <translation>日誌</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="200"/>
         <source>&amp;View</source>
-        <translation type="unfinished"/>
+        <translation>檢視</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="221"/>
         <source>&amp;Help</source>
-        <translation type="unfinished"/>
+        <translation>幫助</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="228"/>
         <source>&amp;Import</source>
-        <translation type="unfinished"/>
+        <translation>匯入</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="245"/>
         <source>&amp;New logbook</source>
-        <translation type="unfinished"/>
+        <translation>建立新日誌</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="248"/>
         <source>New</source>
-        <translation>Novi</translation>
+        <translation>建立</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="251"/>
         <source>Ctrl+N</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+N</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="256"/>
         <source>&amp;Open logbook</source>
-        <translation type="unfinished"/>
+        <translation>開啟日誌</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="259"/>
         <source>Open</source>
-        <translation type="unfinished"/>
+        <translation>開啟</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="262"/>
         <source>Ctrl+O</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+O</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="267"/>
         <source>&amp;Save</source>
-        <translation type="unfinished"/>
+        <translation>儲存</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="270"/>
         <source>Save</source>
-        <translation type="unfinished"/>
+        <translation>儲存</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="273"/>
         <source>Ctrl+S</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+S</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="278"/>
         <location filename="../qt-ui/mainwindow.ui" line="281"/>
         <source>Save as</source>
-        <translation>Spremi kao</translation>
+        <translation>另存為</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="284"/>
         <source>Ctrl+Shift+S</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+Shift+S</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="289"/>
         <location filename="../qt-ui/mainwindow.ui" line="292"/>
         <source>Close</source>
-        <translation>Zatvori</translation>
+        <translation>關閉</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="295"/>
         <source>Ctrl+W</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+W</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="300"/>
         <location filename="../qt-ui/mainwindow.ui" line="303"/>
         <location filename="../qt-ui/mainwindow.cpp" line="169"/>
         <source>Import Files</source>
-        <translation type="unfinished"/>
+        <translation>匯入檔案</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="306"/>
         <source>Ctrl+I</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+I</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="311"/>
@@ -991,22 +992,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="314"/>
         <source>Ctrl+U</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+U</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="319"/>
         <source>&amp;Print</source>
-        <translation type="unfinished"/>
+        <translation>列印</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="330"/>
         <source>Ctrl+,</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+,</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="335"/>
         <source>&amp;Quit</source>
-        <translation type="unfinished"/>
+        <translation>結束</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="343"/>
@@ -1021,7 +1022,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="354"/>
         <source>Ctrl+G</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+G</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="359"/>
@@ -1031,7 +1032,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="367"/>
         <source>Ctrl++</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl++</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="372"/>
@@ -1041,7 +1042,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="375"/>
         <source>Ctrl+R</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+R</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="388"/>
@@ -1066,17 +1067,17 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="409"/>
         <source>Profile</source>
-        <translation>Profil</translation>
+        <translation>潛水記錄</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="417"/>
         <source>Info</source>
-        <translation>Informacije</translation>
+        <translation>資訊</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="425"/>
         <source>All</source>
-        <translation type="unfinished"/>
+        <translation>全部</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="464"/>
@@ -1096,7 +1097,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="483"/>
         <source>Ctrl+L</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+L</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="488"/>
@@ -1116,102 +1117,102 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="322"/>
         <source>Ctrl+P</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+P</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="327"/>
         <source>Preferences</source>
-        <translation>Postavke</translation>
+        <translation>環境設定</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="338"/>
         <source>Ctrl+Q</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+Q</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="346"/>
         <source>Ctrl+D</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+D</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="364"/>
         <source>Add Dive</source>
-        <translation type="unfinished"/>
+        <translation>增加潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="383"/>
         <source>Auto Group</source>
-        <translation type="unfinished"/>
+        <translation>增加群組</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="404"/>
         <source>Ctrl+2</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+2</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="412"/>
         <source>Ctrl+3</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+3</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="420"/>
         <source>Ctrl+4</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+4</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="428"/>
         <source>Ctrl+1</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+1</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="433"/>
         <source>Prev DC</source>
-        <translation>Prethodno računalo</translation>
+        <translation>上一個 DC</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="436"/>
         <source>Left</source>
-        <translation type="unfinished"/>
+        <translation>左邊</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="441"/>
         <source>Next DC</source>
-        <translation>Sljedeće računalo</translation>
+        <translation>下一個 DC</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="444"/>
         <source>Right</source>
-        <translation type="unfinished"/>
+        <translation>右邊</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="449"/>
         <source>Select Events</source>
-        <translation>Odaberi događaje</translation>
+        <translation>選擇事件</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="454"/>
         <source>Input Plan</source>
-        <translation>Unesi plan urona</translation>
+        <translation>輸入計畫</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="459"/>
         <source>About Subsurface</source>
-        <translation>O programu Subsurface</translation>
+        <translation>關於 Subsurface</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="467"/>
         <source>F1</source>
-        <translation type="unfinished"/>
+        <translation>F1</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.ui" line="475"/>
         <source>Ctrl+5</source>
-        <translation type="unfinished"/>
+        <translation>Ctrl+5</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="111"/>
         <source>Open File</source>
-        <translation>Otvori datoteku</translation>
+        <translation>開啟檔案</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="146"/>
@@ -1232,17 +1233,17 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="500"/>
         <source>User Manual</source>
-        <translation>Korisnički priručnik</translation>
+        <translation>使用者說明</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="504"/>
         <source>Cannot find the Subsurface manual</source>
-        <translation type="unfinished"/>
+        <translation>無法找到Subsurface使用說明</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="541"/>
         <source>Do you want to save the changes you made in the file %1?</source>
-        <translation type="unfinished"/>
+        <translation>您是否要對檔案 %1 所做的修改儲存？</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="543"/>
@@ -1252,7 +1253,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="548"/>
         <source>Save Changes?</source>
-        <translation>Spremi promjene?</translation>
+        <translation>儲存變更?</translation>
     </message>
     <message>
         <location filename="../qt-ui/mainwindow.cpp" line="549"/>
@@ -1306,12 +1307,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="95"/>
         <source>Units</source>
-        <translation>Jedinice</translation>
+        <translation>單位</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="105"/>
         <source>Graph</source>
-        <translation type="unfinished"/>
+        <translation>圖表</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="115"/>
@@ -1326,27 +1327,27 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="147"/>
         <source>Font</source>
-        <translation type="unfinished"/>
+        <translation>字型</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="157"/>
         <source>Font size</source>
-        <translation type="unfinished"/>
+        <translation>字體大小</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="170"/>
         <source>Dives</source>
-        <translation>Uroni</translation>
+        <translation>潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="176"/>
         <source>Default Dive file</source>
-        <translation type="unfinished"/>
+        <translation>預設潛水檔案</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="188"/>
         <source>...</source>
-        <translation type="unfinished"/>
+        <translation>...</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="197"/>
@@ -1366,7 +1367,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="256"/>
         <source>System</source>
-        <translation type="unfinished"/>
+        <translation>系統</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="263"/>
@@ -1386,7 +1387,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="307"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="314"/>
@@ -1451,27 +1452,27 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="857"/>
         <source>Filter</source>
-        <translation>Filter</translation>
+        <translation>篩選器</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="334"/>
         <source>Pressure</source>
-        <translation>Pritisak</translation>
+        <translation>壓力</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="361"/>
         <source>Volume</source>
-        <translation type="unfinished"/>
+        <translation>容量</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="388"/>
         <source>Temperature</source>
-        <translation>Temperatura</translation>
+        <translation>溫度</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="415"/>
         <source>Weight</source>
-        <translation>Težina</translation>
+        <translation>配重</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="432"/>
@@ -1481,7 +1482,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="447"/>
         <source>Time units</source>
-        <translation type="unfinished"/>
+        <translation>時間單位</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="453"/>
@@ -1491,12 +1492,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="460"/>
         <source>Minutes</source>
-        <translation type="unfinished"/>
+        <translation>分</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="470"/>
         <source>Seconds</source>
-        <translation type="unfinished"/>
+        <translation>秒</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="502"/>
@@ -1513,12 +1514,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="592"/>
         <source>pHe</source>
-        <translation type="unfinished"/>
+        <translation>pHe</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="633"/>
         <source>MOD</source>
-        <translation type="unfinished"/>
+        <translation>MOD</translation>
     </message>
     <message utf8="true">
         <location filename="../qt-ui/preferences.ui" line="656"/>
@@ -1573,7 +1574,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/preferences.ui" line="14"/>
         <source>Preferences</source>
-        <translation>Postavke</translation>
+        <translation>環境設定</translation>
     </message>
     <message>
         <location filename="../qt-ui/preferences.ui" line="769"/>
@@ -1639,37 +1640,37 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="25"/>
         <source>Dive#</source>
-        <translation>Uron br.</translation>
+        <translation>潛水編號#</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="26"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>日期</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="27"/>
         <source>Depth</source>
-        <translation>Dubina</translation>
+        <translation>深度</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="28"/>
         <source>Duration</source>
-        <translation>Trajanje</translation>
+        <translation>時間</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="29"/>
         <source>Master</source>
-        <translation>Master</translation>
+        <translation>專長</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="30"/>
         <source>Buddy</source>
-        <translation>Buddy</translation>
+        <translation>潛伴</translation>
     </message>
     <message>
         <location filename="../qt-ui/printlayout.cpp" line="31"/>
         <source>Location</source>
-        <translation>Lokacija</translation>
+        <translation>位置</translation>
     </message>
 </context>
 <context>
@@ -1682,47 +1683,47 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="41"/>
         <source>Print only selected dives</source>
-        <translation>Ispiši odabrane urone</translation>
+        <translation>只列印所選擇的潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="60"/>
         <source>Print in color</source>
-        <translation>Ispis u boji</translation>
+        <translation>彩色列印</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="86"/>
         <source>Print type</source>
-        <translation>Vrsta ispisa</translation>
+        <translation>列印類型</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="116"/>
         <source>6 dives per page</source>
-        <translation>6 urona po stranici</translation>
+        <translation>每頁 6 支潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="132"/>
         <source>2 dives per page</source>
-        <translation>2 urona po stranici</translation>
+        <translation>每頁 2 支潛水</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="145"/>
         <source>Table print</source>
-        <translation>Tablični ispis</translation>
+        <translation>表格列印</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="162"/>
         <source>Ordering</source>
-        <translation>Redosljed</translation>
+        <translation>順序</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="180"/>
         <source>Profile on top</source>
-        <translation>Profil na vrhu</translation>
+        <translation>潛水記錄在上方</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="202"/>
         <source>Notes on top</source>
-        <translation>Bilješke na vrhu</translation>
+        <translation>潛水筆記在上方</translation>
     </message>
     <message>
         <location filename="../qt-ui/printoptions.ui" line="219"/>
@@ -1792,7 +1793,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="224"/>
         <source>%1 @ %2:%3</source>
-        <translation type="unfinished"/>
+        <translation>%1 @ %2:%3</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="387"/>
@@ -1828,7 +1829,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="530"/>
         <source>Edit</source>
-        <translation>Uredi</translation>
+        <translation>編輯</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="616"/>
@@ -1849,7 +1850,7 @@ Please, remove them first.</source>
         <location filename="../qt-ui/profilegraphics.cpp" line="754"/>
         <location filename="../qt-ui/profilegraphics.cpp" line="1006"/>
         <source>air</source>
-        <translation>zrak</translation>
+        <translation>air</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="756"/>
@@ -1860,19 +1861,19 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1016"/>
         <source>Bailing out to OC</source>
-        <translation>Neplanirani prelazak na OC sustav</translation>
+        <translation>跳脫至 OC</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1018"/>
         <source> begin</source>
         <comment>Starts with space!</comment>
-        <translation> započni</translation>
+        <translation>開始</translation>
     </message>
     <message>
         <location filename="../qt-ui/profilegraphics.cpp" line="1019"/>
         <source> end</source>
         <comment>Starts with space!</comment>
-        <translation> završi</translation>
+        <translation>結束</translation>
     </message>
 </context>
 <context>
@@ -1880,7 +1881,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1618"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>未知</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1623"/>
@@ -1920,22 +1921,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1649"/>
         <source>Notes:</source>
-        <translation type="unfinished"/>
+        <translation>記錄：</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1656"/>
         <source>Divemaster:</source>
-        <translation type="unfinished"/>
+        <translation>導潛：</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1658"/>
         <source>Buddy:</source>
-        <translation type="unfinished"/>
+        <translation>潛伴：</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1660"/>
         <source>Suit:</source>
-        <translation type="unfinished"/>
+        <translation>防寒衣：</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1662"/>
@@ -1953,7 +1954,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="37"/>
         <source>AIR</source>
-        <translation>Zrak</translation>
+        <translation>AIR</translation>
     </message>
     <message>
         <location filename="../qt-ui/diveplanner.cpp" line="723"/>
@@ -1963,22 +1964,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/kmessagewidget.cpp" line="58"/>
         <source>Close</source>
-        <translation>Zatvori</translation>
+        <translation>關閉</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="27"/>
         <source>Average</source>
-        <translation>Ø</translation>
+        <translation>平均</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="30"/>
         <source>Minimum</source>
-        <translation>Min.</translation>
+        <translation>最低</translation>
     </message>
     <message>
         <location filename="../qt-ui/simplewidgets.cpp" line="33"/>
         <source>Maximum</source>
-        <translation>Max.</translation>
+        <translation>最高</translation>
     </message>
     <message>
         <location filename="../qt-ui/globe.cpp" line="242"/>
@@ -1991,12 +1992,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/renumber.ui" line="14"/>
         <source>Renumber</source>
-        <translation>Renumeriraj</translation>
+        <translation>重新編號</translation>
     </message>
     <message>
         <location filename="../qt-ui/renumber.ui" line="31"/>
         <source>New starting number</source>
-        <translation>Novi početni broj</translation>
+        <translation>新的開始編號</translation>
     </message>
 </context>
 <context>
@@ -2014,7 +2015,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/shifttimes.ui" line="73"/>
         <source>h:mm</source>
-        <translation type="unfinished"/>
+        <translation>h:mm</translation>
     </message>
     <message>
         <location filename="../qt-ui/shifttimes.ui" line="83"/>
@@ -2032,7 +2033,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/about.ui" line="23"/>
         <source>About Subsurface</source>
-        <translation>O programu Subsurface</translation>
+        <translation>關於 Subsurface</translation>
     </message>
     <message>
         <location filename="../qt-ui/about.cpp" line="19"/>
@@ -2055,12 +2056,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="220"/>
         <source>Webservice</source>
-        <translation>Web servis</translation>
+        <translation>網頁服務</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="260"/>
         <source>Connecting...</source>
-        <translation>Spajanje...</translation>
+        <translation>連結...</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="276"/>
@@ -2075,22 +2076,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="299"/>
         <source>Connection Error: </source>
-        <translation>Greška u komunikaciji: </translation>
+        <translation>連結錯誤:</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="300"/>
         <source>Invalid user identifier!</source>
-        <translation>Neispravna korisnička oznaka</translation>
+        <translation>錯誤的使用者Id!</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="301"/>
         <source>Cannot parse response!</source>
-        <translation>Ne mogu obraditi odziv</translation>
+        <translation>回覆無法解析!</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="302"/>
         <source>Download Success!</source>
-        <translation>Preuzimanje uspješno!</translation>
+        <translation>下載成功!</translation>
     </message>
 </context>
 <context>
@@ -2160,22 +2161,22 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/webservices.ui" line="39"/>
         <source>Download</source>
-        <translation type="unfinished"/>
+        <translation>下載</translation>
     </message>
     <message>
         <location filename="../qt-ui/webservices.ui" line="63"/>
         <source>User ID</source>
-        <translation type="unfinished"/>
+        <translation>使用者 ID</translation>
     </message>
     <message>
         <location filename="../qt-ui/webservices.ui" line="80"/>
         <source>Password</source>
-        <translation>Lozinka</translation>
+        <translation>密碼</translation>
     </message>
     <message>
         <location filename="../qt-ui/webservices.ui" line="94"/>
         <source>Upload</source>
-        <translation type="unfinished"/>
+        <translation>上傳</translation>
     </message>
     <message>
         <location filename="../qt-ui/subsurfacewebservices.cpp" line="146"/>
@@ -2193,12 +2194,12 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="403"/>
         <source>Type</source>
-        <translation>Vrsta</translation>
+        <translation>類型</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="403"/>
         <source>Weight</source>
-        <translation>Težina</translation>
+        <translation>配重</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="463"/>
@@ -2217,7 +2218,7 @@ Please, remove them first.</source>
     <message>
         <location filename="../qt-ui/models.cpp" line="1422"/>
         <source>#</source>
-        <translation>Br.</translation>
+        <translation>#</translation>
     </message>
     <message>
         <location filename="../qt-ui/models.cpp" line="1423"/>
@@ -2283,7 +2284,7 @@ Maximum</source>
     <message>
         <location filename="../dive.c" line="57"/>
         <source>pascal</source>
-        <translation>Pa</translation>
+        <translation>pascal</translation>
     </message>
     <message>
         <location filename="../dive.c" line="61"/>
@@ -2340,7 +2341,7 @@ Maximum</source>
     <message>
         <location filename="../dive.c" line="1051"/>
         <source>(%s) or (%s)</source>
-        <translation>(%s) ili (%s)</translation>
+        <translation>(%s) 或 (%s)</translation>
     </message>
     <message>
         <location filename="../divelist.c" line="488"/>
@@ -2350,32 +2351,32 @@ Maximum</source>
         <location filename="../statistics.c" line="356"/>
         <location filename="../statistics.c" line="367"/>
         <source>air</source>
-        <translation>zrak</translation>
+        <translation>air</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="161"/>
         <source>integrated</source>
-        <translation>integrirani</translation>
+        <translation>整合型</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="162"/>
         <source>belt</source>
-        <translation>pojas</translation>
+        <translation>配重帶</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="163"/>
         <source>ankle</source>
-        <translation>gležanj</translation>
+        <translation>腳踝</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="164"/>
         <source>backplate weight</source>
-        <translation>backplate olova</translation>
+        <translation>背板配重</translation>
     </message>
     <message>
         <location filename="../equipment.c" line="165"/>
         <source>clip-on</source>
-        <translation>clip-on</translation>
+        <translation>吊掛式</translation>
     </message>
     <message>
         <location filename="../file.c" line="107"/>
@@ -2385,7 +2386,7 @@ Maximum</source>
         <location filename="../file.c" line="394"/>
         <location filename="../file.c" line="396"/>
         <source>Failed to read &apos;%s&apos;</source>
-        <translation>Nije uspjelo čitanje &apos;%s&apos;</translation>
+        <translation>無法讀取 &apos;%s&apos;</translation>
     </message>
     <message>
         <location filename="../file.c" line="265"/>
@@ -2402,12 +2403,12 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>none</source>
-        <translation>nijedan</translation>
+        <translation>無</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>deco stop</source>
-        <translation>deko zastoj</translation>
+        <translation>減壓停留</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
@@ -2417,73 +2418,73 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>ascent</source>
-        <translation>izron</translation>
+        <translation>上升</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>ceiling</source>
-        <translation>strop</translation>
+        <translation>高度</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="138"/>
         <source>workload</source>
-        <translation>opterećenje</translation>
+        <translation>工作量</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>transmitter</source>
-        <translation>odašiljač</translation>
+        <translation>發射器</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>violation</source>
-        <translation>povreda</translation>
+        <translation>違反</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>bookmark</source>
-        <translation>bookmark</translation>
+        <translation>書籤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>surface</source>
-        <translation>površina</translation>
+        <translation>水面</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="139"/>
         <source>safety stop</source>
-        <translation>sigurnosna stanka</translation>
+        <translation>安全停留</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>gaschange</source>
-        <translation>promjena plina</translation>
+        <translation>氣瓶更換</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <source>safety stop (voluntary)</source>
-        <translation>sigurnosna stanka (opcionalna)</translation>
+        <translation>安全停留 (自發性)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="140"/>
         <source>safety stop (mandatory)</source>
-        <translation>sigurnosna stanka (obavezna)</translation>
+        <translation>安全停留 (強制性)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>deepstop</source>
-        <translation>dubinska stanka</translation>
+        <translation>深停留</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>ceiling (safety stop)</source>
-        <translation>strop (sigurnosni zastoj)</translation>
+        <translation>高度 (安全停留)</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
         <source>divetime</source>
-        <translation>trajanje urona</translation>
+        <translation>潛水時間</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="141"/>
@@ -2494,7 +2495,7 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>maxdepth</source>
-        <translation>Max dubina</translation>
+        <translation>最大深度</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
@@ -2509,7 +2510,7 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>airtime</source>
-        <translation>preostalo trajanje zraka</translation>
+        <translation>空氣時間</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
@@ -2519,62 +2520,62 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="142"/>
         <source>heading</source>
-        <translation>kurs</translation>
+        <translation>標題</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>tissue level warning</source>
-        <translation>upozorenje tkivo</translation>
+        <translation>組織等級警告</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="143"/>
         <source>non stop time</source>
-        <translation>non stop vrijeme</translation>
+        <translation>無停留時間</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="160"/>
         <source>invalid event number</source>
-        <translation>neispravan broj događaja</translation>
+        <translation>錯誤的事件編號</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="393"/>
         <source>Unable to create parser for %s %s</source>
-        <translation>Ne mogu kreirati parser za %s %s</translation>
+        <translation>無法解析 %s %s</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="399"/>
         <source>Error registering the data</source>
-        <translation>Greška pri registraciji podataka</translation>
+        <translation>錯誤的登錄資料</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="408"/>
         <source>Error parsing the datetime</source>
-        <translation>Greška pri parsiranju datuma i vremena</translation>
+        <translation>日期時間解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="425"/>
         <source>Dive %d: %s %d %04d</source>
-        <translation>Uron #%d - %s %d %04d</translation>
+        <translation>潛水 %d: %s %d %04d</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="430"/>
         <source>Error parsing the divetime</source>
-        <translation>Greška pri parsiranju vremena urona</translation>
+        <translation>潛水時間解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="440"/>
         <source>Error parsing the maxdepth</source>
-        <translation>Greška pri parsiranju maksimalne dubine</translation>
+        <translation>最大深度解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="450"/>
         <source>Error parsing the gas mix count</source>
-        <translation>Greška pri parsiranju broja mješavina</translation>
+        <translation>混合氣體數量解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="463"/>
         <source>Error obtaining water salinity</source>
-        <translation>Greška pri dohvaćanju saliniteta vode</translation>
+        <translation>得到錯誤的海水鹽度</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="472"/>
@@ -2584,17 +2585,17 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="481"/>
         <source>Error parsing the gas mix</source>
-        <translation>Greška pri parsiranju mješavine plinova</translation>
+        <translation>混合氣體解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="489"/>
         <source>Error parsing the samples</source>
-        <translation>Greška pri parsiranju uzoraka</translation>
+        <translation>樣本解析錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="616"/>
         <source>Event: waiting for user action</source>
-        <translation>Događaj: čekanje na korisničku akciju</translation>
+        <translation>事件: 等待使用者動作</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="624"/>
@@ -2604,72 +2605,72 @@ Maximum</source>
     <message>
         <location filename="../libdivecomputer.c" line="666"/>
         <source>Error registering the event handler.</source>
-        <translation>Greška pri registraciji event handlera.</translation>
+        <translation>錯誤的註冊程序.</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="671"/>
         <source>Error registering the cancellation handler.</source>
-        <translation>Greška pri registraciji cancellation handlera</translation>
+        <translation>錯誤的註冊取消程序.</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="675"/>
         <source>Dive data import error</source>
-        <translation>Greška pri uvozu podataka</translation>
+        <translation>匯入潛水資料錯誤</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="693"/>
         <source>Unable to create libdivecomputer context</source>
-        <translation>Ne mogu kreirati libdivecomputer kontekst</translation>
+        <translation>無法建立 libdivecomputer 上下文</translation>
     </message>
     <message>
         <location filename="../libdivecomputer.c" line="695"/>
         <source>Unable to open %s %s (%s)</source>
-        <translation>Nije uspjelo otvaranje %s %s (%s)</translation>
+        <translation> 無法開啟 %s %s (%s)</translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="580"/>
         <source>Strange percentage reading %s
 </source>
-        <translation>Neobično očitanje postotka %s
+        <translation>有問題的讀取比例 %s
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1717"/>
         <source>Failed to parse '%s'.
 </source>
-        <translation>Nije uspjelo parsiranje &apos;%s&apos;.
+        <translation>無法解析訊息 &apos;%s&apos; .
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1718"/>
         <source>Failed to parse &apos;%s&apos;</source>
-        <translation>Nije uspjelo parsiranje &apos;%s&apos;</translation>
+        <translation>無法解析訊息 &apos;%s&apos;</translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1916"/>
         <source>Database query get_events failed.
 </source>
-        <translation>Neuspjeo get_events na bazi.
+        <translation>資料庫讀取 get_events 失敗.
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1951"/>
         <source>Database connection failed '%s'.
 </source>
-        <translation>Neuspjelo spajanje na bazu &apos;%s&apos;.
+        <translation>資料庫連結錯誤 &apos;%s&apos; .
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="1958"/>
         <source>Database query failed '%s'.
 </source>
-        <translation>Neuspjeo upit na bazu &apos;%s&apos;.
+        <translation>資料庫要求錯誤 &apos;%s&apos; .
 </translation>
     </message>
     <message>
         <location filename="../parse-xml.c" line="2069"/>
         <source>Can&apos;t open stylesheet (%s)/%s</source>
-        <translation>Ne mogu otvoriti stylesheet (%s)/%s</translation>
+        <translation>無法開啟樣板 (%s)/%s</translation>
     </message>
     <message>
         <location filename="../planner.c" line="98"/>
@@ -2680,12 +2681,12 @@ Maximum</source>
     <message>
         <location filename="../planner.c" line="133"/>
         <source>Can&apos;t find gas %d/%d</source>
-        <translation>Ne mogu naći plin %d/%d</translation>
+        <translation>無法找到氣源 %d/%d</translation>
     </message>
     <message>
         <location filename="../planner.c" line="315"/>
         <source>Too many gas mixes</source>
-        <translation>Previše mješavina plinova</translation>
+        <translation>太多氣體混合</translation>
     </message>
     <message>
         <location filename="../planner.c" line="493"/>
@@ -2695,8 +2696,8 @@ based on GFlow = %.0f and GFhigh = %.0f
 
 </source>
         <translation>%s
-Subsurface plan urona
-temeljen na GFlow = %.0f i GFhigh = %.0f
+Subsurface 潛水計畫
+以 GFlow = %.0f and GFhigh = %.0f 為基礎
 
 </translation>
     </message>
@@ -2704,35 +2705,35 @@ temeljen na GFlow = %.0f i GFhigh = %.0f
         <location filename="../planner.c" line="534"/>
         <source>Transition to %.*f %s in %d:%02d min - runtime %d:%02u on %s
 </source>
-        <translation>Prelazak na %.*f %s u %d:%02d min - ukupno vrijeme %d:%02u na %s
+        <translation>禁搭飛機 %.*f %s 在 %d:%02d min - 運行時間 %d:%02u 在 %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="543"/>
         <source>Stay at %.*f %s for %d:%02d min - runtime %d:%02u on %s
 </source>
-        <translation>Stanka na %.*f %s u trajanju %d:%02d min - Ukupno vrijeme %d:%02u na %s
+        <translation>在 %.*f %s 停留 %d:%02d min - 時間運行 %d:%02u 於 %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="554"/>
         <source>Switch gas to %s
 </source>
-        <translation>Prebaci plin na %s
+        <translation>更換氣體至 %s
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="562"/>
         <source>Gas consumption:
 </source>
-        <translation>Potrošnja plina:
+        <translation>氣體消耗:
 </translation>
     </message>
     <message>
         <location filename="../planner.c" line="573"/>
         <source>%.0f%s of %s
 </source>
-        <translation>%.0f%s %s
+        <translation>%.0f%s of %s
 </translation>
     </message>
     <message>
@@ -2745,7 +2746,7 @@ temeljen na GFlow = %.0f i GFhigh = %.0f
         <source>%s
 P:%d %s</source>
         <translation>%s
-D:%d %s</translation>
+P:%d %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1209"/>
@@ -2765,7 +2766,7 @@ V:%.2f %s</source>
         <source>%s
 Calculated ceiling %.0f %s</source>
         <translation>%s
-Izračunati strop %.0f %s</translation>
+計算的深度 %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1309"/>
@@ -2778,7 +2779,7 @@ Tissue %.0fmin: %.0f %s</source>
         <source>%s
 Safetystop:%umin @ %.0f %s</source>
         <translation>%s
-Sigurnosni zastanak:%umin @ %.0f %s</translation>
+安全停留:%umin @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1200"/>
@@ -2797,28 +2798,28 @@ SAC:%2.1fl/min</source>
         <source>%s
 Safetystop:unkn time @ %.0f %s</source>
         <translation>%s
-Sigurnosni zastoj:nepoz.vrijeme @ %.0f %s</translation>
+安全停留:未知時間 @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1264"/>
         <source>%s
 Deco:%umin @ %.0f %s</source>
         <translation>%s
-Deko:%umin @ %.0f %s</translation>
+Deco:%umin @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1267"/>
         <source>%s
 Deco:unkn time @ %.0f %s</source>
         <translation>%s
-Deko:nepoznato vrijeme @ %.0f %s</translation>
+Deco:時間未知 @ %.0f %s</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1273"/>
         <source>%s
 In deco</source>
         <translation>%s
-U deko</translation>
+減壓中</translation>
     </message>
     <message>
         <location filename="../profile.c" line="1276"/>
@@ -2939,7 +2940,7 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../qt-gui.cpp" line="295"/>
         <source>F</source>
-        <translation type="unfinished"/>
+        <translation>F</translation>
     </message>
     <message>
         <location filename="../qt-gui.cpp" line="469"/>
@@ -2965,67 +2966,67 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>boat</source>
-        <translation>brod</translation>
+        <translation>船</translation>
     </message>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>shore</source>
-        <translation>obala</translation>
+        <translation>岸潛</translation>
     </message>
     <message>
         <location filename="../dive.c" line="13"/>
         <source>drift</source>
-        <translation>drift</translation>
+        <translation>放流</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>deep</source>
-        <translation>dubok</translation>
+        <translation>深</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>cavern</source>
-        <translation>pećina</translation>
+        <translation>大地洞</translation>
     </message>
     <message>
         <location filename="../dive.c" line="14"/>
         <source>ice</source>
-        <translation>led</translation>
+        <translation>冰</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>wreck</source>
-        <translation>olupina</translation>
+        <translation>沈船</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>cave</source>
-        <translation>špilja</translation>
+        <translation>洞穴</translation>
     </message>
     <message>
         <location filename="../dive.c" line="15"/>
         <source>altitude</source>
-        <translation>nadmorska visina</translation>
+        <translation>高海拔</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>pool</source>
-        <translation>bazen</translation>
+        <translation>泳池</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>lake</source>
-        <translation>jezero</translation>
+        <translation>湖泊</translation>
     </message>
     <message>
         <location filename="../dive.c" line="16"/>
         <source>river</source>
-        <translation>rijeka</translation>
+        <translation>河流</translation>
     </message>
     <message>
         <location filename="../dive.c" line="17"/>
         <source>night</source>
-        <translation>noć</translation>
+        <translation>夜潛</translation>
     </message>
     <message>
         <location filename="../dive.c" line="17"/>
@@ -3040,12 +3041,12 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="18"/>
         <source>photo</source>
-        <translation>fotografija</translation>
+        <translation>照片</translation>
     </message>
     <message>
         <location filename="../dive.c" line="18"/>
         <source>video</source>
-        <translation>video</translation>
+        <translation>攝影</translation>
     </message>
     <message>
         <location filename="../dive.c" line="18"/>
@@ -3055,12 +3056,12 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../dive.c" line="19"/>
         <source>deco</source>
-        <translation>deko</translation>
+        <translation>減壓</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="214"/>
         <source>more than %d days</source>
-        <translation>više od %d dana</translation>
+        <translation>超過 %d日</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="220"/>
@@ -3070,342 +3071,342 @@ TTS:%umin (calc)</source>
     <message>
         <location filename="../statistics.c" line="222"/>
         <source>%dh %dmin</source>
-        <translation>%dst %dmin</translation>
+        <translation>%dh %dmin</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="233"/>
         <source>for dives #</source>
-        <translation>za urone #</translation>
+        <translation>針對潛水 #</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="240"/>
         <source>for selected dives</source>
-        <translation>za odabrane urone</translation>
+        <translation>針對選擇的潛水</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="275"/>
         <source>for dive #%d</source>
-        <translation>za uron #%d</translation>
+        <translation>針對潛水 #%d</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="277"/>
         <source>for selected dive</source>
-        <translation>za odabrani uron</translation>
+        <translation>針對選擇的潛水</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="279"/>
         <source>for all dives</source>
-        <translation>za sve urone</translation>
+        <translation>針對所有潛水</translation>
     </message>
     <message>
         <location filename="../statistics.c" line="281"/>
         <source>(no dives)</source>
-        <translation>(nema urona)</translation>
+        <translation>(無潛水)</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Sun</source>
-        <translation>Ned</translation>
+        <translation>周日</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Mon</source>
-        <translation>Pon</translation>
+        <translation>周一</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Tue</source>
-        <translation>Uto</translation>
+        <translation>周二</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Wed</source>
-        <translation>Sri</translation>
+        <translation>周三</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Thu</source>
-        <translation>Čet</translation>
+        <translation>周四</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Fri</source>
-        <translation>Pet</translation>
+        <translation>周五</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="61"/>
         <source>Sat</source>
-        <translation>Sub</translation>
+        <translation>周六</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Jan</source>
-        <translation>Sij</translation>
+        <translation>1月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Feb</source>
-        <translation>Velj</translation>
+        <translation>2月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Mar</source>
-        <translation>Ožu</translation>
+        <translation>3月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Apr</source>
-        <translation>Tra</translation>
+        <translation>4月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>May</source>
-        <translation>Svi</translation>
+        <translation>5月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="70"/>
         <source>Jun</source>
-        <translation>Lip</translation>
+        <translation>6月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Jul</source>
-        <translation>Srp</translation>
+        <translation>7月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Aug</source>
-        <translation>Kol</translation>
+        <translation>8月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Sep</source>
-        <translation>Ruj</translation>
+        <translation>9月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Oct</source>
-        <translation>Lis</translation>
+        <translation>10月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Nov</source>
-        <translation>Stu</translation>
+        <translation>11月</translation>
     </message>
     <message>
         <location filename="../subsurfacestartup.c" line="71"/>
         <source>Dec</source>
-        <translation>Pro</translation>
+        <translation>12月</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="24"/>
         <source>Uemis Zurich: File System is almost full
 Disconnect/reconnect the dive computer
 and click &apos;Retry&apos;</source>
-        <translation>Uemis Zurich: Datotečni sustav je skoro pun
-odspojite pa ponovo spojite ronilačko računalo
-i kliknite &apos;Retry&apos;</translation>
+        <translation>Uemis Zurich: 檔案系統使用空間已接近額滿
+請將潛水電腦中斷/重新連接
+並按下&quot;重試&quot;鈕</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="25"/>
         <source>Uemis Zurich: File System is full
 Disconnect/reconnect the dive computer
 and try again</source>
-        <translation>Uemis Zurich: Datotečni sustav je pun
-Iskopčajte i ponovo ukopčajte ronilačko računalo
-i pokušajte ponovo.</translation>
+        <translation>Uemis Zurich: 檔案系統使用空間已額滿
+請將潛水電腦中斷/重新連接
+並再次嘗試</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="26"/>
         <source>Short write to req.txt file
 Is the Uemis Zurich plugged in correctly?</source>
-        <translation>Greška pri pisanju u datoteku req.txt
-Je li Uemis Zurich ispravno priključen?</translation>
+        <translation>無法寫入 req.txt 檔案
+請確認 Uemis Zurich 是否正確連接?</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="106"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>未知</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="357"/>
         <source>Reading %s %s</source>
-        <translation>Čitanje %s %s</translation>
+        <translation>讀取%s %s</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="377"/>
         <source>data</source>
-        <translation>podaci</translation>
+        <translation>資料</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="398"/>
         <source>divelog entry id</source>
-        <translation>ID unosa u dnevniku</translation>
+        <translation>潛水記錄連結 id</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="400"/>
         <source>divespot data id</source>
-        <translation>divespot data id</translation>
+        <translation>潛點資料 id</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="402"/>
         <source>more data dive id</source>
-        <translation>više podataka za ID urona</translation>
+        <translation>更多潛水記錄, 潛水編號 </translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>wetsuit</source>
-        <translation>mokro odijelo</translation>
+        <translation>濕式防寒衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>semidry</source>
-        <translation>polusuho</translation>
+        <translation>半乾衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="582"/>
         <source>drysuit</source>
-        <translation>suho odijelo</translation>
+        <translation>乾式防寒衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>shorty</source>
-        <translation>shorty</translation>
+        <translation>短袖防寒衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>vest</source>
-        <translation>jakna</translation>
+        <translation>背心</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>long john</source>
-        <translation>long john</translation>
+        <translation>長約翰式</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>jacket</source>
-        <translation>kompenzator plovnosti</translation>
+        <translation>夾克式</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>full suit</source>
-        <translation>puno odijelo</translation>
+        <translation>全身式防寒衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="583"/>
         <source>2 pcs full suit</source>
-        <translation>dvodjelno odijelo</translation>
+        <translation>2 件式防寒衣</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="584"/>
         <source>membrane</source>
-        <translation>membrana</translation>
+        <translation>膜組織</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="761"/>
         <source>Init Communication</source>
-        <translation>Uspostavljanje veze</translation>
+        <translation>初始化通訊</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="763"/>
         <source>Uemis init failed</source>
-        <translation>Uemis greška pri inicijalizaciji</translation>
+        <translation>Uemis 初始化失敗</translation>
     </message>
     <message>
         <location filename="../uemis-downloader.c" line="774"/>
         <source>Start download</source>
-        <translation>Započni preuzimanje</translation>
+        <translation>開始下載</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="194"/>
         <source>Safety Stop Violation</source>
-        <translation>Kršenje sigurnosne stanke</translation>
+        <translation>違反安全停留</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="196"/>
         <source>Speed Alarm</source>
-        <translation>Alarm: Brzina</translation>
+        <translation>速度過快警示</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="199"/>
         <source>Speed Warning</source>
-        <translation>Upozorenje: Brzina</translation>
+        <translation>速度過快提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="201"/>
         <source>PO2 Green Warning</source>
-        <translation>Upozorenje: PO2 Zeleno</translation>
+        <translation>PO2 提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="204"/>
         <source>PO2 Ascend Warning</source>
-        <translation>Upozorenje: Prebrzi izron / PO2</translation>
+        <translation>PO2 上升提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="206"/>
         <source>PO2 Ascend Alarm</source>
-        <translation>Alarm: Prebrzi izron / PO2</translation>
+        <translation>PO2 上升警告</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="210"/>
         <source>Tank Pressure Info</source>
-        <translation>Podaci od pritisku u boci</translation>
+        <translation>氣瓶壓力資訊</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="212"/>
         <source>RGT Warning</source>
-        <translation>RTG Upozorenje</translation>
+        <translation>RGT 提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="214"/>
         <source>RGT Alert</source>
-        <translation>RGT Alarm</translation>
+        <translation>RGT 警告</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="216"/>
         <source>Tank Change Suggested</source>
-        <translation>Preporučena izmjena boce</translation>
+        <translation>氣瓶更換建議</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="218"/>
         <source>Depth Limit Exceeded</source>
-        <translation>Premašeno ograničenje dubine</translation>
+        <translation>超過深度限制</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="220"/>
         <source>Max Deco Time Warning</source>
-        <translation>Upozorenje: Max. vrijeme dekompresije</translation>
+        <translation>最大減壓時間提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="222"/>
         <source>Dive Time Info</source>
-        <translation>Info: Trajanje urona</translation>
+        <translation>潛水時間資訊</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="224"/>
         <source>Dive Time Alert</source>
-        <translation>Alarm: Trajanje urona</translation>
+        <translation>潛水時間警告</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="226"/>
         <source>Marker</source>
-        <translation>Oznaka</translation>
+        <translation>標記</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="228"/>
         <source>No Tank Data</source>
-        <translation>Nema podatka o boci</translation>
+        <translation>無氣瓶資料</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="230"/>
         <source>Low Battery Warning</source>
-        <translation>Upozorenje: Baterija pri izmaku</translation>
+        <translation>電池低電量提醒</translation>
     </message>
     <message>
         <location filename="../uemis.c" line="232"/>
         <source>Low Battery Alert</source>
-        <translation>Alarm: Baterija pri izmaku</translation>
+        <translation>電池低電量警示</translation>
     </message>
 </context>
 </TS>
