@@ -8,6 +8,7 @@ class QAbstractButton;
 #include <QDialog>
 
 #include "ui_renumber.h"
+#include "ui_shifttimes.h"
 
 class MinMaxAvgWidget : public QWidget{
 	Q_OBJECT
@@ -16,6 +17,7 @@ class MinMaxAvgWidget : public QWidget{
 	Q_PROPERTY(double average READ average WRITE setAverage)
 public:
 	MinMaxAvgWidget(QWidget *parent);
+	~MinMaxAvgWidget();
 	double minimum() const;
 	double maximum() const;
 	double average() const;
@@ -27,7 +29,7 @@ public:
 	void setAverage(const QString& average);
 	void clear();
 private:
-	MinMaxAvgWidgetPrivate *d;
+	QScopedPointer<MinMaxAvgWidgetPrivate> d;
 };
 
 class RenumberDialog : public QDialog {
@@ -37,8 +39,19 @@ public:
 private slots:
 	void buttonClicked(QAbstractButton *button);
 private:
-	explicit RenumberDialog();
+	explicit RenumberDialog(QWidget *parent);
 	Ui::RenumberDialog ui;
+};
+
+class ShiftTimesDialog : public QDialog {
+	Q_OBJECT
+public:
+	static ShiftTimesDialog *instance();
+private slots:
+	void buttonClicked(QAbstractButton *button);
+private:
+	explicit ShiftTimesDialog(QWidget *parent);
+	Ui::ShiftTimesDialog ui;
 };
 
 bool isGnome3Session();

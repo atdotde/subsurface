@@ -10,6 +10,7 @@
 #include <QAbstractTableModel>
 #include <QCoreApplication>
 #include <QStringList>
+#include <QStringListModel>
 
 #include "../dive.h"
 #include "../divelist.h"
@@ -79,9 +80,10 @@ private:
 class CylindersModel : public CleanerTableModel {
 Q_OBJECT
 public:
-	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE};
+	enum Column {REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, DEPTH, COLUMNS};
 
 	explicit CylindersModel(QObject* parent = 0);
+	static CylindersModel *instance();
 	/*reimp*/ QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 	/*reimp*/ int rowCount(const QModelIndex& parent = QModelIndex()) const;
 	/*reimp*/ Qt::ItemFlags flags(const QModelIndex& index) const;
@@ -142,6 +144,9 @@ public:
 	virtual ~TreeItem();
 	TreeItem();
 	virtual QVariant data (int column, int role) const;
+	virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+	virtual Qt::ItemFlags flags(const QModelIndex &index) const;
+
 	int row() const;
 	QList<TreeItem*> children;
 	TreeItem *parent;
@@ -153,7 +158,8 @@ struct DiveItem : public TreeItem {
 
 	virtual QVariant data(int column, int role) const;
 	struct dive* dive;
-
+	virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+	virtual Qt::ItemFlags flags(const QModelIndex& index) const;
 	QString displayDate() const;
 	QString displayDuration() const;
 	QString displayDepth() const;
@@ -172,7 +178,6 @@ class TreeModel : public QAbstractItemModel
 public:
 	TreeModel(QObject *parent = 0);
 	virtual ~TreeModel();
-
 	virtual   QVariant data(const QModelIndex &index, int role) const;
 	/*reimp*/ int rowCount(const QModelIndex &parent = QModelIndex()) const;
 	/*reimp*/ int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -190,15 +195,15 @@ public:
 	enum Column {NR, DATE, RATING, DEPTH, DURATION, TEMPERATURE, TOTALWEIGHT,
 		SUIT, CYLINDER, NITROX, SAC, OTU, MAXCNS, LOCATION, COLUMNS };
 
-	enum ExtraRoles{STAR_ROLE = Qt::UserRole + 1, DIVE_ROLE, TRIP_ROLE, SORT_ROLE};
+	enum ExtraRoles{STAR_ROLE = Qt::UserRole + 1, DIVE_ROLE, TRIP_ROLE, SORT_ROLE, DIVE_IDX};
 	enum Layout{TREE, LIST, CURRENT};
 
 	Qt::ItemFlags flags(const QModelIndex &index) const;
 	virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+	virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 	DiveTripModel(QObject* parent = 0);
 	Layout layout() const;
 	void setLayout(Layout layout);
-
 private:
 	void setupModelData();
 	QMap<dive_trip_t*, TripItem*> trips;
@@ -229,7 +234,7 @@ private:
 class YearlyStatisticsModel : public TreeModel {
 	Q_OBJECT
 public:
-	enum { 	YEAR,DIVES,TOTAL_TIME,AVERAGE_TIME,SHORTEST_TIME,LONGEST_TIME,AVG_DEPTH,MIN_DEPTH,
+	enum {	YEAR,DIVES,TOTAL_TIME,AVERAGE_TIME,SHORTEST_TIME,LONGEST_TIME,AVG_DEPTH,MIN_DEPTH,
 		MAX_DEPTH,AVG_SAC,MIN_SAC,MAX_SAC,AVG_TEMP,MIN_TEMP,MAX_TEMP,COLUMNS};
 
 	virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
@@ -297,4 +302,26 @@ public:
 	void setDive(struct dive *divePtr);
 };
 
+class GasSelectionModel : public QStringListModel{
+	Q_OBJECT
+public:
+	static GasSelectionModel* instance();
+	Qt::ItemFlags flags(const QModelIndex& index) const;
+	virtual QVariant data(const QModelIndex& index, int role) const;
+public slots:
+	void repopulate();
+};
+
+
+class LanguageModel : public QAbstractListModel {
+	Q_OBJECT
+public:
+	static LanguageModel* instance();
+	virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
+	virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
+private:
+	LanguageModel(QObject* parent = 0);
+
+	QStringList languages;
+};
 #endif

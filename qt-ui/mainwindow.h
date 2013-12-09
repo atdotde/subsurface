@@ -9,6 +9,7 @@
 
 #include <QMainWindow>
 #include <QAction>
+#include <QUrl>
 
 #include "ui_mainwindow.h"
 
@@ -36,6 +37,7 @@ public:
 	enum {COLLAPSED, EXPANDED};
 	enum StackWidgetIndexes{ PROFILE, PLANNERPROFILE};
 	enum InfoWidgetIndexes{ MAINTAB, PLANNERWIDGET};
+	enum CurrentState{ VIEWALL, GLOBE_MAXIMIZED, INFO_MAXIMIZED, PROFILE_MAXIMIZED, LIST_MAXIMIZED};
 
 	MainWindow();
 	ProfileGraphicsView *graphics();
@@ -69,6 +71,7 @@ private slots:
 	/* log menu actions */
 	void on_actionDownloadDC_triggered();
 	void on_actionDownloadWeb_triggered();
+	void on_actionDivelogs_de_triggered();
 	void on_actionEditDeviceNames_triggered();
 	void on_actionAddDive_triggered();
 	void on_actionRenumber_triggered();
@@ -100,27 +103,33 @@ private slots:
 	void initialUiSetup();
 
 	void on_actionImportCSV_triggered();
+	void linkClickedSlot(QUrl url);
 
 protected:
 	void closeEvent(QCloseEvent *);
 
 public slots:
 	void readSettings();
-	void refreshDisplay();
+	void refreshDisplay(bool recreateDiveList = true);
 	void showProfile();
+	void editCurrentDive();
 
 private:
 	Ui::MainWindow ui;
 	QAction *actionNextDive;
 	QAction *actionPreviousDive;
 	QWebView *helpView;
+	CurrentState state;
 	QString filter();
 	bool askSaveChanges();
 	void writeSettings();
 	void redrawProfile();
 	void file_save();
 	void file_save_as();
-	void setupSplitters();
+	void beginChangeState(CurrentState s);
+	void saveSplitterSizes();
+	QString lastUsedDir();
+	void updateLastUsedDir(const QString& s);
 };
 
 MainWindow *mainWindow();

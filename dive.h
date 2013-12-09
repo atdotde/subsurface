@@ -59,34 +59,6 @@ typedef int bool;
 #define SEAWATER_SALINITY	10300
 #define FRESHWATER_SALINITY	10000
 
-/* Dive tag definitions */
-#define DTAG_INVALID		(1 << 0)
-#define DTAG_BOAT		(1 << 1)
-#define DTAG_SHORE		(1 << 2)
-#define DTAG_DRIFT		(1 << 3)
-#define DTAG_DEEP		(1 << 4)
-#define DTAG_CAVERN		(1 << 5)
-#define DTAG_ICE		(1 << 6)
-#define DTAG_WRECK		(1 << 7)
-#define DTAG_CAVE		(1 << 8)
-#define DTAG_ALTITUDE		(1 << 9)
-#define DTAG_POOL		(1 << 10)
-#define DTAG_LAKE		(1 << 11)
-#define DTAG_RIVER		(1 << 12)
-#define DTAG_NIGHT		(1 << 13)
-#define DTAG_FRESH		(1 << 14)
-#define DTAG_FRESH_NR		14
-#define DTAG_STUDENT		(1 << 15)
-#define DTAG_INSTRUCTOR		(1 << 16)
-#define DTAG_PHOTO		(1 << 17)
-#define DTAG_VIDEO		(1 << 18)
-#define DTAG_DECO		(1 << 19)
-#define DTAG_NR			20
-/* defined in statistics.c */
-extern char *dtag_names[DTAG_NR];
-extern int dtag_shown[DTAG_NR];
-extern int dive_mask;
-
 /*
  * Some silly typedefs to make our units very explicit.
  *
@@ -171,6 +143,7 @@ typedef struct {
 	cylinder_type_t type;
 	struct gasmix gasmix;
 	pressure_t start, end, sample_start, sample_end;
+	depth_t depth;
 } cylinder_t;
 
 typedef struct {
@@ -309,6 +282,45 @@ struct sample {
 	int po2;
 };
 
+struct divetag {
+	/*
+	 * The name of the divetag. If a translation is available, name contains
+	 * the translated tag
+	 */
+	char *name;
+	/*
+	 * If a translation is available, we write the original tag to source.
+	 * This enables us to write a non-localized tag to the xml file.
+	 */
+	char *source;
+};
+
+struct tag_entry {
+	struct divetag *tag;
+	struct tag_entry *next;
+};
+
+/*
+ * divetags are only stored once, each dive only contains
+ * a list of tag_entries which then point to the divetags
+ * in the global g_tag_list
+ */
+
+extern struct tag_entry *g_tag_list;
+
+struct divetag *taglist_add_tag(struct tag_entry *tag_list, const char *tag);
+
+/*
+ * Writes all divetags in tag_list to buffer, limited by the buffer's (len)gth.
+ * Returns the characters written
+ */
+int taglist_get_tagstring(struct tag_entry *tag_list, char *buffer, int len);
+
+void taglist_init(struct tag_entry **tag_list);
+void taglist_clear(struct tag_entry *tag_list);
+void taglist_init_global();
+
+
 /*
  * Events are currently pretty meaningless. This is
  * just based on the random data that libdivecomputer
@@ -399,12 +411,10 @@ struct dive {
 	pressure_t surface_pressure;
 	duration_t duration;
 	int salinity; // kg per 10000 l
-	int dive_tags;
+	struct tag_entry *tag_list;
 
 	struct divecomputer dc;
 };
-
-extern int get_index_for_dive(struct dive *dive);
 
 static inline int dive_has_gps_location(struct dive *dive)
 {
@@ -533,7 +543,7 @@ extern const struct units SI_units, IMPERIAL_units;
 extern struct units xml_parsing_units;
 
 extern struct units *get_units(void);
-extern int verbose;
+extern int verbose, quit;
 
 struct dive_table {
 	int nr, allocated, preexisting;
@@ -616,11 +626,14 @@ extern void set_filename(const char *filename, bool force);
 extern int parse_dm4_buffer(const char *url, const char *buf, int size, struct dive_table *table, char **error);
 
 extern void parse_file(const char *filename, char **error);
-extern void parse_csv_file(const char *filename, int time, int depth, int temp, char **error);
+extern void parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, char **error);
 
 extern void save_dives(const char *filename);
 extern void save_dives_logic(const char *filename, bool select_only);
 extern void save_dive(FILE *f, struct dive *dive);
+extern void export_dives_uddf(const char *filename, const bool selected);
+
+extern void shift_times(const timestamp_t amount);
 
 extern xsltStylesheetPtr get_stylesheet(const char *name);
 
@@ -638,13 +651,19 @@ extern void finish_sample(struct divecomputer *dc);
 extern void sort_table(struct dive_table *table);
 extern struct dive *fixup_dive(struct dive *dive);
 extern unsigned int dc_airtemp(struct divecomputer *dc);
+extern unsigned int dc_watertemp(struct divecomputer *dc);
 extern struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer_downloaded);
 extern struct dive *try_to_merge(struct dive *a, struct dive *b, bool prefer_downloaded);
 extern void renumber_dives(int nr);
+extern void copy_events(struct dive *s, struct dive *d);
+extern void copy_cylinders(struct dive *s, struct dive *d);
 extern void copy_samples(struct dive *s, struct dive *d);
 
+extern void fill_default_cylinder(cylinder_t *cyl);
 extern void add_gas_switch_event(struct dive *dive, struct divecomputer *dc, int time, int idx);
 extern void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
+extern void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration);
+extern int get_cylinder_index(struct dive *dive, struct event *ev);
 
 /* UI related protopypes */
 
@@ -697,7 +716,7 @@ extern double add_segment(double pressure, const struct gasmix *gasmix, int peri
 extern void clear_deco(double surface_pressure);
 extern void dump_tissues(void);
 extern unsigned int deco_allowed_depth(double tissues_tolerance, double surface_pressure, struct dive *dive, bool smooth);
-extern void set_gf(short gflow, short gfhigh);
+extern void set_gf(short gflow, short gfhigh, bool gf_low_at_maxdepth);
 extern void cache_deco_state(double, char **datap);
 extern double restore_deco_state(char *data);
 

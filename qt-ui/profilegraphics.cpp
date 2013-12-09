@@ -17,6 +17,7 @@
 #include <QMouseEvent>
 #include <QToolBar>
 #include <qtextdocument.h>
+#include <QMessageBox>
 #include <limits>
 
 #include "../color.h"
@@ -25,6 +26,8 @@
 #include "../profile.h"
 #include "../device.h"
 #include "../helpers.h"
+#include "../planner.h"
+#include "../gettextfromc.h"
 
 #include <libdivecomputer/parser.h>
 #include <libdivecomputer/version.h>
@@ -44,6 +47,10 @@ struct text_render_options{
 extern struct ev_select *ev_namelist;
 extern int evn_allocated;
 extern int evn_used;
+
+#define TOOLBAR_POS \
+QPoint(viewport()->geometry().width() - toolBarProxy->boundingRect().width(), \
+viewport()->geometry().height() - toolBarProxy->boundingRect().height() )
 
 ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , dive(0), diveDC(0), rulerItem(0), toolBarProxy(0)
 {
@@ -108,9 +115,128 @@ void ProfileGraphicsView::wheelEvent(QWheelEvent* event)
 		scale(1.0 / scaleFactor, 1.0 / scaleFactor);
 		zoomLevel--;
 	}
+
 	scrollViewTo(event->pos());
-	toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
+	toolTip->setPos(mapToScene(toolTipPos));
+	toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	if(zoomLevel != 0){
+		toolBarProxy->hide();
+	}else{
+		toolBarProxy->show();
+	}
 }
+
+void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
+{
+	if(selected_dive == -1)
+		return;
+	QMenu m;
+	QMenu *gasChange = m.addMenu(tr("Add Gas Change"));
+	GasSelectionModel *model = GasSelectionModel::instance();
+	model->repopulate();
+	int rowCount = model->rowCount();
+	for(int i = 0; i < rowCount; i++){
+		QAction *action = new QAction(&m);
+		action->setText( model->data(model->index(i, 0),Qt::DisplayRole).toString());
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(changeGas()));
+		action->setData(event->globalPos());
+		gasChange->addAction(action);
+	}
+	QAction *action = m.addAction(tr("Add Bookmark"), this, SLOT(addBookmark()));
+	action->setData(event->globalPos());
+	QList<QGraphicsItem*> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
+	Q_FOREACH(QGraphicsItem *i, itemsAtPos){
+		EventItem *item = dynamic_cast<EventItem*>(i);
+		if(!item)
+			continue;
+		QAction *action = new QAction(&m);
+		action->setText(tr("Remove Event"));
+		action->setData(QVariant::fromValue<void*>(item)); // so we know what to remove.
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(removeEvent()));
+		m.addAction(action);
+		action = new QAction(&m);
+		action->setText(tr("Hide similar events"));
+		action->setData(QVariant::fromValue<void*>(item));
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(hideEvents()));
+		m.addAction(action);
+		break;
+	}
+	m.exec(event->globalPos());
+}
+
+void ProfileGraphicsView::addBookmark()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QPoint globalPos = action->data().toPoint();
+	QPoint viewPos = mapFromGlobal(globalPos);
+	QPointF scenePos = mapToScene(viewPos);
+	int seconds = scenePos.x() / gc.maxx * (gc.rightx - gc.leftx) + gc.leftx;
+	add_event(current_dc, seconds, SAMPLE_EVENT_BOOKMARK, 0, 0, "bookmark");
+	mark_divelist_changed(TRUE);
+	plot(current_dive, TRUE);
+}
+
+void ProfileGraphicsView::changeGas()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QPoint globalPos = action->data().toPoint();
+	QPoint viewPos = mapFromGlobal(globalPos);
+	QPointF scenePos = mapToScene(viewPos);
+	QString gas = action->text();
+	int o2, he;
+	validate_gas(gas.toUtf8().constData(), &o2, &he);
+	int seconds = scenePos.x() / gc.maxx * (gc.rightx - gc.leftx) + gc.leftx;
+	add_gas_switch_event(current_dive, current_dc, seconds, get_gasidx(current_dive, o2, he));
+	mark_divelist_changed(TRUE);
+	plot(current_dive, TRUE);
+}
+
+void ProfileGraphicsView::hideEvents()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
+	struct event *event = item->ev;
+
+	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+				  tr("Hide events"),
+				  tr("Hide all %1 events?").arg(event->name)),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok){
+		if (event->name) {
+			for (int i = 0; i < evn_used; i++) {
+				if (! strcmp(event->name, ev_namelist[i].ev_name)) {
+					ev_namelist[i].plot_ev = false;
+					break;
+				}
+			}
+		}
+		plot(current_dive, TRUE);
+	}
+}
+
+void ProfileGraphicsView::removeEvent()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
+	struct event *event = item->ev;
+
+	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+				  tr("Remove the selected event?"),
+				  tr("%1 @ %2:%3").arg(event->name)
+				  .arg(event->time.seconds / 60)
+				  .arg(event->time.seconds % 60, 2, 10, QChar('0'))),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok){
+		struct event **ep = &current_dc->events;
+		while (ep && *ep != event)
+			ep = &(*ep)->next;
+		if (ep) {
+			*ep = event->next;
+			free(event);
+		}
+		mark_divelist_changed(TRUE);
+		plot(current_dive, TRUE);
+	}
+}
+
 
 void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
 {
@@ -118,15 +244,15 @@ void ProfileGraphicsView::mouseMoveEvent(QMouseEvent* event)
 		return;
 
 	toolTip->refresh(&gc,  mapToScene(event->pos()));
-
 	QPoint toolTipPos = mapFromScene(toolTip->pos());
-
 	scrollViewTo(event->pos());
 
 	if (zoomLevel == 0)
 		QGraphicsView::mouseMoveEvent(event);
-	else
-		toolTip->setPos(mapToScene(toolTipPos).x(), mapToScene(toolTipPos).y());
+	else{
+		toolTip->setPos(mapToScene(toolTipPos));
+		toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	}
 }
 
 bool ProfileGraphicsView::eventFilter(QObject* obj, QEvent* event)
@@ -137,10 +263,12 @@ bool ProfileGraphicsView::eventFilter(QObject* obj, QEvent* event)
 		return true;
 	}
 
-	// This will "Eat" the default tooltip behavior.
+	// This will "Eat" the default tooltip behavior if it is not on the toolBar.
 	if (event->type() == QEvent::GraphicsSceneHelp) {
-		event->ignore();
-		return true;
+		if(toolBarProxy && !toolBarProxy->geometry().contains(mapToScene(mapFromGlobal(QCursor::pos())))){
+			event->ignore();
+			return true;
+		}
 	}
 	return QGraphicsView::eventFilter(obj, event);
 }
@@ -170,6 +298,8 @@ void ProfileGraphicsView::showEvent(QShowEvent* event)
 		dive = 0;
 		plot(get_dive(selected_dive));
 	}
+	if (toolBarProxy)
+		toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
 }
 
 void ProfileGraphicsView::clear()
@@ -273,7 +403,7 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	gc.maxy = (profile_grid_area.height() - 2 * profile_grid_area.y());
 
 	/* This is per-dive-computer */
-	gc.pi = *create_plot_info(dive, dc, &gc);
+	gc.pi = *create_plot_info(dive, dc, &gc, printMode);
 
 	/* Bounding box */
 	QPen pen = defaultPen;
@@ -342,7 +472,7 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	}
 
 	if (!printMode)
-		addControlItems();
+		addControlItems(d);
 
 	if (rulerEnabled && !printMode)
 		add_ruler();
@@ -378,43 +508,62 @@ void ProfileGraphicsView::plot_depth_scale()
 	depthMarkers->setPos(depthMarkers->pos().x() - 10, 0);
 }
 
-void ProfileGraphicsView::addControlItems()
+void ProfileGraphicsView::addControlItems(struct dive *d)
 {
 	QAction *scaleAction = new QAction(QIcon(":scale"), tr("Scale"), this);
 	QAction *rulerAction = new QAction(QIcon(":ruler"), tr("Ruler"), this);
 	QToolBar *toolBar = new QToolBar("", 0);
+	rulerAction->setToolTip(tr("Measure properties of dive segments"));
+	scaleAction->setToolTip(tr("Scale your dive to screen size"));
 	toolBar->addAction(rulerAction);
 	toolBar->addAction(scaleAction);
+	toolBar->setOrientation(Qt::Vertical);
 	//make toolbar transparent
-	toolBar->setStyleSheet(QString::fromUtf8 ("background-color: rgba(255,255,255,0);"));
+	//toolBar->setStyleSheet(QString::fromUtf8 ("background-color: rgba(255,255,255,0);"));
 
 	connect(scaleAction, SIGNAL(triggered()), this, SLOT(on_scaleAction()));
 	connect(rulerAction, SIGNAL(triggered()), this, SLOT(on_rulerAction()));
-	toolBarProxy = scene()->addWidget(toolBar);
 	//Put it into the lower right corner of the profile
-	toolBarProxy->setPos(gc.maxx-toolBar->width(), gc.maxy-toolBar->height());
+
+	QString defaultDC(d->dc.model);
+	if (defaultDC == "manually added dive" || defaultDC == "planned dive") {
+		QAction *editAction = new QAction(QIcon(":edit"), tr("Edit"), this);
+		toolBar->addAction(editAction);
+		connect(editAction, SIGNAL(triggered()), mainWindow(), SLOT(editCurrentDive()));
+	}
+	toolBarProxy = scene()->addWidget(toolBar);
+	toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
+	toolBarProxy->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 }
 
 void ProfileGraphicsView::plot_pp_text()
 {
 	double pp, dpp, m;
 	int hpos;
-	static text_render_options_t tro = {PP_TEXT_SIZE, PP_LINES, LEFT, MIDDLE};
+	static text_render_options_t tro = {PP_TEXT_SIZE, PP_LINES, LEFT, -0.75};
 	QGraphicsRectItem *pressureMarkers = new QGraphicsRectItem();
 
 	setup_pp_limits(&gc);
 	pp = floor(gc.pi.maxpp * 10.0) / 10.0 + 0.2;
-	dpp = pp > 4 ? 1.0 : 0.5;
+	dpp = pp > 4 ? 0.5 : 0.25;
 	hpos = gc.pi.entry[gc.pi.nr - 1].sec;
 	QColor c = getColor(PP_LINES);
 
+	bool alt = true;
 	for (m = 0.0; m <= pp; m += dpp) {
 		QGraphicsLineItem *item = new QGraphicsLineItem(SCALEGC(0, m), SCALEGC(hpos, m));
 		QPen pen(defaultPen);
 		pen.setColor(c);
+		if ( QString::number(m).toDouble() != QString::number(m).toInt()){
+			pen.setStyle(Qt::DashLine);
+			pen.setWidthF(1.2);
+		}
 		item->setPen(pen);
 		scene()->addItem(item);
-		plot_text(&tro, QPointF(hpos, m), QString::number(m), pressureMarkers);
+		qreal textPos = hpos;
+		if (alt)
+			plot_text(&tro, QPointF(textPos, m), QString::number(m), pressureMarkers);
+		alt = !alt;
 	}
 	scene()->addItem(pressureMarkers);
 	pressureMarkers->setPos(pressureMarkers->pos().x() + 10, 0);
@@ -440,6 +589,8 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 	setup_pp_limits(&gc);
 	QColor c;
 	QPointF from, to;
+	QPointF legendPos = QPointF(scene()->sceneRect().width() * 0.4, scene()->sceneRect().height() - scene()->sceneRect().height()*0.02);
+
 	if (prefs.pp_graphs.pn2) {
 		c = getColor(PN2);
 		entry = pi->entry;
@@ -462,6 +613,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			else
 				from = QPointF(SCALEGC(entry->sec, entry->pn2));
 		}
+		createPPLegend(trUtf8("pN" UTF8_SUBSCRIPT_2),getColor(PN2), legendPos);
 	}
 
 	if (prefs.pp_graphs.phe) {
@@ -487,6 +639,7 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			else
 				from = QPointF(SCALEGC(entry->sec, entry->phe));
 		}
+		createPPLegend(trUtf8("pHe"),getColor(PHE), legendPos);
 	}
 	if (prefs.pp_graphs.po2) {
 		c = getColor(PO2);
@@ -510,6 +663,25 @@ void ProfileGraphicsView::plot_pp_gas_profile()
 			 else
 				from = QPointF(SCALEGC(entry->sec, entry->po2));
 		}
+		createPPLegend(trUtf8("pO" UTF8_SUBSCRIPT_2),getColor(PO2), legendPos);
+	}
+}
+
+void ProfileGraphicsView::createPPLegend(QString title, const QColor& c, QPointF& legendPos)
+{
+	QGraphicsRectItem *rect = new QGraphicsRectItem(0, 0, scene()->sceneRect().width() * 0.01, scene()->sceneRect().width() * 0.01);
+	rect->setBrush(QBrush(c));
+	rect->setPos(legendPos);
+	rect->setPen(QPen(QColor(Qt::transparent)));
+	QGraphicsSimpleTextItem *text = new QGraphicsSimpleTextItem(title);
+	text->setPos(legendPos.x() + rect->boundingRect().width() + 5, legendPos.y() );
+	scene()->addItem(rect);
+	scene()->addItem(text);
+	legendPos.setX(text->pos().x() + text->boundingRect().width() + 20);
+	if(printMode){
+		QFont f = text->font();
+		f.setPointSizeF( f.pointSizeF() * 0.7);
+		text->setFont(f);
 	}
 }
 
@@ -694,11 +866,9 @@ void ProfileGraphicsView::plot_single_temp_text(int sec, int mkelvin)
 void ProfileGraphicsView::plot_cylinder_pressure()
 {
 	int i;
-	int last = -1, last_index = -1;
+	int last_index = -1;
 	int lift_pen = FALSE;
 	int first_plot = TRUE;
-	int sac = 0;
-	struct plot_data *last_entry = NULL;
 
 	if (!get_cylinder_pressure_range(&gc))
 		return;
@@ -711,29 +881,13 @@ void ProfileGraphicsView::plot_cylinder_pressure()
 		mbar = GET_PRESSURE(entry);
 		if (entry->cylinderindex != last_index) {
 			lift_pen = TRUE;
-			last_entry = NULL;
 		}
 		if (!mbar) {
 			lift_pen = TRUE;
 			continue;
 		}
-		if (!last_entry) {
-			last = i;
-			last_entry = entry;
-			sac = get_local_sac(entry, gc.pi.entry + i + 1, dive);
-		} else {
-			int j;
-			sac = 0;
-			for (j = last; j < i; j++)
-				sac += get_local_sac(gc.pi.entry + j, gc.pi.entry + j + 1, dive);
-			sac /= (i - last);
-			if (entry->sec - last_entry->sec >= SAC_WINDOW) {
-				last++;
-				last_entry = gc.pi.entry + last;
-			}
-		}
 
-		QColor c = get_sac_color(sac, dive->sac);
+		QColor c = get_sac_color(entry->sac, dive->sac);
 
 		if (lift_pen) {
 			if (!first_plot && entry->cylinderindex == last_index) {
@@ -790,9 +944,9 @@ void ProfileGraphicsView::plot_events(struct divecomputer *dc)
 {
 	struct event *event = dc->events;
 
-// 	if (gc->printer) {
-// 		return;
-// 	}
+//	if (gc->printer) {
+//		return;
+//	}
 
 	while (event) {
 		plot_one_event(event);
@@ -834,21 +988,24 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	int x = SCALEXGC(ev->time.seconds);
 	int y = SCALEYGC(entry->depth);
 
-	EventItem *item = new EventItem(0, isGrayscale);
+	EventItem *item = new EventItem(ev, 0, isGrayscale);
 	item->setPos(x, y);
 	scene()->addItem(item);
 
-	/* we display the event on screen - so translate */
-	QString name = tr(ev->name);
+	/* we display the event on screen - so translate (with the correct context for events) */
+	QString name = gettextFromC::instance()->tr(ev->name);
 	if (ev->value) {
-		if (ev->name && name == "gaschange") {
+		if (ev->name && strcmp(ev->name, "gaschange") == 0) {
 			int he = get_he(&dive->cylinder[entry->cylinderindex].gasmix);
 			int o2 = get_o2(&dive->cylinder[entry->cylinderindex].gasmix);
 
 			name += ": ";
-			name += (he) ? QString("%1/%2").arg((o2 + 5) / 10).arg((he + 5) / 10)
-				  : is_air(o2, he) ? name += tr("air")
-				  : QString(tr("EAN%1")).arg((o2 + 5) / 10);
+			if (he)
+				name += QString("%1/%2").arg((o2 + 5) / 10).arg((he + 5) / 10);
+			else if(is_air(o2, he))
+				name += tr("air");
+			else
+				name += QString(tr("EAN%1")).arg((o2 + 5) / 10);
 
 		} else if (ev->name && !strcmp(ev->name, "SP change")) {
 			name += QString(":%1").arg((double) ev->value / 1000);
@@ -856,7 +1013,7 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 			name += QString(":%1").arg(ev->value);
 		}
 	} else if (ev->name && name == "SP change") {
-		name += tr("Bailing out to OC");
+		name += "\n" + tr("Bailing out to OC");
 	} else {
 		name += ev->flags == SAMPLE_FLAGS_BEGIN ? tr(" begin", "Starts with space!") :
 				ev->flags == SAMPLE_FLAGS_END ? tr(" end", "Starts with space!") : "";
@@ -1392,7 +1549,7 @@ ToolTipItem::ToolTipItem(QGraphicsItem* parent): QGraphicsPathItem(parent), back
 {
 	title = new QGraphicsSimpleTextItem(tr("Information"), this);
 	separator = new QGraphicsLineItem(this);
-	setFlags(ItemIgnoresTransformations | ItemIsMovable);
+	setFlags(ItemIgnoresTransformations | ItemIsMovable | ItemClipsChildrenToShape);
 	status = COLLAPSED;
 	updateTitlePosition();
 	setZValue(99);
@@ -1449,7 +1606,6 @@ void ToolTipItem::persistPos()
 	s.beginGroup("ProfileMap");
 	s.setValue("tooltip_position", currentPos);
 	s.endGroup();
-	s.sync();
 }
 
 void ToolTipItem::readPos()
@@ -1459,6 +1615,9 @@ void ToolTipItem::readPos()
 	QPointF value = scene()->views().at(0)->mapToScene(
 		s.value("tooltip_position").toPoint()
 	);
+	if (!scene()->sceneRect().contains(value)){
+		value = QPointF(0,0);
+	}
 	setPos(value);
 }
 
@@ -1467,38 +1626,13 @@ QColor EventItem::getColor(const color_indice_t i)
 	return profile_color[i].at((isGrayscale) ? 1 : 0);
 }
 
-EventItem::EventItem(QGraphicsItem* parent, bool grayscale): QGraphicsPolygonItem(parent)
+EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPixmapItem(parent), ev(ev), isGrayscale(grayscale)
 {
-	isGrayscale = grayscale;
-	setFlag(ItemIgnoresTransformations);
-	setFlag(ItemIsFocusable);
-	setAcceptHoverEvents(true);
-
-	QPolygonF poly;
-	poly.push_back(QPointF(-8, 16));
-	poly.push_back(QPointF(8, 16));
-	poly.push_back(QPointF(0, 0));
-	poly.push_back(QPointF(-8, 16));
-
-	QPen defaultPen ;
-	defaultPen.setJoinStyle(Qt::RoundJoin);
-	defaultPen.setCapStyle(Qt::RoundCap);
-	defaultPen.setWidth(2);
-	defaultPen.setCosmetic(true);
-
-	QPen pen = defaultPen;
-	pen.setBrush(QBrush(getColor(ALERT_BG)));
-
-	setPolygon(poly);
-	setBrush(QBrush(getColor(ALERT_BG)));
-	setPen(pen);
-
-	QGraphicsLineItem *line = new QGraphicsLineItem(0, 5, 0, 10, this);
-	line->setPen(QPen(getColor(ALERT_FG), 2));
-
-	QGraphicsEllipseItem *ball = new QGraphicsEllipseItem(-1, 12, 2, 2, this);
-	ball->setBrush(QBrush(getColor(ALERT_FG)));
-	ball->setPen(QPen(getColor(ALERT_FG)));
+	if(ev->name && strcmp(ev->name, "bookmark") == 0) {
+		setPixmap( QPixmap(QString(":flag")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	} else {
+		setPixmap( QPixmap(QString(":warning")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	}
 }
 
 RulerNodeItem::RulerNodeItem(QGraphicsItem *parent, graphics_context context) : QGraphicsEllipseItem(parent), gc(context), entry(NULL) , ruler(NULL)

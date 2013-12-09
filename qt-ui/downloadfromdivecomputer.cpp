@@ -37,7 +37,7 @@ namespace DownloadFromDcGlobal{
 
 DownloadFromDCWidget *DownloadFromDCWidget::instance()
 {
-	static DownloadFromDCWidget *dialog = new DownloadFromDCWidget();
+	static DownloadFromDCWidget *dialog = new DownloadFromDCWidget(mainWindow());
 	dialog->setAttribute(Qt::WA_QuitOnClose, false);
 	return dialog;
 }
@@ -106,6 +106,7 @@ void DownloadFromDCWidget::updateState(states state)
 		&& state == CANCELLING) {
 		timer->stop();
 		reject();
+		ui.ok->setText(tr("OK"));
 	}
 
 	// the cancelation process is finished
@@ -122,6 +123,7 @@ void DownloadFromDCWidget::updateState(states state)
 		timer->stop();
 		ui.progressBar->setValue(100);
 		markChildrenAsEnabled();
+		ui.ok->setText(tr("OK"));
 		accept();
 	}
 
@@ -135,11 +137,11 @@ void DownloadFromDCWidget::updateState(states state)
 
 	// got an error
 	else if (state == ERROR) {
-		QMessageBox::critical(this, tr("Error"), this->thread->error, QMessageBox::Ok);
+		QMessageBox::critical(this, TITLE_OR_TEXT(tr("Error"), this->thread->error), QMessageBox::Ok);
 
 		markChildrenAsEnabled();
 		ui.progressBar->hide();
-		ui.ok->setText(tr("retry"));
+		ui.ok->setText(tr("Retry"));
 	}
 
 	// properly updating the widget state
@@ -235,6 +237,9 @@ void DownloadFromDCWidget::on_ok_clicked()
 	MainWindow *w = mainWindow();
 	connect(thread, SIGNAL(finished()), w, SLOT(refreshDisplay()));
 
+	// before we start, remember where the dive_table ended
+	previousLast = dive_table.nr;
+
 	thread->start();
 }
 
@@ -260,10 +265,18 @@ void DownloadFromDCWidget::onDownloadThreadFinished()
 			updateState(ERROR);
 
 		// I'm not sure if we should really call process_dives even
-		// if there's an error or a cancelation
-		process_dives(TRUE, preferDownloaded());
-	} else
+		// if there's an error
+		if (import_thread_cancelled) {
+			// walk backwards so we don't keep moving the dives
+			// down in the dive_table
+			for (int i = dive_table.nr - 1; i >= previousLast; i--)
+				delete_single_dive(i);
+		} else {
+			process_dives(TRUE, preferDownloaded());
+		}
+	} else {
 		updateState(CANCELLED);
+	}
 }
 
 void DownloadFromDCWidget::markChildrenAsDisabled()

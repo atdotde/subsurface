@@ -6,7 +6,7 @@ INCLUDEPATH += qt-ui $$PWD
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 3.1
+VERSION = 3.9.2
 
 HEADERS = \
 	color.h \
@@ -56,7 +56,9 @@ HEADERS = \
 	subsurfacestartup.h \
 	uemis.h \
 	webservice.h \
-	qt-ui/csvimportdialog.h
+	qt-ui/csvimportdialog.h \
+	qt-ui/tagwidget.h \
+	qt-ui/groupedlineedit.h
 
 SOURCES =  \
 	deco.c \
@@ -103,7 +105,9 @@ SOURCES =  \
 	time.c \
 	uemis.c \
 	uemis-downloader.c \
-	qt-ui/csvimportdialog.cpp
+	qt-ui/csvimportdialog.cpp \
+	qt-ui/tagwidget.cpp \
+	qt-ui/groupedlineedit.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
@@ -119,9 +123,10 @@ FORMS = \
 	qt-ui/preferences.ui \
 	qt-ui/printoptions.ui \
 	qt-ui/renumber.ui \
-	qt-ui/subsurfacewebservices.ui \
+	qt-ui/shifttimes.ui \
+	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
-    qt-ui/csvimportdialog.ui
+	qt-ui/csvimportdialog.ui
 
 RESOURCES = subsurface.qrc
 
@@ -145,7 +150,11 @@ TRANSLATIONS = \
 	translations/subsurface_pt_PT.ts \
 	translations/subsurface_ru_RU.ts \
 	translations/subsurface_sk_SK.ts \
-	translations/subsurface_sv_SE.ts
+	translations/subsurface_sv_SE.ts \
+	translations/subsurface_zh_TW.ts \
+	translations/subsurface_he.ts \
+	translations/subsurface_vi.ts \
+	translations/subsurface_id.ts
 
 QTTRANSLATIONS = \
 	qt_da.qm \
@@ -167,9 +176,15 @@ mac: ICON = packaging/macosx/Subsurface.icns
 else: ICON = subsurface-icon.svg
 MANPAGE = subsurface.1
 XSLT_FILES = xslt
+ICONS_FILES = icons
 DOC_FILES = $$OUT_PWD/Documentation/user-manual.html Documentation/images
 MARBLEDIR = marbledata/maps marbledata/bitmaps
-DEPLOYMENT_PLUGIN += imageformats/qjpeg
+
+#DEPLOYMENT_PLUGIN += bearer/qnativewifibearer
+DEPLOYMENT_PLUGIN += codecs/qcncodecs codecs/qjpcodecs codecs/qkrcodecs codecs/qtwcodecs
+DEPLOYMENT_PLUGIN += imageformats/qgif imageformats/qjpeg imageformats/qsvg
+DEPLOYMENT_PLUGIN += iconengines/qsvgicon
+#DEPLOYMENT_PLUGIN += sqldrivers/qsqlite
 
 # This information will go into the Windows .rc file and linked into the .exe
 QMAKE_TARGET_COMPANY = subsurface team

@@ -24,6 +24,7 @@ int main(int argc, char **argv)
 
 	init_ui(&argc, &argv);
 	parse_xml_init();
+	taglist_init_global();
 
 	QStringList files;
 	QStringList importedFiles;
@@ -49,7 +50,8 @@ int main(int argc, char **argv)
 	parse_xml_exit();
 	mainWindow()->loadFiles(files);
 	mainWindow()->importFiles(importedFiles);
-	run_ui();
+	if (!quit)
+		run_ui();
 	exit_ui();
 	return 0;
 }

@@ -19,15 +19,18 @@ class DiveListView : public QTreeView
 	Q_OBJECT
 public:
 	DiveListView(QWidget *parent = 0);
+	~DiveListView();
 	void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
 	void currentChanged(const QModelIndex& current, const QModelIndex& previous);
 	void reload(DiveTripModel::Layout layout, bool forceSort = true);
 	bool eventFilter(QObject* , QEvent* );
 	void unselectDives();
-	void selectDive(struct dive *, bool scrollto = false, bool toggle = false);
+	void selectDive(int dive_table_idx, bool scrollto = false, bool toggle = false);
+	void selectDives(const QList<int>& newDiveSelection);
+	void rememberSelection();
+	void restoreSelection();
 	void contextMenuEvent(QContextMenuEvent *event);
-	QSet<dive_trip_t *> selectedTrips;
-
+	QList<dive_trip_t*> selectedTrips();
 public slots:
 	void toggleColumnVisibilityByIndex();
 	void reloadHeaderActions();
@@ -35,23 +38,42 @@ public slots:
 	void showSearchEdit();
 	void removeFromTrip();
 	void deleteDive();
+<<<<<<< HEAD
 	void exportTeX();
+=======
+	void markDiveInvalid();
+>>>>>>> master
 	void testSlot();
 	void fixMessyQtModelBehaviour();
 	void mergeTripAbove();
 	void mergeTripBelow();
+	void newTripAbove();
+	void addToTripAbove();
 	void mergeDives();
+	void saveSelectedDivesAs();
+	void exportSelectedDivesAsUDDF();
+	void shiftTimes();
 
 signals:
 	void currentDiveChanged(int divenr);
 
 private:
 	bool mouseClickSelection;
-	int currentHeaderClicked;
+	QList<int> expandedRows;
+	int sortColumn;
+	Qt::SortOrder currentOrder;
 	DiveTripModel::Layout currentLayout;
 	QLineEdit *searchBox;
 	QModelIndex contextMenuIndex;
+
+	/* if dive_trip_t is null, there's no problem. */
+	QMultiHash<dive_trip_t *, int> selectedDives;
 	void merge_trip(const QModelIndex &a, const int offset);
+	void setupUi();
+	void backupExpandedRows();
+	void restoreExpandedRows();
+	int lastVisibleColumn();
+	void selectTrip ( dive_trip_t* trip );
 };
 
 #endif // DIVELISTVIEW_H

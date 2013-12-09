@@ -37,7 +37,7 @@ Building the Qt version under MacOSX
 
 1)  Install Homebrew
 
-$ ruby -e "$(curl -fsSL https://raw.github.com/mxcl/homebrew/go)"
+$ ruby -e "$(curl -fsSL https://raw.github.com/mxcl/homebrew/go/install)"
 
 2) Install needed dependencies
 
@@ -53,11 +53,14 @@ $ mkdir -p ~/src/marble/build
 $ git clone -b KDE/4.11 git://anongit.kde.org/marble ~/src/marble/sources
 $ cd ~/src/marble/build
 $ cmake -DCMAKE_BUILD_TYPE=Debug -DQTONLY=TRUE -DCMAKE_INSTALL_PREFIX=/usr/local ../sources
+ - or -
+$ cmake -DCMAKE_BUILD_TYPE=Release -DQTONLY=TRUE -DCMAKE_INSTALL_PREFIX=/usr/local ../sources
 $ cd src/lib
 $ make -j4
+$ install_name_tool -id /usr/local/lib/`echo libmarblewidget.??.dylib` libmarblewidget.dylib
 $ cp *dylib /usr/local/lib/
 $ mkdir -p /usr/local/include/marble
-$ cd ../../../source/src/lib
+$ cd ../../../sources/src/lib
 $ cp $(find . -name '*.h') /usr/local/include/marble/
 
 5) Install Libdivecomputer
@@ -90,6 +93,13 @@ $ qmake
 $ make
 $ make mac-create-dmg
 
+NOTES: macdeployqt assumes that the plugins are located "next" to the
+frameworks. The frameworks are linked from /usr/local/lib - but the
+plugins are not in /usr/local/plugins.
+The easiest workaround is to create a symbolic link from
+/usr/local/plugins to /usr/local/Cellar/qt/4.8.5/plugins (or whatever
+version of Qt you have built earlier).
+
 Cross-building Subsurface on Linux for Windows
 ----------------------------------------------
 
@@ -100,21 +110,38 @@ included in the packaging/Windows directory.
 
 The best way to get libdivecomputer to build appears to be
 
-$ git clone git://libdivecomputer.git.sourceforge.net/gitroot/libdivecomputer/libdivecomputer
+$ git clone git://git.libdivecomputer.org/libdivecomputer
 $ cd libdivecomputer
 $ git checkout release-0.4
 $ mingw32-configure --disable-shared
 $ mingw32-make
 $ sudo mingw32-make install
 
+To compile Marble, use:
+
+$ mkdir -p ~/src/marble/build
+$ git clone -b v4.11.2 git://anongit.kde.org/marble ~/src/marble/sources
+$ cd ~/src/marble/build
+$ mingw32-cmake -DCMAKE_BUILD_TYPE=Debug -DQTONLY=TRUE ../sources
+ - or -
+$ mingw32-cmake -DCMAKE_BUILD_TYPE=Release -DQTONLY=TRUE ../sources
+$ mingw32-make -j4
+$ mingw32-make install
+
 To compile Subsurface, use:
 
 $ git clone git://subsurface.hohndel.org/subsurface.git
 $ cd subsurface
-$ i686-w64-mingw32-qmake-qt4
-$ make
-$ make install
-$ make create-windows-installer
+$ packaging/windows/mingw-make.sh
+$ packaging/windows/mingw-make.sh install
+$ packaging/windows/mingw-make.sh installer
+
+The last step assumes that you have a link from packaging/windows/dll to
+the correct directory in your MinGW installation. On my machine that is
+/usr/i686-w64-mingw32/sys-root/mingw/bin
+Similarly, the paths used in packaging/windows/mingw-make.sh may need to
+be adjusted according to your distributions layout
+
 
 Building Subsurface on Windows
 ------------------------------
@@ -183,7 +210,7 @@ $ cd subsurface
 $ qmake
 $ make
 $ make install
-$ make create-windows-installer
+$ make installer
 
 Build options
 -------------

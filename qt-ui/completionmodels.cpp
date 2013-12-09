@@ -1,17 +1,19 @@
 #include "completionmodels.h"
 #include "dive.h"
+#include "mainwindow.h"
 
 #define CREATE_SINGLETON(X) \
 X* X::instance() \
 { \
-	static X* self = new X(); \
-	return self; \
+	static QScopedPointer<X> self(new X()); \
+	return self.data(); \
 }
 
 CREATE_SINGLETON(BuddyCompletionModel);
 CREATE_SINGLETON(DiveMasterCompletionModel);
 CREATE_SINGLETON(LocationCompletionModel);
 CREATE_SINGLETON(SuitCompletionModel);
+CREATE_SINGLETON(TagCompletionModel);
 
 #undef CREATE_SINGLETON
 
@@ -35,3 +37,15 @@ CREATE_UPDATE_METHOD(DiveMasterCompletionModel, divemaster);
 CREATE_UPDATE_METHOD(LocationCompletionModel, location);
 CREATE_UPDATE_METHOD(SuitCompletionModel, suit);
 
+void TagCompletionModel::updateModel()
+{
+	if(g_tag_list == NULL)
+		return;
+	QStringList list;
+	struct tag_entry *current_tag_entry = g_tag_list->next;
+	while (current_tag_entry != NULL) {
+		list.append(QString(current_tag_entry->tag->name));
+		current_tag_entry = current_tag_entry->next;
+	}
+	setStringList(list);
+}

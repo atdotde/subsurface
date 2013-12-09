@@ -54,7 +54,7 @@ struct atomics_gas_info {
 #define COBALT_CFATBAR 2
 #define COBALT_WETINDL 3
 
-static void get_tanksize(device_data_t *devdata, const unsigned char *data, cylinder_t *cyl, int idx)
+static bool get_tanksize(device_data_t *devdata, const unsigned char *data, cylinder_t *cyl, int idx)
 {
 	/* I don't like this kind of match... I'd love to have an ID and
 	 * a firmware version or... something; and even better, just get
@@ -69,7 +69,7 @@ static void get_tanksize(device_data_t *devdata, const unsigned char *data, cyli
 		 * right data */
 		if (*(uint32_t *)data != 0xFFFEFFFE) {
 			printf("incorrect header for Atomics dive\n");
-			return;
+			return FALSE;
 		}
 		atomics_gas_info = (void*)(data + COBALT_HEADER);
 		switch (atomics_gas_info[idx].tankspecmethod) {
@@ -89,7 +89,9 @@ static void get_tanksize(device_data_t *devdata, const unsigned char *data, cyli
 			cyl[idx].type.size.mliter = atomics_gas_info[idx].tanksize * 100;
 			break;
 		}
+		return TRUE;
 	}
+	return FALSE;
 }
 
 static int parse_gasmixes(device_data_t *devdata, struct dive *dive, dc_parser_t *parser, int ngases,
@@ -121,7 +123,8 @@ static int parse_gasmixes(device_data_t *devdata, struct dive *dive, dc_parser_t
 		dive->cylinder[i].gasmix.o2.permille = o2;
 		dive->cylinder[i].gasmix.he.permille = he;
 
-		get_tanksize(devdata, data, dive->cylinder, i);
+		if (!get_tanksize(devdata, data, dive->cylinder, i))
+			fill_default_cylinder(&dive->cylinder[i]);
 	}
 	return DC_STATUS_SUCCESS;
 }
@@ -135,7 +138,7 @@ static void handle_event(struct divecomputer *dc, struct sample *sample, dc_samp
 		QT_TRANSLATE_NOOP("gettextFromC","none"), QT_TRANSLATE_NOOP("gettextFromC","deco stop"), QT_TRANSLATE_NOOP("gettextFromC","rbt"), QT_TRANSLATE_NOOP("gettextFromC","ascent"), QT_TRANSLATE_NOOP("gettextFromC","ceiling"), QT_TRANSLATE_NOOP("gettextFromC","workload"),
 		QT_TRANSLATE_NOOP("gettextFromC","transmitter"), QT_TRANSLATE_NOOP("gettextFromC","violation"), QT_TRANSLATE_NOOP("gettextFromC","bookmark"), QT_TRANSLATE_NOOP("gettextFromC","surface"), QT_TRANSLATE_NOOP("gettextFromC","safety stop"),
 		QT_TRANSLATE_NOOP("gettextFromC","gaschange"), QT_TRANSLATE_NOOP("gettextFromC","safety stop (voluntary)"), QT_TRANSLATE_NOOP("gettextFromC","safety stop (mandatory)"),
-		QT_TRANSLATE_NOOP("gettextFromC","deepstop"), QT_TRANSLATE_NOOP("gettextFromC","ceiling (safety stop)"), QT_TRANSLATE_NOOP("gettextFromC","below floor"), QT_TRANSLATE_NOOP("gettextFromC","divetime"),
+		QT_TRANSLATE_NOOP("gettextFromC","deepstop"), QT_TRANSLATE_NOOP("gettextFromC","ceiling (safety stop)"), QT_TRANSLATE_NOOP3("gettextFromC","below floor","event showing dive is below deco floor and adding deco time"), QT_TRANSLATE_NOOP("gettextFromC","divetime"),
 		QT_TRANSLATE_NOOP("gettextFromC","maxdepth"), QT_TRANSLATE_NOOP("gettextFromC","OLF"), QT_TRANSLATE_NOOP("gettextFromC","PO2"), QT_TRANSLATE_NOOP("gettextFromC","airtime"), QT_TRANSLATE_NOOP("gettextFromC","rgbm"), QT_TRANSLATE_NOOP("gettextFromC","heading"),
 		QT_TRANSLATE_NOOP("gettextFromC","tissue level warning"), QT_TRANSLATE_NOOP("gettextFromC","gaschange"), QT_TRANSLATE_NOOP("gettextFromC","non stop time")
 	};
@@ -200,7 +203,7 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 		sample->cylinderpressure.mbar = value.pressure.value * 1000 + 0.5;
 		break;
 	case DC_SAMPLE_TEMPERATURE:
-		sample->temperature.mkelvin = value.temperature * 1000 + ZERO_C_IN_MKELVIN + 0.5;
+		sample->temperature.mkelvin = C_to_mkelvin(value.temperature);
 		break;
 	case DC_SAMPLE_EVENT:
 		handle_event(dc, sample, value);
@@ -221,7 +224,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			printf("%02X", ((unsigned char *) value.vendor.data)[i]);
 		printf("</vendor>\n");
 		break;
-#if DC_VERSION_CHECK(0, 3, 0)
 	case DC_SAMPLE_SETPOINT:
 		/* for us a setpoint means constant pO2 from here */
 		sample->po2 = po2 = value.setpoint * 1000 + 0.5;
@@ -248,7 +250,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
 			sample->stoptime.seconds = stoptime = value.deco.time;
 		}
-#endif
 	default:
 		break;
 	}
@@ -449,7 +450,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 
-#if DC_VERSION_CHECK(0, 3, 0)
 	// Check if the libdivecomputer version already supports salinity & atmospheric
 	dc_salinity_t salinity = {
 		.type = DC_WATER_SALT,
@@ -471,7 +471,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 	dive->dc.surface_pressure.mbar = surface_pressure * 1000.0 + 0.5;
-#endif
 
 	rc = parse_gasmixes(devdata, dive, parser, ngases, data);
 	if (rc != DC_STATUS_SUCCESS) {

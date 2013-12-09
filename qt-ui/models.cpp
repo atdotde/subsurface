@@ -5,18 +5,24 @@
  *
  */
 #include "models.h"
+#include "diveplanner.h"
+#include "mainwindow.h"
 #include "../helpers.h"
 #include "../dive.h"
 #include "../device.h"
 #include "../statistics.h"
 #include "../qthelper.h"
+#include "../gettextfromc.h"
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QSettings>
 #include <QColor>
 #include <QBrush>
 #include <QFont>
 #include <QIcon>
+#include <QMessageBox>
 
 QFont defaultModelFont()
 {
@@ -58,8 +64,14 @@ void CleanerTableModel::setHeaderDataStrings(const QStringList& newHeaders)
 
 CylindersModel::CylindersModel(QObject* parent): current(0), rows(0)
 {
-	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE,};
-	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  tr("O2%") << tr("HE"));
+	//	enum{REMOVE, TYPE, SIZE, WORKINGPRESS, START, END, O2, HE, DEPTH};
+	setHeaderDataStrings( QStringList() <<  "" << tr("Type") << tr("Size") << tr("WorkPress") << tr("StartPress") << tr("EndPress") <<  trUtf8("O" UTF8_SUBSCRIPT_2 "%") << tr("He%") << tr("Switch at"));
+}
+
+CylindersModel *CylindersModel::instance()
+{
+	static QScopedPointer<CylindersModel> self(new CylindersModel());
+	return self.data();
 }
 
 static QVariant percent_string(fraction_t fraction)
@@ -83,21 +95,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 	case Qt::FontRole: {
 		QFont font = defaultModelFont();
 		switch (index.column()) {
-		case START:
-			if (!cyl->start.mbar)
-				font.setItalic(true);
-			break;
-		case END:
-			if (!cyl->end.mbar)
-				font.setItalic(true);
-			break;
+		case START: font.setItalic(!cyl->start.mbar); break;
+		case END: font.setItalic(!cyl->end.mbar); break;
 		}
 		ret = font;
 		break;
 	}
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignHCenter;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
@@ -108,16 +114,7 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			// we can't use get_volume_string because the idiotic imperial tank
 			// sizes take working pressure into account...
 			if (cyl->type.size.mliter) {
-				double volume;
-				int mbar = cyl->type.workingpressure.mbar;
-
-				if (mbar && prefs.units.volume == prefs.units.CUFT) {
-					volume = ml_to_cuft(cyl->type.size.mliter);
-					volume *= bar_to_atm(mbar / 1000.0);
-				} else {
-					volume = cyl->type.size.mliter / 1000.0;
-				}
-				ret = QString("%1").arg(volume, 0, 'f', 1);
+				ret = get_volume_string(cyl->type.size, TRUE);
 			}
 			break;
 		case WORKINGPRESS:
@@ -126,15 +123,15 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			break;
 		case START:
 			if (cyl->start.mbar)
-				ret = get_pressure_string(cyl->start, FALSE);
+				ret = get_pressure_string(cyl->start, TRUE);
 			else if (cyl->sample_start.mbar)
-				ret = get_pressure_string(cyl->sample_start, FALSE);
+				ret = get_pressure_string(cyl->sample_start, TRUE);
 			break;
 		case END:
 			if (cyl->end.mbar)
-				ret = get_pressure_string(cyl->end, FALSE);
+				ret = get_pressure_string(cyl->end, TRUE);
 			else if (cyl->sample_end.mbar)
-				ret = get_pressure_string(cyl->sample_end, FALSE);
+				ret = get_pressure_string(cyl->sample_end, TRUE);
 			break;
 		case O2:
 			ret = percent_string(cyl->gasmix.o2);
@@ -142,11 +139,19 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 		case HE:
 			ret = percent_string(cyl->gasmix.he);
 			break;
+		case DEPTH:
+			ret = get_depth_string(cyl->depth, TRUE);
+			break;
 		}
 		break;
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this cylinder.");
 		break;
 	}
 
@@ -163,7 +168,7 @@ cylinder_t* CylindersModel::cylinderAt(const QModelIndex& index)
 // so we only implement the two columns we care about
 void CylindersModel::passInData(const QModelIndex& index, const QVariant& value)
 {
-	cylinder_t *cyl = &current->cylinder[index.row()];
+	cylinder_t *cyl = cylinderAt(index);
 	switch(index.column()) {
 	case SIZE:
 		if (cyl->type.size.mliter != value.toInt()) {
@@ -180,11 +185,17 @@ void CylindersModel::passInData(const QModelIndex& index, const QVariant& value)
 	}
 }
 
-#define CHANGED(_t,_u1,_u2) value._t() != data(index, role).toString().remove(_u1).remove(_u2)._t()
+#define CHANGED(_t,_u1,_u2) \
+	value.toString().remove(_u1).remove(_u2)._t() !=  \
+	data(index, role).toString().remove(_u1).remove(_u2)._t()
 
 bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-	cylinder_t *cyl = &current->cylinder[index.row()];
+	bool addDiveMode = DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING;
+	if (addDiveMode)
+		DivePlannerPointsModel::instance()->rememberTanks();
+
+	cylinder_t *cyl = cylinderAt(index);
 	switch(index.column()) {
 	case TYPE:
 		if (!value.isNull()) {
@@ -263,24 +274,41 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 		break;
 	case O2:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.o2.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int o2 = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.he.permille + o2 <= 1000) {
+				cyl->gasmix.o2.permille = o2;
+				changed = true;
+			}
 		}
 		break;
 	case HE:
 		if (CHANGED(toDouble, "%", "%")) {
-			cyl->gasmix.he.permille = value.toString().remove('%').toDouble() * 10 + 0.5;
-			changed = true;
+			int he = value.toString().remove('%').toDouble() * 10 + 0.5;
+			if (cyl->gasmix.o2.permille + he <= 1000) {
+				cyl->gasmix.he.permille = he;
+				changed = true;
+			}
 		}
 		break;
+	case DEPTH:
+		if (CHANGED(toDouble, "ft", "m")) {
+			if (value.toInt() != 0) {
+				if (prefs.units.length == prefs.units.FEET)
+					cyl->depth.mm = feet_to_mm(value.toString().remove("ft").remove("m").toInt());
+				else
+					cyl->depth.mm = value.toString().remove("ft").remove("m").toInt() * 1000;
+			}
+		}
 	}
 	dataChanged(index, index);
+	if (addDiveMode)
+		DivePlannerPointsModel::instance()->tanksUpdated();
 	return true;
 }
 
 int CylindersModel::rowCount(const QModelIndex& parent) const
 {
-	return 	rows;
+	return	rows;
 }
 
 void CylindersModel::add()
@@ -290,7 +318,7 @@ void CylindersModel::add()
 	}
 
 	int row = rows;
-
+	fill_default_cylinder(&current->cylinder[row]);
 	beginInsertRows(QModelIndex(), row, row);
 	rows++;
 	changed = true;
@@ -314,20 +342,18 @@ void CylindersModel::setDive(dive* d)
 {
 	if (current)
 		clear();
-
-	int amount = MAX_CYLINDERS;
+	if (!d)
+		return;
+	rows = 0;
 	for(int i = 0; i < MAX_CYLINDERS; i++) {
-		cylinder_t *cylinder = &d->cylinder[i];
-		if (cylinder_none(cylinder)) {
-			amount = i;
-			break;
+		if (!cylinder_none(&d->cylinder[i])) {
+			rows = i+1;
 		}
 	}
-	rows = amount;
 	current = d;
 	changed = false;
-	if (amount > 0) {
-		beginInsertRows(QModelIndex(), 0, amount - 1);
+	if (rows > 0) {
+		beginInsertRows(QModelIndex(), 0, rows-1);
 		endInsertRows();
 	}
 }
@@ -342,6 +368,14 @@ Qt::ItemFlags CylindersModel::flags(const QModelIndex& index) const
 void CylindersModel::remove(const QModelIndex& index)
 {
 	if (index.column() != REMOVE) {
+		return;
+	}
+	cylinder_t *cyl = &current->cylinder[index.row()];
+	if (DivePlannerPointsModel::instance()->tankInUse(cyl->gasmix.o2.permille, cyl->gasmix.he.permille)) {
+		QMessageBox::warning(mainWindow(), TITLE_OR_TEXT(
+				tr("Cylinder cannot be removed"),
+				tr("This gas in use. Only cylinders that are not used in the dive can be removed.")),
+				QMessageBox::Ok);
 		return;
 	}
 	beginRemoveRows(QModelIndex(), index.row(), index.row()); // yah, know, ugly.
@@ -395,13 +429,13 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 		ret = defaultModelFont();
 		break;
 	case Qt::TextAlignmentRole:
-		ret = Qt::AlignRight;
-		break;
+		ret = Qt::AlignCenter;
+	break;
 	case Qt::DisplayRole:
 	case Qt::EditRole:
 		switch(index.column()) {
 		case TYPE:
-			ret = QString(ws->description);
+			ret = gettextFromC::instance()->tr(ws->description);
 			break;
 		case WEIGHT:
 			ret = get_weight_string(ws->weight, TRUE);
@@ -411,6 +445,10 @@ QVariant WeightModel::data(const QModelIndex& index, int role) const
 	case Qt::DecorationRole:
 		if (index.column() == REMOVE)
 			ret = QIcon(":trash");
+		break;
+	case Qt::ToolTipRole:
+		if (index.column() == REMOVE)
+			ret = tr("Clicking here will remove this weigthsystem.");
 		break;
 	}
 	return ret;
@@ -436,10 +474,17 @@ bool WeightModel::setData(const QModelIndex& index, const QVariant& value, int r
 	switch(index.column()) {
 	case TYPE:
 		if (!value.isNull()) {
-			QByteArray ba = value.toString().toUtf8();
-			const char *text = ba.constData();
-			if (!ws->description || strcmp(ws->description, text)) {
-				ws->description = strdup(text);
+			if (!ws->description || gettextFromC::instance()->tr(ws->description) != value.toString()) {
+				// loop over translations to see if one matches
+				int i = -1;
+				while(ws_info[++i].name) {
+					if (gettextFromC::instance()->tr(ws_info[i].name) == value.toString()) {
+						ws->description = ws_info[i].name;
+						break;
+					}
+				}
+				if (ws_info[i].name == NULL) // didn't find a match
+					ws->description = strdup(value.toString().toUtf8().constData());
 				changed = true;
 			}
 		}
@@ -453,7 +498,7 @@ bool WeightModel::setData(const QModelIndex& index, const QVariant& value, int r
 			// now update the ws_info
 			changed = true;
 			WSInfoModel *wsim = WSInfoModel::instance();
-			QModelIndexList matches = wsim->match(wsim->index(0,0), Qt::DisplayRole, ws->description);
+			QModelIndexList matches = wsim->match(wsim->index(0,0), Qt::DisplayRole, gettextFromC::instance()->tr(ws->description));
 			if (!matches.isEmpty())
 				wsim->setData(wsim->index(matches.first().row(), WSInfoModel::GR), ws->weight.grams);
 		}
@@ -496,28 +541,24 @@ void WeightModel::setDive(dive* d)
 {
 	if (current)
 		clear();
-
-	int amount = MAX_WEIGHTSYSTEMS;
+	rows = 0;
 	for(int i = 0; i < MAX_WEIGHTSYSTEMS; i++) {
-		weightsystem_t *weightsystem = &d->weightsystem[i];
-		if (weightsystem_none(weightsystem)) {
-			amount = i;
-			break;
+		if (!weightsystem_none(&d->weightsystem[i])) {
+			rows = i+1;
 		}
 	}
-	rows = amount;
 	current = d;
 	changed = false;
-	if (amount > 0) {
-		beginInsertRows(QModelIndex(), 0, amount - 1);
+	if (rows > 0) {
+		beginInsertRows(QModelIndex(), 0, rows-1);
 		endInsertRows();
 	}
 }
 
 WSInfoModel* WSInfoModel::instance()
 {
-	static WSInfoModel *self = new WSInfoModel();
-	return self;
+	static QScopedPointer<WSInfoModel> self(new WSInfoModel());
+	return self.data();
 }
 
 bool WSInfoModel::insertRows(int row, int count, const QModelIndex& parent)
@@ -567,7 +608,7 @@ QVariant WSInfoModel::data(const QModelIndex& index, int role) const
 					ret = gr;
 					break;
 				case DESCRIPTION:
-					ret = QString(info->name);
+					ret = gettextFromC::instance()->tr(info->name);
 					break;
 			}
 			break;
@@ -590,7 +631,7 @@ WSInfoModel::WSInfoModel() : rows(-1)
 	setHeaderDataStrings( QStringList() << tr("Description") << tr("kg"));
 	struct ws_info_t *info = ws_info;
 	for (info = ws_info; info->name; info++, rows++){
-		QString wsInfoName(info->name);
+		QString wsInfoName = gettextFromC::instance()->tr(info->name);
 		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
 	}
@@ -608,7 +649,7 @@ void WSInfoModel::updateInfo()
 	endRemoveRows();
 	rows = -1;
 	for (info = ws_info; info->name; info++, rows++){
-		QString wsInfoName(info->name);
+		QString wsInfoName = gettextFromC::instance()->tr(info->name);
 		if( wsInfoName.count() > biggerEntry.count())
 			biggerEntry = wsInfoName;
 	}
@@ -637,8 +678,8 @@ void WSInfoModel::update()
 
 TankInfoModel* TankInfoModel::instance()
 {
-	static TankInfoModel *self = new TankInfoModel();
-	return self;
+	static QScopedPointer<TankInfoModel> self(new TankInfoModel());
+	return self.data();
 }
 
 const QString& TankInfoModel::biggerString() const
@@ -715,10 +756,10 @@ int TankInfoModel::rowCount(const QModelIndex& parent) const
 
 TankInfoModel::TankInfoModel() :  rows(-1)
 {
-	setHeaderDataStrings( QStringList() << tr("Description") << tr("Ml") << tr("Bar"));
+	setHeaderDataStrings( QStringList() << tr("Description") << tr("ml") << tr("bar"));
 	struct tank_info_t *info = tank_info;
 	for (info = tank_info; info->name; info++, rows++){
-		QString infoName(info->name);
+		QString infoName = gettextFromC::instance()->tr(info->name);
 		if (infoName.count() > biggerEntry.count())
 			biggerEntry = infoName;
 	}
@@ -769,6 +810,11 @@ TreeItem::~TreeItem()
 	qDeleteAll(children);
 }
 
+Qt::ItemFlags TreeItem::flags(const QModelIndex& index) const
+{
+	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+}
+
 int TreeItem::row() const
 {
 	if (parent)
@@ -803,6 +849,11 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
 		return defaultModelFont();
 	else
 		return val;
+}
+
+bool TreeItem::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	return false;
 }
 
 QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent)
@@ -873,7 +924,10 @@ QVariant TripItem::data(int column, int role) const
 	if (role == Qt::DisplayRole) {
 		switch (column) {
 			case DiveTripModel::NR:
-			ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			if (trip->location && *trip->location)
+				ret = QString(trip->location) + ", " + get_trip_date_string(trip->when, trip->nrdives);
+			else
+				ret = get_trip_date_string(trip->when, trip->nrdives);
 			break;
 		}
 	}
@@ -948,7 +1002,41 @@ QVariant DiveItem::data(int column, int role) const
 	if (role == DiveTripModel::DIVE_ROLE)
 		retVal = QVariant::fromValue<void*>(dive);
 
+	if(role == DiveTripModel::DIVE_IDX){
+		retVal = get_divenr(dive);
+	}
 	return retVal;
+}
+
+Qt::ItemFlags DiveItem::flags(const QModelIndex& index) const
+{
+	if(index.column() == NR){
+		return TreeItem::flags(index) | Qt::ItemIsEditable;
+	}
+	return TreeItem::flags(index);
+}
+
+bool DiveItem::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	if (role != Qt::EditRole)
+		return false;
+	if (index.column() != NR)
+		return false;
+
+	int v = value.toInt();
+	if (v == 0)
+		return false;
+
+	int i;
+	struct dive *d;
+	for_each_dive(i, d){
+		if (d->number == v)
+			return false;
+	}
+
+	dive->number = value.toInt();
+	mark_divelist_changed(TRUE);
+	return true;
 }
 
 QString DiveItem::displayDate() const
@@ -1031,7 +1119,8 @@ Qt::ItemFlags DiveTripModel::flags(const QModelIndex& index) const
 	if (!index.isValid())
 		return 0;
 
-	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+	TripItem *item = static_cast<TripItem*>(index.internalPointer());
+	return item->flags(index);
 }
 
 QVariant DiveTripModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -1046,19 +1135,19 @@ QVariant DiveTripModel::headerData(int section, Qt::Orientation orientation, int
 		case Qt::DisplayRole :
 			switch (section) {
 			case NR:		ret = tr("#"); break;
-			case DATE:		ret = tr("Date"); break;
+			case DATE:		ret = tr("date"); break;
 			case RATING:	ret = UTF8_BLACKSTAR; break;
 			case DEPTH:		ret = (get_units()->length == units::METERS) ? tr("m") : tr("ft"); break;
 			case DURATION:	ret = tr("min"); break;
 			case TEMPERATURE:ret = QString("%1%2").arg(UTF8_DEGREE).arg((get_units()->temperature == units::CELSIUS) ? "C" : "F"); break;
 			case TOTALWEIGHT:ret = (get_units()->weight == units::KG) ? tr("kg") : tr("lbs"); break;
-			case SUIT:		ret = tr("Suit"); break;
-			case CYLINDER:	ret = tr("Cyl"); break;
+			case SUIT:		ret = tr("suit"); break;
+			case CYLINDER:	ret = tr("cyl"); break;
 			case NITROX:	ret = QString("O%1%").arg(UTF8_SUBSCRIPT_2); break;
 			case SAC:		ret = tr("SAC"); break;
 			case OTU:		ret = tr("OTU"); break;
 			case MAXCNS:	ret = tr("maxCNS"); break;
-			case LOCATION:	ret = tr("Location"); break;
+			case LOCATION:	ret = tr("location"); break;
 			}break;
 	}
 
@@ -1123,6 +1212,15 @@ void DiveTripModel::setLayout(DiveTripModel::Layout layout)
 	setupModelData();
 }
 
+bool DiveTripModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+	TreeItem* item = static_cast<TreeItem*>(index.internalPointer());
+	DiveItem *diveItem = dynamic_cast<DiveItem*>(item);
+	if(!diveItem)
+		return false;
+	return diveItem->setData(index, value, role);}
+
+
 /*####################################################################
  *
  * Dive Computer Model
@@ -1151,8 +1249,11 @@ QVariant DiveComputerModel::data(const QModelIndex& index, int role) const
 		}
 	}
 
-	if (role ==  Qt::DecorationRole && index.column() == REMOVE){
-		ret = QIcon(":trash");
+	if (index.column() == REMOVE){
+		switch(role){
+			case Qt::DecorationRole : ret = QIcon(":trash"); break;
+			case Qt::ToolTipRole : ret = tr("Clicking here will remove this divecomputer."); break;
+		}
 	}
 	return ret;
 }
@@ -1254,7 +1355,13 @@ QVariant YearStatisticsItem::data(int column, int role) const
 		return ret;
 	}
 	switch(column) {
-	case YEAR:		ret =  stats_interval.period; break;
+	case YEAR:
+		if (stats_interval.is_trip) {
+			ret = stats_interval.location;
+		} else {
+			ret =  stats_interval.period;
+		}
+		break;
 	case DIVES:		ret =  stats_interval.selection_size; break;
 	case TOTAL_TIME:	ret = get_time_string(stats_interval.total_time.seconds, 0); break;
 	case AVERAGE_TIME:	ret = get_minutes(stats_interval.total_time.seconds / stats_interval.selection_size); break;
@@ -1299,7 +1406,7 @@ QVariant YearlyStatisticsModel::headerData(int section, Qt::Orientation orientat
 
 	if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
 		switch(section) {
-		case YEAR:		val = tr("Year \n > Month"); break;
+		case YEAR:		val = tr("Year \n > Month / Trip"); break;
 		case DIVES:		val = tr("#"); break;
 		case TOTAL_TIME:	val = tr("Duration \n Total"); break;
 		case AVERAGE_TIME:	val = tr("\nAverage"); break;
@@ -1333,6 +1440,18 @@ void YearlyStatisticsModel::update_yearly_stats()
 			item->children.append(iChild);
 			iChild->parent = item;
 			month++;
+		}
+		rootItem->children.append(item);
+		item->parent = rootItem;
+	}
+
+
+	if (stats_by_trip != NULL && stats_by_trip[0].is_trip == TRUE) {
+		YearStatisticsItem *item = new YearStatisticsItem(stats_by_trip[0]);
+		for (i = 1; stats_by_trip != NULL && stats_by_trip[i].is_trip; ++i) {
+			YearStatisticsItem *iChild = new YearStatisticsItem(stats_by_trip[i]);
+			item->children.append(iChild);
+			iChild->parent = item;
 		}
 		rootItem->children.append(item);
 		item->parent = rootItem;
@@ -1407,7 +1526,23 @@ bool TablePrintModel::setData(const QModelIndex &index, const QVariant &value, i
 			case 3: list.at(index.row())->duration = value.toString();
 			case 4: list.at(index.row())->divemaster = value.toString();
 			case 5: list.at(index.row())->buddy = value.toString();
-			case 6: list.at(index.row())->location = value.toString();
+			case 6: {
+				/* truncate if there are more than N lines of text,
+				 * we don't want a row to be larger that a single page! */
+				QString s = value.toString();
+				const int maxLines = 15;
+				int count = 0;
+				for (int i = 0; i < s.length(); i++) {
+					if (s.at(i) != QChar('\n'))
+						continue;
+					count++;
+					if (count > maxLines) {
+						s = s.left(i - 1);
+						break;
+					}
+				}
+				list.at(index.row())->location = s;
+			}
 			}
 			return true;
 		}
@@ -1442,28 +1577,6 @@ ProfilePrintModel::ProfilePrintModel(QObject *parent)
 {
 }
 
-/* this is just a helper function to truncate C strings near 'maxlen' characters
- * by finding word bounderies and adding '...' at the end of the truncated string.
- * not really optimal for all languages!
- */
-QString ProfilePrintModel::truncateString(char *str, const int maxlen) const
-{
-	if (!str)
-		return QString("");
-	QString trunc = QString(str);
-	const int len = trunc.length();
-	for (int i = 0; i < len; i++) {
-		char c = trunc.at(i).toAscii();
-		if (c == ' ' || c == '\n' || c == '\t') {
-			if (i > maxlen) {
-				trunc = trunc.left(i) + QString("...");
-				break;
-			}
-		}
-	}
-	return trunc;
-}
-
 void ProfilePrintModel::setDive(struct dive *divePtr)
 {
 	dive = divePtr;
@@ -1472,12 +1585,12 @@ void ProfilePrintModel::setDive(struct dive *divePtr)
 
 int ProfilePrintModel::rowCount(const QModelIndex &parent) const
 {
-	return 11;
+	return 12;
 }
 
 int ProfilePrintModel::columnCount(const QModelIndex &parent) const
 {
-	return 7;
+	return 5;
 }
 
 QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
@@ -1488,8 +1601,7 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 	switch (role) {
 	case Qt::DisplayRole: {
 		struct DiveItem di;
-		di.dive = dive;;
-		char buf[80];
+		di.dive = dive;
 
 		const QString unknown = tr("unknown");
 
@@ -1497,91 +1609,87 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 		if (row == 0) {
 			if (col == 0)
 				return tr("Dive #%1 - %2").arg(dive->number).arg(di.displayDate());
-			if (col == 5) {
+			if (col == 4) {
 				QString unit = (get_units()->length == units::METERS) ? "m" : "ft";
 				return tr("Max depth: %1 %2").arg(di.displayDepth()).arg(unit);
 			}
 		}
 		if (row == 1) {
 			if (col == 0)
-				return truncateString(dive->location, 32);
-			if (col == 5)
+				return QString(dive->location);
+			if (col == 4)
 				return QString(tr("Duration: %1 min")).arg(di.displayDuration());
 		}
-		// cylinder headings
+		// headings
 		if (row == 2) {
 			if (col == 0)
-				return tr("Cylinder");
-			if (col == 1)
-				return tr("Gasmix");
+				return tr("Gas Used:");
 			if (col == 2)
-				return tr("Gas Used");
+				return tr("SAC:");
+			if (col == 3)
+				return tr("Max. CNS:");
+			if (col == 4)
+				return tr("Weights:");
 		}
-		// cylinder data
-		if (row > 2 && row < 10 && row - 3 < MAX_CYLINDERS) {
-			cylinder_t *cyl = &dive->cylinder[row - 3];
-			if (cyl->type.description) { // how do we check if a cylinder is added?
-				if (col == 0) {
-					if (cyl->type.description[0] != '\0')
-						return QString(cyl->type.description);
-					return unknown;
-				}
-				if (col == 1) {
-					get_gas_string(cyl->gasmix.o2.permille, cyl->gasmix.he.permille, buf, sizeof(buf));
-					return QString(buf);
-				}
-				if (col == 2) {
-					return get_cylinder_used_gas_string(cyl, true);
-				}
-			}
-		}
-		// dive notes
-		if (row == 10 && col == 0)
-			return truncateString(dive->notes, 640);
-		// sac, cns, otu - headings
-		if (col == 3) {
-			if (row == 2)
-				return tr("SAC");
-			if (row == 4)
-				return tr("Max. CNS");
+		// notes
+		if (col == 0) {
 			if (row == 6)
-				return tr("OTU");
+				return tr("Notes:");
+			if (row == 7)
+				return QString(dive->notes);
 		}
-		// sac, cns, otu - data
-		if (col == 4) {
-			if (row == 2)
+		// more headings
+		if (row == 4) {
+			if (col == 0)
+				return tr("Divemaster:");
+			if (col == 1)
+				return tr("Buddy:");
+			if (col == 2)
+				return tr("Suit:");
+			if (col == 3)
+				return tr("Viz:");
+			if (col == 4)
+				return tr("Rating:");
+		}
+		// values for gas, sac, etc...
+		if (row == 3) {
+			if (col == 0) {
+				int added = 0;
+				const char *desc;
+				QString gases;
+				for (int i = 0; i < MAX_CYLINDERS; i++) {
+					desc = dive->cylinder[i].type.description;
+					// if has a description and if such gas is not already present
+					if (desc && gases.indexOf(QString(desc)) == -1) {
+						if (added > 0)
+							gases += QString(" / ");
+						gases += QString(desc);
+						added++;
+					}
+				}
+				return gases;
+			}
+			if (col == 2)
 				return di.displaySac();
-			if (row == 4)
+			if (col == 3)
 				return QString::number(dive->maxcns);
-			if (row == 6)
-				return QString::number(dive->otu);
-		}
-		// weights heading
-		if (row == 2 && col == 5)
-			return tr("Weights");
-		// total weight
-		if (row == 9) {
-			weight_t tw = { total_weight(dive) };
-			if (tw.grams) {
-				if (col == 5)
-					return tr("Total weight");
-				if (col == 6)
-					return get_weight_string(tw, true);
+			if (col == 4) {
+				weight_t tw = { total_weight(dive) };
+				return get_weight_string(tw, true);
 			}
 		}
-		// weight data
-		if (row > 2 && row < 10 && row - 3 < MAX_WEIGHTSYSTEMS) {
-			weightsystem_t *ws = &dive->weightsystem[row - 3];
-			if (ws->weight.grams) {
-				if (col == 5) {
-					if (ws->description && ws->description[0] != '\0')
-						return QString(ws->description);
-					return unknown;
-				}
-				if (col == 6) {
-					return get_weight_string(ws->weight, true);
-				}
-			}
+		// values for DM, buddy, suit, etc...
+		if (row == 5) {
+			if (col == 0)
+				return QString(dive->divemaster);
+			if (col == 1)
+				return QString(dive->buddy);
+			if (col == 2)
+				return QString(dive->suit);
+			if (col == 3)
+				return (dive->visibility) ? QString::number(dive->visibility).append(" / 5") : QString();
+			if (col == 4)
+				return (dive->rating) ? QString::number(dive->rating).append(" / 5") : QString();
 		}
 		return QString();
 	}
@@ -1594,35 +1702,86 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 			font.setPixelSize(baseSize + 1);
 			return QVariant::fromValue(font);
 		}
-		// dive location
-		if (row == 1 && col == 0) {
-			font.setPixelSize(baseSize);
-			font.setBold(true);
-			return QVariant::fromValue(font);
-		}
-		// depth/duration
-		if ((row == 0 || row == 1) && col == 5) {
-			font.setPixelSize(baseSize);
-			return QVariant::fromValue(font);
-		}
-		// notes
-		if (row == 9 && col == 0) {
-			font.setPixelSize(baseSize + 1);
-			return QVariant::fromValue(font);
-		}
 		font.setPixelSize(baseSize);
 		return QVariant::fromValue(font);
 	}
 	case Qt::TextAlignmentRole: {
-		unsigned int align = Qt::AlignCenter;
-		// dive #, location, notes
-		if ((row < 2 || row == 10) && col == 0)
-			align = Qt::AlignLeft | Qt::AlignVCenter;
-		// depth, duration
-		if (row < 2 && col == 5)
+		// everything is aligned to the left
+		unsigned int align = Qt::AlignLeft;
+		// align depth and duration right
+		if (row < 2 && col == 4)
 			align = Qt::AlignRight | Qt::AlignVCenter;
 		return QVariant::fromValue(align);
 	}
 	} // switch (role)
 	return QVariant();
+}
+
+Qt::ItemFlags GasSelectionModel::flags(const QModelIndex& index) const
+{
+	return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+}
+
+GasSelectionModel* GasSelectionModel::instance()
+{
+	static QScopedPointer<GasSelectionModel> self(new GasSelectionModel());
+	return self.data();
+}
+
+void GasSelectionModel::repopulate()
+{
+	setStringList(DivePlannerPointsModel::instance()->getGasList());
+}
+
+QVariant GasSelectionModel::data(const QModelIndex& index, int role) const
+{
+	if(role == Qt::FontRole){
+		return defaultModelFont();
+	}
+	return QStringListModel::data(index, role);
+}
+
+// Language Model, The Model to populate the list of possible Languages.
+
+LanguageModel* LanguageModel::instance()
+{
+	static LanguageModel *self = new LanguageModel();
+	QLocale l;
+	return self;
+}
+
+LanguageModel::LanguageModel(QObject* parent): QAbstractListModel(parent)
+{
+	QSettings s;
+	QDir d(getSubsurfaceDataPath("translations"));
+	QStringList result = d.entryList();
+	Q_FOREACH(const QString& s, result){
+		if ( s.startsWith("subsurface_") && s.endsWith(".qm") ){
+			languages.push_back( (s == "subsurface_source.qm") ? "English" : s);
+		}
+	}
+}
+
+QVariant LanguageModel::data(const QModelIndex& index, int role) const
+{
+	QLocale loc;
+	QString currentString = languages.at(index.row());
+	if(!index.isValid())
+		return QVariant();
+	switch(role){
+		case Qt::DisplayRole:{
+			QLocale l( currentString.remove("subsurface_"));
+			return currentString == "English" ? currentString : QString("%1 (%2)").arg(l.languageToString(l.language())).arg(l.countryToString(l.country()));
+		}break;
+	case Qt::UserRole:{
+			QString currentString = languages.at(index.row());
+			return currentString == "English" ? "en_US" : currentString.remove("subsurface_");
+		}break;
+	}
+	return QVariant();
+}
+
+int LanguageModel::rowCount(const QModelIndex& parent) const
+{
+	return languages.count();
 }

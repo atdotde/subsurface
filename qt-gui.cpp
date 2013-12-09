@@ -83,10 +83,21 @@ void init_ui(int *argcp, char ***argvp)
 	QCoreApplication::setOrganizationName("Subsurface");
 	QCoreApplication::setOrganizationDomain("subsurface.hohndel.org");
 	QCoreApplication::setApplicationName("Subsurface");
+	// find plugins installed in the application directory (without this SVGs don't work on Windows)
+	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
 	xslt_path = strdup(getSubsurfaceDataPath("xslt").toAscii().data());
 
+	QSettings s;
+	s.beginGroup("Language");
 	QLocale loc;
+
+	if (!s.value("UseSystemLanguage", true).toBool()){
+	    loc = QLocale(s.value("UiLanguage", QLocale().uiLanguages().first()).toString());
+	}
+
 	QString uiLang = loc.uiLanguages().first();
+	s.endGroup();
+
 	// there's a stupid Qt bug on MacOS where uiLanguages doesn't give us the country info
 	if (!uiLang.contains('-') && uiLang != loc.bcp47Name()) {
 		QLocale loc2(loc.bcp47Name());
@@ -115,10 +126,6 @@ void init_ui(int *argcp, char ***argvp)
 		}
 	}
 
-	QSettings s;
-	s.beginGroup("GeneralSettings");
-	prefs.default_filename = getSetting(s, "default_filename");
-	s.endGroup();
 	s.beginGroup("DiveComputer");
 	default_dive_computer_vendor = getSetting(s, "dive_computer_vendor");
 	default_dive_computer_product = getSetting(s,"dive_computer_product");
@@ -219,9 +226,9 @@ QString get_depth_string(depth_t depth, bool showunit, bool showdecimal)
 QString get_depth_unit()
 {
 	if (prefs.units.length == units::METERS)
-		return "m";
+		return QString("%1").arg(translate("gettextFromC","m"));
 	else
-		return "ft";
+		return QString("%1").arg(translate("gettextFromC","ft"));
 }
 
 QString get_weight_string(weight_t weight, bool showunit)
@@ -238,9 +245,9 @@ QString get_weight_string(weight_t weight, bool showunit)
 QString get_weight_unit()
 {
 	if (prefs.units.weight == units::KG)
-		return "kg";
+		return QString("%1").arg(translate("gettextFromC","kg"));
 	else
-		return "lbs";
+		return QString("%1").arg(translate("gettextFromC","lbs"));
 }
 
 /* these methods retrieve used gas per cylinder */
@@ -396,10 +403,11 @@ QString getSubsurfaceDataPath(QString folderToFind)
 
 	// next check for the Linux typical $(prefix)/share/subsurface
 	execdir = QCoreApplication::applicationDirPath();
-	folder = QDir(execdir.replace("bin", "share/subsurface/").append(folderToFind));
-	if (folder.exists())
-		return folder.absolutePath();
-
+	if (execdir.contains("bin")) {
+		folder = QDir(execdir.replace("bin", "share/subsurface/").append(folderToFind));
+		if (folder.exists())
+			return folder.absolutePath();
+	}
 	// then look for the usual location on a Mac
 	execdir = QCoreApplication::applicationDirPath();
 	folder = QDir(execdir.append("/../Resources/share/").append(folderToFind));
@@ -436,7 +444,7 @@ int parseTemperatureToMkelvin(const QString& text)
 {
 	int mkelvin;
 	QString numOnly = text;
-	numOnly.replace(",",".").remove(QRegExp("[^0-9.]"));
+	numOnly.replace(",",".").remove(QRegExp("[^-0-9.]"));
 	if (numOnly == "")
 		return 0;
 	double number = numOnly.toDouble();

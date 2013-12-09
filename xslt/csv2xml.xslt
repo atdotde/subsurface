@@ -2,17 +2,37 @@
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
   <xsl:import href="commonTemplates.xsl"/>
   <xsl:strip-space elements="*"/>
+  <xsl:param name="timeField" select="timeField"/>
+  <xsl:param name="depthField" select="depthField"/>
   <xsl:param name="tempField" select="tempField"/>
+  <xsl:param name="po2Field" select="po2Field"/>
+  <xsl:param name="cnsField" select="cnsField"/>
+  <xsl:param name="otuField" select="otuField"/>
+  <xsl:param name="stopdepthField" select="stopdepthField"/>
+  <xsl:param name="date" select="date"/>
+  <xsl:param name="time" select="time"/>
+  <xsl:param name="separatorIndex" select="separatorIndex"/>
   <xsl:output method="xml" indent="yes"/>
 
   <xsl:variable name="lf"><xsl:text>
 </xsl:text></xsl:variable>
-  <xsl:variable name="fs"><xsl:text>	</xsl:text></xsl:variable>
+  <xsl:variable name="fs">
+    <xsl:choose>
+      <xsl:when test="$separatorIndex = 0"><xsl:text>	</xsl:text></xsl:when>
+      <xsl:otherwise><xsl:text>,</xsl:text></xsl:otherwise>
+    </xsl:choose>
+  </xsl:variable>
 
   <xsl:template match="/">
     <divelog program="subsurface-import" version="2">
       <dives>
         <dive>
+          <xsl:attribute name="date">
+            <xsl:value-of select="concat(substring($date, 1, 4), '-', substring($date, 5, 2), '-', substring($date, 7, 2))"/>
+          </xsl:attribute>
+          <xsl:attribute name="time">
+            <xsl:value-of select="concat(substring($time, 2, 2), ':', substring($time, 4, 2))"/>
+          </xsl:attribute>
           <divecomputerid deviceid="ffffffff" model="stone" />
           <xsl:call-template name="printLine">
             <xsl:with-param name="line" select="substring-before(//csv, $lf)"/>
@@ -26,9 +46,12 @@
   <xsl:template name="printLine">
     <xsl:param name="line"/>
     <xsl:param name="remaining"/>
-    <xsl:call-template name="printFields">
-      <xsl:with-param name="line" select="$line"/>
-    </xsl:call-template>
+
+    <xsl:if test="substring-before($line, $fs) != substring-before(substring-before($remaining, $lf), $fs)">
+      <xsl:call-template name="printFields">
+        <xsl:with-param name="line" select="$line"/>
+      </xsl:call-template>
+    </xsl:if>
     <xsl:if test="$remaining != ''">
       <xsl:call-template name="printLine">
         <xsl:with-param name="line" select="substring-before($remaining, $lf)"/>
@@ -42,7 +65,7 @@
 
     <xsl:variable name="value">
       <xsl:call-template name="getFieldByIndex">
-        <xsl:with-param name="index" select="0"/>
+        <xsl:with-param name="index" select="$timeField"/>
         <xsl:with-param name="line" select="$line"/>
       </xsl:call-template>
     </xsl:variable>
@@ -77,17 +100,65 @@
 
         <xsl:attribute name="depth">
           <xsl:call-template name="getFieldByIndex">
-            <xsl:with-param name="index" select="1"/>
+            <xsl:with-param name="index" select="$depthField"/>
             <xsl:with-param name="line" select="$line"/>
           </xsl:call-template>
         </xsl:attribute>
 
-        <xsl:attribute name="temp">
-          <xsl:call-template name="getFieldByIndex">
-            <xsl:with-param name="index" select="$tempField"/>
-            <xsl:with-param name="line" select="$line"/>
-          </xsl:call-template>
-        </xsl:attribute>
+        <xsl:if test="$tempField >= 0">
+          <xsl:attribute name="temp">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$tempField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$po2Field >= 0">
+          <xsl:attribute name="po2">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$po2Field"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$cnsField >= 0">
+          <xsl:attribute name="cns">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$cnsField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$otuField >= 0">
+          <xsl:attribute name="otu">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$otuField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$stopdepthField >= 0">
+          <xsl:variable name="stopdepth">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$stopdepthField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:variable>
+          <xsl:attribute name="stopdepth">
+            <xsl:copy-of select="$stopdepth"/>
+          </xsl:attribute>
+
+          <xsl:attribute name="in_deco">
+            <xsl:choose>
+              <xsl:when test="$stopdepth > 0">1</xsl:when>
+              <xsl:otherwise>0</xsl:otherwise>
+            </xsl:choose>
+          </xsl:attribute>
+        </xsl:if>
       </sample>
     </xsl:if>
   </xsl:template>

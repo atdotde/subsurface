@@ -5,6 +5,19 @@
 #include <limits.h>
 #include "gettext.h"
 #include "dive.h"
+#include "planner.h"
+
+struct tag_entry *g_tag_list = NULL;
+
+static const char* default_tags[] = {
+	QT_TRANSLATE_NOOP("gettextFromC", "boat"), QT_TRANSLATE_NOOP("gettextFromC", "shore"), QT_TRANSLATE_NOOP("gettextFromC", "drift"),
+	QT_TRANSLATE_NOOP("gettextFromC", "deep"), QT_TRANSLATE_NOOP("gettextFromC", "cavern") , QT_TRANSLATE_NOOP("gettextFromC", "ice"),
+	QT_TRANSLATE_NOOP("gettextFromC", "wreck"), QT_TRANSLATE_NOOP("gettextFromC", "cave"), QT_TRANSLATE_NOOP("gettextFromC", "altitude"),
+	QT_TRANSLATE_NOOP("gettextFromC", "pool"), QT_TRANSLATE_NOOP("gettextFromC", "lake"), QT_TRANSLATE_NOOP("gettextFromC", "river"),
+	QT_TRANSLATE_NOOP("gettextFromC", "night"), QT_TRANSLATE_NOOP("gettextFromC", "fresh"), QT_TRANSLATE_NOOP("gettextFromC", "student"),
+	QT_TRANSLATE_NOOP("gettextFromC", "instructor"), QT_TRANSLATE_NOOP("gettextFromC", "photo"), QT_TRANSLATE_NOOP("gettextFromC", "video"),
+	QT_TRANSLATE_NOOP("gettextFromC", "deco")
+};
 
 void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name)
 {
@@ -189,10 +202,34 @@ struct dive *alloc_dive(void)
 	if (!dive)
 		exit(1);
 	memset(dive, 0, sizeof(*dive));
+	taglist_init(&(dive->tag_list));
 	return dive;
 }
 
-void copy_samples(struct dive* s, struct dive* d)
+/* only copies events from the first dive computer */
+void copy_events(struct dive *s, struct dive *d)
+{
+	struct event *ev;
+	if (!s || !d)
+		return;
+	ev = s->dc.events;
+	d->dc.events = NULL;
+	while (ev != NULL) {
+		add_event(&d->dc, ev->time.seconds, ev->type, ev->flags, ev->value, ev->name);
+		ev = ev->next;
+	}
+}
+
+void copy_cylinders(struct dive *s, struct dive *d)
+{
+	int i;
+	if (!s || !d)
+		return;
+	for (i = 0; i < MAX_CYLINDERS; i++)
+		d->cylinder[i] = s->cylinder[i];
+}
+
+void copy_samples(struct dive *s, struct dive *d)
 {
 	/* instead of carefully copying them one by one and calling add_sample
 	 * over and over again, let's just copy the whole blob */
@@ -300,6 +337,44 @@ static void fixup_dc_duration(struct divecomputer *dc)
 	if (duration) {
 		dc->duration.seconds = duration;
 		dc->meandepth.mm = (depthtime + duration/2) / duration;
+	}
+}
+
+void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration)
+{
+	int i;
+	int depthtime[MAX_CYLINDERS] = {0,};
+	int lasttime = 0, lastdepth = 0;
+	int idx = 0;
+
+	for (i = 0; i < MAX_CYLINDERS; i++)
+		mean[i] = duration[i] = 0;
+	struct event *ev = get_next_event(dc->events, "gaschange");
+	if (!ev) {
+		// special case - no gas changes
+		mean[0] = dc->meandepth.mm;
+		duration[0] = dc->duration.seconds;
+		return;
+	}
+	for (i = 0; i < dc->samples; i++) {
+		struct sample *sample = dc->sample + i;
+		int time = sample->time.seconds;
+		int depth = sample->depth.mm;
+		if (ev && time >= ev->time.seconds) {
+			idx = get_cylinder_index(dive, ev);
+			ev = get_next_event(ev->next, "gaschange");
+		}
+		/* We ignore segments at the surface */
+		if (depth > SURFACE_THRESHOLD || lastdepth > SURFACE_THRESHOLD) {
+			duration[idx] += time - lasttime;
+			depthtime[idx] += (time - lasttime) * (depth + lastdepth) / 2;
+		}
+		lastdepth = depth;
+		lasttime = time;
+	}
+	for (i = 0; i < MAX_CYLINDERS; i++) {
+		if (duration[i])
+			mean[i] = (depthtime[i] + duration[i] / 2) / duration[i];
 	}
 }
 
@@ -571,19 +646,29 @@ static void fixup_duration(struct dive *dive)
 	dive->duration.seconds = duration;
 }
 
-static void fixup_watertemp(struct dive *dive)
+/*
+ * What do the dive computers say the water temperature is?
+ * (not in the samples, but as dc property for dcs that support that)
+ */
+unsigned int dc_watertemp(struct divecomputer *dc)
 {
-	struct divecomputer *dc;
 	int sum = 0, nr = 0;
 
-	for_each_dc(dive, dc) {
+	do {
 		if (dc->watertemp.mkelvin) {
 			sum += dc->watertemp.mkelvin;
 			nr++;
 		}
-	}
-	if (nr)
-		dive->watertemp.mkelvin = (sum + nr / 2) / nr;
+	} while ((dc = dc->next) != NULL);
+	if (!nr)
+		return 0;
+	return (sum + nr / 2) / nr;
+}
+
+static void fixup_watertemp(struct dive *dive)
+{
+	if (!dive->watertemp.mkelvin)
+		dive->watertemp.mkelvin = dc_watertemp(&dive->dc);
 }
 
 /*
@@ -1101,20 +1186,13 @@ static int find_cylinder_match(cylinder_t *cyl, cylinder_t array[], unsigned int
 /* Force an initial gaschange event to the (old) gas #0 */
 static void add_initial_gaschange(struct dive *dive, struct divecomputer *dc)
 {
-	int o2, he, value;
 	struct event *ev = get_next_event(dc->events, "gaschange");
 
 	if (ev && ev->time.seconds < 30)
 		return;
 
 	/* Old starting gas mix */
-	o2 = get_o2(&dive->cylinder[0].gasmix);
-	he = get_he(&dive->cylinder[0].gasmix);
-	o2 = (o2 + 5) / 10;
-	he = (he + 5) / 10;
-	value = o2 + (he << 16);
-
-	add_event(dc, 0, 25, 0, value, "gaschange"); /* SAMPLE_EVENT_GASCHANGE2 */
+	add_gas_switch_event(dive, dc, 0, 0);
 }
 
 static void dc_cylinder_renumber(struct dive *dive, struct divecomputer *dc, int mapping[])
@@ -1813,6 +1891,160 @@ static void join_dive_computers(struct divecomputer *res, struct divecomputer *a
 	remove_redundant_dc(res, prefer_downloaded);
 }
 
+int taglist_get_tagstring(struct tag_entry *tag_list, char *buffer, int len) {
+	int i = 0;
+	struct tag_entry *tmp;
+	tmp = tag_list->next;
+	memset(buffer, 0, len);
+	while(tmp != NULL) {
+		int newlength = strlen(tmp->tag->name);
+		if (i > 0)
+			newlength += 2;
+		if ((i+newlength) < len) {
+			if (i > 0) {
+				strcpy(buffer+i, ", ");
+				strcpy(buffer+i+2, tmp->tag->name);
+			} else {
+				strcpy(buffer, tmp->tag->name);
+			}
+		} else {
+			return i;
+		}
+		i += newlength;
+		tmp = tmp->next;
+	}
+	return i;
+}
+
+struct divetag *taglist_get_tag(struct tag_entry *tag_list, const char *tag)
+{
+	struct tag_entry *tmp;
+	tmp = tag_list->next;
+	while(tmp != NULL) {
+		if (tmp->tag != NULL) {
+			if (strcmp(tmp->tag->name, tag) == 0)
+				return tmp->tag;
+			else
+				tmp = tmp->next;
+		}
+	}
+	return NULL;
+}
+
+static inline void taglist_free_divetag(struct divetag *tag) {
+	if (tag->name != NULL)
+		free(tag->name);
+	if (tag->source != NULL)
+		free(tag->source);
+	free(tag);
+}
+
+/* Add a tag to the tag_list, keep the list sorted */
+static struct divetag *taglist_add_divetag(struct tag_entry *tag_list, struct divetag *tag)
+{
+	struct tag_entry *tmp, *last;
+	last = tag_list;
+	tmp = tag_list->next;
+	while(1) {
+		if (tmp == NULL || strcmp(tmp->tag->name, tag->name) > 0) {
+			/* Insert in front of it */
+			last->next = malloc(sizeof(struct tag_entry));
+			last->next->next = tmp;
+			last->next->tag = tag;
+			return last->next->tag;
+		} else if (strcmp(tmp->tag->name, tag->name) == 0) {
+			/* Already in list */
+			return tmp->tag;
+		} else {
+			last = tmp;
+			tmp = tmp->next;
+		}
+	}
+}
+
+struct divetag *taglist_add_tag(struct tag_entry *tag_list, const char *tag)
+{
+	int i = 0, is_default_tag = 0;
+	struct divetag *ret_tag, *new_tag;
+	const char *translation;
+	new_tag = malloc(sizeof(struct divetag));
+
+	for (i=0; i<sizeof(default_tags)/sizeof(char*); i++) {
+		if (strcmp(default_tags[i], tag) == 0) {
+			is_default_tag = 1;
+			break;
+		}
+	}
+	/* Only translate default tags */
+	if (is_default_tag) {
+		translation = translate("gettextFromC", tag);
+		new_tag->name = malloc(strlen(translation)+1);
+		memcpy(new_tag->name, translation, strlen(translation)+1);
+		new_tag->source = malloc(strlen(tag)+1);
+		memcpy(new_tag->source, tag, strlen(tag)+1);
+	} else {
+		new_tag->source = NULL;
+		new_tag->name = malloc(strlen(tag)+1);
+		memcpy(new_tag->name, tag, strlen(tag)+1);
+	}
+	/* Try to insert new_tag into g_tag_list if we are not operating on it */
+	if (tag_list != g_tag_list) {
+		ret_tag = taglist_add_divetag(g_tag_list, new_tag);
+		/* g_tag_list already contains new_tag, free the duplicate */
+		if (ret_tag != new_tag)
+			taglist_free_divetag(new_tag);
+		ret_tag = taglist_add_divetag(tag_list, ret_tag);
+	} else {
+		ret_tag = taglist_add_divetag(tag_list, new_tag);
+		if (ret_tag != new_tag)
+			taglist_free_divetag(new_tag);
+	}
+	return ret_tag;
+}
+
+void taglist_init(struct tag_entry **tag_list) {
+	*tag_list = malloc(sizeof(struct tag_entry));
+	(*tag_list)->next = NULL;
+	(*tag_list)->tag = NULL;
+}
+
+/* Clear everything but the first element */
+void taglist_clear(struct tag_entry *tag_list) {
+	struct tag_entry *current_tag_entry, *next;
+	current_tag_entry = tag_list->next;
+	while (current_tag_entry != NULL) {
+		next = current_tag_entry->next;
+		free(current_tag_entry);
+		current_tag_entry = next;
+	}
+	tag_list->next = NULL;
+}
+
+/* Merge src1 and src2, write to *dst */
+static void taglist_merge(struct tag_entry *dst, struct tag_entry *src1, struct tag_entry *src2)
+{
+	struct tag_entry *current_tag_entry;
+	current_tag_entry = src1->next;
+	while (current_tag_entry != NULL) {
+		taglist_add_divetag(dst, current_tag_entry->tag);
+		current_tag_entry = current_tag_entry->next;
+	}
+	current_tag_entry = src2->next;
+	while (current_tag_entry != NULL) {
+		taglist_add_divetag(dst, current_tag_entry->tag);
+		current_tag_entry = current_tag_entry->next;
+	}
+}
+
+void taglist_init_global()
+{
+	int i;
+	taglist_init(&g_tag_list);
+
+	for(i=0; i<sizeof(default_tags)/sizeof(char*); i++)
+		taglist_add_tag(g_tag_list, default_tags[i]);
+}
+
 struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer_downloaded)
 {
 	struct dive *res = alloc_dive();
@@ -1841,7 +2073,7 @@ struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer
 	MERGE_MAX(res, a, b, number);
 	MERGE_NONZERO(res, a, b, cns);
 	MERGE_NONZERO(res, a, b, visibility);
-	MERGE_NONZERO(res, a, b, dive_tags);
+	taglist_merge(res->tag_list, a->tag_list, b->tag_list);
 	merge_equipment(res, a, b);
 	merge_airtemps(res, a, b);
 	if (dl) {
@@ -1854,15 +2086,6 @@ struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer
 
 	fixup_dive(res);
 	return res;
-}
-
-int get_index_for_dive(struct dive *dive) {
-	int i;
-	struct dive *d;
-	for_each_dive(i, d)
-		if (d == dive)
-			return i;
-	return -1;
 }
 
 struct dive *find_dive_including(timestamp_t when)
@@ -1898,4 +2121,16 @@ struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset)
 				return dive;
 	}
 	return NULL;
+}
+
+void shift_times(const timestamp_t amount)
+{
+	int i;
+	struct dive *dive;
+
+	for_each_dive (i, dive) {
+		if (!dive->selected)
+			continue;
+		dive->when += amount;
+	}
 }

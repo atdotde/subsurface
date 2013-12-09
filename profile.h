@@ -23,11 +23,11 @@ struct plot_data {
 	int ceiling;
 	int ceilings[16];
 	int ndl;
-	int tts;
 	int stoptime;
 	int stopdepth;
 	int cns;
 	int smoothed;
+	int sac;
 	double po2, pn2, phe;
 	double mod, ead, end, eadd;
 	velocity_t velocity;
@@ -35,10 +35,16 @@ struct plot_data {
 	struct plot_data *min[3];
 	struct plot_data *max[3];
 	int avg[3];
+	/* values calculated by us */
+	unsigned int in_deco_calc:1;
+	int ndl_calc;
+	int tts_calc;
+	int stoptime_calc;
+	int stopdepth_calc;
 };
 
 void calculate_max_limits(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc);
-struct plot_info *create_plot_info(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc);
+struct plot_info *create_plot_info(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc, bool print_mode);
 int setup_temperature_limits(struct graphics_context *gc);
 int get_cylinder_pressure_range(struct graphics_context *gc);
 void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int bufsize, int sum);
@@ -62,8 +68,6 @@ int get_maxtime(struct plot_info *pi);
  * take into account the additional verical space needed to plot
  * partial pressure graphs */
 int get_maxdepth(struct plot_info *pi);
-
-int get_local_sac(struct plot_data *entry1, struct plot_data *entry2, struct dive *dive);
 
 void setup_pp_limits(struct graphics_context *gc);
 

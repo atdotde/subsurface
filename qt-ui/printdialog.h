@@ -4,8 +4,10 @@
 #include <QDialog>
 #include <QPrinter>
 #include "../display.h"
-#include "printoptions.h"
-#include "printlayout.h"
+
+class QProgressBar;
+class PrintOptions;
+class PrintLayout;
 
 // should be based on a custom QPrintDialog class
 class PrintDialog : public QDialog {
@@ -20,10 +22,13 @@ private:
 	explicit PrintDialog(QWidget *parent = 0, Qt::WindowFlags f = 0);
 	PrintOptions *optionsWidget;
 	PrintLayout *printLayout;
+	QProgressBar *progressBar;
 	QPrinter printer;
 
 private slots:
+	void previewClicked();
 	void printClicked();
+	void closeClicked();
 	void onPaintRequested(QPrinter *);
 };
 

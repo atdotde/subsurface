@@ -10,9 +10,6 @@
     <height>517</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>TabWidget</string>
-  </property>
   <property name="currentIndex">
    <number>0</number>
   </property>
@@ -21,6 +18,9 @@
     <string>Dive Notes</string>
    </attribute>
    <layout class="QGridLayout" name="gridLayout_3">
+    <item row="2" column="1">
+     <widget class="KMessageWidget" name="diveNotesMessage" native="true"/>
+    </item>
     <item row="3" column="1">
      <widget class="QScrollArea" name="scrollArea">
       <property name="frameShape">
@@ -37,8 +37,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>513</width>
-         <height>468</height>
+         <width>493</width>
+         <height>586</height>
         </rect>
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
@@ -57,28 +57,33 @@
         <property name="spacing">
          <number>2</number>
         </property>
-        <item row="0" column="0" colspan="2">
-         <widget class="KMessageWidget" name="diveNotesMessage" native="true"/>
-        </item>
         <item row="1" column="0">
          <widget class="QLabel" name="DateTimeLabel">
           <property name="text">
-           <string>Starttime</string>
+           <string>Start time</string>
           </property>
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QLabel" name="TemperaturesLabel">
-          <property name="text">
-           <string>air / water Temperatures</string>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="temperatureLabels">
+          <item>
+           <widget class="QLabel" name="airTempLabel">
+            <property name="text">
+             <string>Air temp</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="waterTempLabel">
+            <property name="text">
+             <string>Water temp</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item row="2" column="0">
          <widget class="QDateTimeEdit" name="dateTimeEdit">
-          <property name="displayFormat">
-           <string>M/d/yy h:mm</string>
-          </property>
           <property name="calendarPopup">
            <bool>true</bool>
           </property>
@@ -102,6 +107,13 @@
           </item>
          </layout>
         </item>
+        <item row="4" column="0" colspan="2">
+         <widget class="QLineEdit" name="location">
+          <property name="readOnly">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
         <item row="3" column="0">
          <widget class="QLabel" name="LocationLabel">
           <property name="text">
@@ -109,8 +121,22 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="0" colspan="2">
-         <widget class="QLineEdit" name="location">
+        <item row="11" column="0">
+         <widget class="QLabel" name="TagLabel">
+          <property name="text">
+           <string>Tags</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="0" colspan="2">
+         <widget class="QLineEdit" name="coordinates">
+          <property name="readOnly">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="8" column="0">
+         <widget class="QLineEdit" name="divemaster">
           <property name="readOnly">
            <bool>false</bool>
           </property>
@@ -123,8 +149,15 @@
           </property>
          </widget>
         </item>
-        <item row="6" column="0" colspan="2">
-         <widget class="QLineEdit" name="coordinates">
+        <item row="7" column="1">
+         <widget class="QLabel" name="BuddyLabel">
+          <property name="text">
+           <string>Buddy</string>
+          </property>
+         </widget>
+        </item>
+        <item row="8" column="1">
+         <widget class="QLineEdit" name="buddy">
           <property name="readOnly">
            <bool>false</bool>
           </property>
@@ -137,22 +170,15 @@
           </property>
          </widget>
         </item>
-        <item row="7" column="1">
-         <widget class="QLabel" name="BuddyLabel">
-          <property name="text">
-           <string>Buddy</string>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="0">
-         <widget class="QLineEdit" name="divemaster">
+        <item row="14" column="0" colspan="2">
+         <widget class="QTextEdit" name="notes">
           <property name="readOnly">
            <bool>false</bool>
           </property>
          </widget>
         </item>
-        <item row="8" column="1">
-         <widget class="QLineEdit" name="buddy">
+        <item row="10" column="1">
+         <widget class="QLineEdit" name="suit">
           <property name="readOnly">
            <bool>false</bool>
           </property>
@@ -176,6 +202,13 @@
           </item>
          </layout>
         </item>
+        <item row="13" column="0">
+         <widget class="QLabel" name="NotesLabel">
+          <property name="text">
+           <string>Notes</string>
+          </property>
+         </widget>
+        </item>
         <item row="9" column="1">
          <widget class="QLabel" name="SuitLabel">
           <property name="text">
@@ -193,31 +226,28 @@
           </item>
          </layout>
         </item>
-        <item row="10" column="1">
-         <widget class="QLineEdit" name="suit">
-          <property name="readOnly">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="11" column="0">
-         <widget class="QLabel" name="NotesLabel">
-          <property name="text">
-           <string>Notes</string>
-          </property>
-         </widget>
-        </item>
         <item row="12" column="0" colspan="2">
-         <widget class="QTextEdit" name="notes">
-          <property name="readOnly">
-           <bool>false</bool>
+         <widget class="TagWidget" name="tagWidget">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
           </property>
-         </widget>
-        </item>
-        <item row="13" column="0" colspan="2">
-         <widget class="QDialogButtonBox" name="notesButtonBox">
-          <property name="standardButtons">
-           <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="verticalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+          <property name="horizontalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+          <property name="lineWrapMode">
+           <enum>QPlainTextEdit::NoWrap</enum>
           </property>
          </widget>
         </item>
@@ -233,6 +263,9 @@
    </attribute>
    <layout class="QGridLayout" name="gridLayout_4">
     <item row="0" column="0">
+     <widget class="KMessageWidget" name="diveEquipmentMessage" native="true"/>
+    </item>
+    <item row="1" column="0">
      <widget class="QScrollArea" name="scrollArea_2">
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
@@ -248,8 +281,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>513</width>
-         <height>468</height>
+         <width>507</width>
+         <height>459</height>
         </rect>
        </property>
        <layout class="QGridLayout" name="gridLayout_5">
@@ -268,9 +301,6 @@
         <property name="spacing">
          <number>2</number>
         </property>
-        <item row="0" column="0">
-         <widget class="KMessageWidget" name="diveEquipmentMessage" native="true"/>
-        </item>
         <item row="1" column="0">
          <widget class="QWidget" name="widget" native="true">
           <layout class="QVBoxLayout" name="verticalLayout">
@@ -301,13 +331,6 @@
           </layout>
          </widget>
         </item>
-        <item row="2" column="0">
-         <widget class="QDialogButtonBox" name="equipmentButtonBox">
-          <property name="standardButtons">
-           <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-          </property>
-         </widget>
-        </item>
        </layout>
       </widget>
      </widget>
@@ -320,6 +343,9 @@
    </attribute>
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
+     <widget class="KMessageWidget" name="diveInfoMessage" native="true"/>
+    </item>
+    <item row="1" column="0">
      <widget class="QScrollArea" name="scrollArea_3">
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
@@ -335,8 +361,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>513</width>
-         <height>468</height>
+         <width>492</width>
+         <height>375</height>
         </rect>
        </property>
        <layout class="QGridLayout" name="gridLayout_6">
@@ -584,7 +610,7 @@
          </widget>
         </item>
         <item row="4" column="0">
-         <widget class="QGroupBox">
+         <widget class="QGroupBox" name="groupBox_1">
           <property name="title">
            <string>Salinity</string>
           </property>
@@ -627,6 +653,9 @@
    </attribute>
    <layout class="QGridLayout" name="gridLayout1">
     <item row="0" column="1">
+     <widget class="KMessageWidget" name="diveStatisticsMessage" native="true"/>
+    </item>
+    <item row="1" column="1">
      <widget class="QScrollArea" name="scrollArea_4">
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
@@ -642,8 +671,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>513</width>
-         <height>468</height>
+         <width>323</width>
+         <height>130</height>
         </rect>
        </property>
        <layout class="QGridLayout" name="gridLayout_7">
@@ -802,7 +831,28 @@
    <header>tableview.h</header>
    <container>1</container>
   </customwidget>
+  <customwidget>
+   <class>TagWidget</class>
+   <extends>QPlainTextEdit</extends>
+   <header>qt-ui/tagwidget.h</header>
+  </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>dateTimeEdit</tabstop>
+  <tabstop>airtemp</tabstop>
+  <tabstop>watertemp</tabstop>
+  <tabstop>location</tabstop>
+  <tabstop>coordinates</tabstop>
+  <tabstop>divemaster</tabstop>
+  <tabstop>buddy</tabstop>
+  <tabstop>suit</tabstop>
+  <tabstop>tagWidget</tabstop>
+  <tabstop>notes</tabstop>
+  <tabstop>scrollArea_2</tabstop>
+  <tabstop>scrollArea_3</tabstop>
+  <tabstop>scrollArea_4</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

@@ -368,10 +368,12 @@ static void add_dive_to_deco(struct dive *dive)
 
 int get_divenr(struct dive *dive)
 {
-	int divenr = -1;
-	while (++divenr < dive_table.nr && get_dive(divenr) != dive)
-		;
-	return divenr;
+	int i;
+	struct dive *d;
+	for_each_dive(i, d)
+		if (d == dive)
+			return i;
+	return -1;
 }
 
 static struct gasmix air = { .o2.permille = O2_IN_AIR };
@@ -598,7 +600,7 @@ static void delete_trip(dive_trip_t *trip)
 	free(trip);
 }
 
-static void find_new_trip_start_time(dive_trip_t *trip)
+void find_new_trip_start_time(dive_trip_t *trip)
 {
 	struct dive *dive = trip->dives;
 	timestamp_t when = dive->when;
@@ -735,6 +737,11 @@ void delete_single_dive(int idx)
 		free((void *)dive->buddy);
 	if (dive->suit)
 		free((void *)dive->suit);
+	if (dive->tag_list) {
+		taglist_clear(dive->tag_list);
+		/* Remove head of list */
+		free((void *)dive->tag_list);
+	}
 	free(dive);
 }
 
@@ -782,8 +789,8 @@ struct dive *merge_two_dives(struct dive *a, struct dive *b)
 
 	if (!a || !b)
 		return NULL;
-	i = get_index_for_dive(a);
-	j = get_index_for_dive(b);
+	i = get_divenr(a);
+	j = get_divenr(b);
 	res = merge_dives(a, b, b->when - a->when, FALSE);
 	if (!res)
 		return NULL;
@@ -800,8 +807,6 @@ void select_dive(int idx)
 	struct dive *dive = get_dive(idx);
 	if (dive) {
 		/* never select an invalid dive that isn't displayed */
-		if (dive->dive_tags & DTAG_INVALID && !prefs.display_invalid_dives)
-			return;
 		if (!dive->selected) {
 			dive->selected = 1;
 			amount_selected++;
@@ -815,7 +820,8 @@ void deselect_dive(int idx)
 	struct dive *dive = get_dive(idx);
 	if (dive && dive->selected) {
 		dive->selected = 0;
-		amount_selected--;
+		if (amount_selected)
+			amount_selected--;
 		if (selected_dive == idx && amount_selected > 0) {
 			/* pick a different dive as selected */
 			while (--selected_dive >= 0) {

@@ -1,12 +1,16 @@
 #include "preferences.h"
+#include "mainwindow.h"
 #include <QSettings>
 #include <QDebug>
 #include <QFileDialog>
+#include <QMessageBox>
+#include <QSortFilterProxyModel>
 
 PreferencesDialog* PreferencesDialog::instance()
 {
-	static PreferencesDialog *dialog = new PreferencesDialog();
+	static PreferencesDialog *dialog = new PreferencesDialog(mainWindow());
 	dialog->setAttribute(Qt::WA_QuitOnClose, false);
+	LanguageModel::instance();
 	return dialog;
 }
 
@@ -14,9 +18,22 @@ PreferencesDialog::PreferencesDialog(QWidget* parent, Qt::WindowFlags f) : QDial
 {
 	ui.setupUi(this);
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+	connect(ui.gflow, SIGNAL(valueChanged(int)), this, SLOT(gflowChanged(int)));
+	connect(ui.gfhigh, SIGNAL(valueChanged(int)), this, SLOT(gfhighChanged(int)));
 	setUiFromPrefs();
 	rememberPrefs();
 }
+
+#define DANGER_GF ( gf > 100 ) ? "* { color: red; }" : ""
+void PreferencesDialog::gflowChanged(int gf)
+{
+	ui.gflow->setStyleSheet(DANGER_GF);
+}
+void PreferencesDialog::gfhighChanged(int gf)
+{
+	ui.gfhigh->setStyleSheet(DANGER_GF);
+}
+#undef DANGER_GF
 
 void PreferencesDialog::showEvent(QShowEvent *event)
 {
@@ -38,6 +55,9 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.po2Threshold->setValue(prefs.pp_graphs.po2_threshold);
 	ui.pn2Threshold->setValue(prefs.pp_graphs.pn2_threshold);
 	ui.ead_end_eadd->setChecked(prefs.ead);
+	ui.mod->setChecked(prefs.mod);
+	ui.maxppo2->setEnabled(ui.mod->isChecked());
+	ui.maxppo2->setValue(prefs.mod_ppO2);
 	ui.dc_reported_ceiling->setChecked(prefs.profile_dc_ceiling);
 	ui.red_ceiling->setEnabled(ui.dc_reported_ceiling->isChecked());
 	ui.red_ceiling->setChecked(prefs.profile_red_ceiling);
@@ -46,10 +66,13 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.increment_3m->setChecked(prefs.calc_ceiling_3m_incr);
 	ui.all_tissues->setEnabled(ui.calculated_ceiling->isChecked());
 	ui.all_tissues->setChecked(prefs.calc_all_tissues);
-	ui.groupBox->setEnabled(ui.personalize->isChecked());
+	ui.calc_ndl_tts->setEnabled(ui.calculated_ceiling->isChecked());
+	ui.calc_ndl_tts->setChecked(prefs.calc_ndl_tts);
+	ui.units_group->setEnabled(ui.personalize->isChecked());
 
 	ui.gflow->setValue(prefs.gflow);
 	ui.gfhigh->setValue(prefs.gfhigh);
+	ui.gf_low_at_maxdepth->setChecked(prefs.gf_low_at_maxdepth);
 
 	// units
 	if (prefs.unit_system == METRIC)
@@ -67,57 +90,48 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.psi->setChecked(prefs.units.pressure == units::PSI);
 	ui.liter->setChecked(prefs.units.volume == units::LITER);
 	ui.cuft->setChecked(prefs.units.volume == units::CUFT);
-	ui.kgs->setChecked(prefs.units.weight == units::KG);
+	ui.kg->setChecked(prefs.units.weight == units::KG);
 	ui.lbs->setChecked(prefs.units.weight == units::LBS);
+
 	ui.font->setFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
 	ui.defaultfilename->setText(prefs.default_filename);
-	ui.displayinvalid->setChecked(prefs.show_invalid);
-	ui.show_time->setChecked(prefs.show_time);
+	ui.default_cylinder->clear();
+	for(int i=0; tank_info[i].name != NULL; i++) {
+		ui.default_cylinder->addItem(tank_info[i].name);
+		if (prefs.default_cylinder && strcmp(tank_info[i].name, prefs.default_cylinder) == 0)
+			ui.default_cylinder->setCurrentIndex(i);
+	}
+	ui.displayinvalid->setChecked(prefs.display_invalid_dives);
+	ui.show_sac->setChecked(prefs.show_sac);
 	ui.vertical_speed_minutes->setChecked(prefs.units.vertical_speed_time == units::MINUTES);
 	ui.vertical_speed_seconds->setChecked(prefs.units.vertical_speed_time == units::SECONDS);
+
+	QSortFilterProxyModel *filterModel = new QSortFilterProxyModel();
+	filterModel->setSourceModel(LanguageModel::instance());
+	filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+	ui.languageView->setModel(filterModel);
+	filterModel->sort(0);
+	connect(ui.languageFilter, SIGNAL(textChanged(QString)), filterModel, SLOT(setFilterFixedString(QString)));
+
+	QSettings s;
+	s.beginGroup("Language");
+	ui.languageSystemDefault->setChecked(s.value("UseSystemLanguage").toBool());
+	  QAbstractItemModel *m = ui.languageView->model();
+	  QModelIndexList languages = m->match( m->index(0,0), Qt::UserRole, s.value("UiLanguage").toString());
+	  if (languages.count())
+		  ui.languageView->setCurrentIndex(languages.first());
 }
 
 void PreferencesDialog::restorePrefs()
 {
 	prefs = oldPrefs;
+	setUiFromPrefs();
 }
 
 void PreferencesDialog::rememberPrefs()
 {
 	oldPrefs = prefs;
-}
-
-#define SP(V, B) prefs.V = (int)(B->isChecked() ? 1 : 0)
-
-void PreferencesDialog::setPrefsFromUi()
-{
-	SP(pp_graphs.phe, ui.phe);
-	SP(pp_graphs.po2, ui.po2);
-	SP(pp_graphs.pn2, ui.pn2);
-	prefs.pp_graphs.phe_threshold = ui.pheThreshold->value();
-	prefs.pp_graphs.po2_threshold = ui.po2Threshold->value();
-	prefs.pp_graphs.pn2_threshold = ui.pn2Threshold->value();
-	SP(ead, ui.ead_end_eadd);
-	SP(profile_dc_ceiling, ui.dc_reported_ceiling);
-	SP(profile_red_ceiling, ui.red_ceiling);
-	SP(profile_calc_ceiling, ui.calculated_ceiling);
-	SP(calc_ceiling_3m_incr, ui.increment_3m);
-	SP(calc_all_tissues, ui.all_tissues);
-	prefs.gflow = ui.gflow->value();
-	prefs.gfhigh = ui.gfhigh->value();
-	prefs.unit_system = ui.metric->isChecked() ? METRIC : (ui.imperial->isChecked() ? IMPERIAL : PERSONALIZE);
-	prefs.units.temperature = ui.fahrenheit->isChecked() ? units::FAHRENHEIT : units::CELSIUS;
-	prefs.units.length = ui.feet->isChecked() ? units::FEET : units::METERS;
-	prefs.units.pressure = ui.psi->isChecked() ? units::PSI : units::BAR;
-	prefs.units.volume = ui.cuft->isChecked() ? units::CUFT : units::LITER;
-	prefs.units.weight = ui.lbs->isChecked() ? units::LBS : units::KG;
-	prefs.units.vertical_speed_time = ui.vertical_speed_minutes->isChecked() ? units::MINUTES : units::SECONDS;
-	prefs.divelist_font = strdup(ui.font->font().family().toUtf8().data());
-	prefs.font_size = ui.fontsize->value();
-	prefs.default_filename = strdup(ui.defaultfilename->text().toUtf8().data());
-	prefs.display_invalid_dives = ui.displayinvalid->isChecked();
-	SP(show_time, ui.show_time);
 }
 
 #define SB(V, B) s.setValue(V, (int)(B->isChecked() ? 1 : 0))
@@ -136,14 +150,18 @@ void PreferencesDialog::syncSettings()
 	s.setValue("po2threshold", ui.po2Threshold->value());
 	s.setValue("pn2threshold", ui.pn2Threshold->value());
 	SB("ead", ui.ead_end_eadd);
+	SB("mod", ui.mod);
+	s.setValue("modppO2", ui.maxppo2->value());
 	SB("dcceiling", ui.dc_reported_ceiling);
 	SB("redceiling", ui.red_ceiling);
 	SB("calcceiling", ui.calculated_ceiling);
 	SB("calcceiling3m", ui.increment_3m);
+	SB("calcndltts", ui.calc_ndl_tts);
 	SB("calcalltissues", ui.all_tissues);
 	s.setValue("gflow", ui.gflow->value());
 	s.setValue("gfhigh", ui.gfhigh->value());
-	SB("show_time", ui.show_time);
+	SB("gf_low_at_maxdepth", ui.gf_low_at_maxdepth);
+	SB("show_sac", ui.show_sac);
 	s.endGroup();
 
 	// Units
@@ -159,12 +177,26 @@ void PreferencesDialog::syncSettings()
 	s.endGroup();
 	// Defaults
 	s.beginGroup("GeneralSettings");
-	s.value("table_fonts", ui.font->font().family());
-	s.value("font_size", ui.fontsize->value());
-	s.value("default_filename", ui.defaultfilename->text());
-	s.value("displayinvalid", ui.displayinvalid->isChecked());
+	s.setValue("default_filename", ui.defaultfilename->text());
+	s.setValue("default_cylinder", ui.default_cylinder->currentText());
+	s.endGroup();
+
+	s.beginGroup("Display");
+	s.setValue("divelist_font", ui.font->font().family());
+	s.setValue("font_size", ui.fontsize->value());
+	s.setValue("displayinvalid", ui.displayinvalid->isChecked());
 	s.endGroup();
 	s.sync();
+
+	QLocale loc;
+	s.beginGroup("Language");
+	if (s.value("UiLanguage").toString() != ui.languageView->currentIndex().data(Qt::UserRole) ||
+	    s.value("UseSystemLanguage").toBool() != ui.languageSystemDefault->isChecked()) {
+		QMessageBox::warning(mainWindow(), tr("Restart required"),
+				     tr("To correctly load a new language you must restart Subsurface."));
+	}
+	s.setValue("UseSystemLanguage", ui.languageSystemDefault->isChecked());
+	s.setValue("UiLanguage", ui.languageView->currentIndex().data(Qt::UserRole));
 
 	emit settingsChanged();
 }
@@ -174,16 +206,12 @@ void PreferencesDialog::buttonClicked(QAbstractButton* button)
 	switch(ui.buttonBox->standardButton(button)){
 	case QDialogButtonBox::Discard:
 		restorePrefs();
-		setUiFromPrefs();
-		syncSettings();
 		close();
 		break;
 	case QDialogButtonBox::Apply:
-		setPrefsFromUi();
 		syncSettings();
 		break;
 	case QDialogButtonBox::FirstButton:
-		setPrefsFromUi();
 		syncSettings();
 		close();
 		break;
@@ -197,6 +225,6 @@ void PreferencesDialog::buttonClicked(QAbstractButton* button)
 
 void PreferencesDialog::on_chooseFile_clicked()
 {
-    QFileInfo fi(system_default_filename());
-    ui.defaultfilename->setText(QFileDialog::getOpenFileName(this, tr("Open Default Log File"), fi.absolutePath(), tr("XML Files (*.xml)")));
+	QFileInfo fi(system_default_filename());
+	ui.defaultfilename->setText(QFileDialog::getOpenFileName(this, tr("Open Default Log File"), fi.absolutePath(), tr("Subsurface XML files (*.ssrf *.xml *.XML)")));
 }

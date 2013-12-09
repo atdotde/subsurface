@@ -15,19 +15,11 @@
 #include "divelist.h"
 #include "statistics.h"
 
-/* mark for translation but don't translate here as these terms are used
- * in save-xml.c */
-char *dtag_names[DTAG_NR] = {
-	QT_TRANSLATE_NOOP("gettextFromC","invalid"), QT_TRANSLATE_NOOP("gettextFromC","boat"), QT_TRANSLATE_NOOP("gettextFromC","shore"), QT_TRANSLATE_NOOP("gettextFromC","drift"), QT_TRANSLATE_NOOP("gettextFromC","deep"), QT_TRANSLATE_NOOP("gettextFromC","cavern"),
-	QT_TRANSLATE_NOOP("gettextFromC","ice"), QT_TRANSLATE_NOOP("gettextFromC","wreck"), QT_TRANSLATE_NOOP("gettextFromC","cave"), QT_TRANSLATE_NOOP("gettextFromC","altitude"), QT_TRANSLATE_NOOP("gettextFromC","pool"), QT_TRANSLATE_NOOP("gettextFromC","lake"),
-	QT_TRANSLATE_NOOP("gettextFromC","river"), QT_TRANSLATE_NOOP("gettextFromC","night"), QT_TRANSLATE_NOOP("gettextFromC","freshwater"), QT_TRANSLATE_NOOP("gettextFromC","training"), QT_TRANSLATE_NOOP("gettextFromC","teaching"),
-	QT_TRANSLATE_NOOP("gettextFromC","photo"), QT_TRANSLATE_NOOP("gettextFromC","video"), QT_TRANSLATE_NOOP("gettextFromC","deco")
-};
-
 static stats_t stats;
 stats_t stats_selection;
 stats_t *stats_monthly = NULL;
 stats_t *stats_yearly = NULL;
+stats_t *stats_by_trip = NULL;
 
 static void process_temperatures(struct dive *dp, stats_t *stats)
 {
@@ -104,6 +96,8 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 	int year_iter = 0;
 	int month_iter = 0;
 	int prev_month = 0, prev_year = 0;
+	int trip_iter = 0;
+	dive_trip_t *trip_ptr = 0;
 	unsigned int size;
 
 	*prev_dive = NULL;
@@ -121,14 +115,17 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 	if (stats_yearly != NULL) {
 		free(stats_yearly);
 		free(stats_monthly);
+		free(stats_by_trip);
 	}
 	size = sizeof(stats_t) * (dive_table.nr + 1);
 	stats_yearly = malloc(size);
 	stats_monthly = malloc(size);
-	if (!stats_yearly || !stats_monthly)
+	stats_by_trip = malloc(size);
+	if (!stats_yearly || !stats_monthly || !stats_by_trip)
 		return;
 	memset(stats_yearly, 0, size);
 	memset(stats_monthly, 0, size);
+	memset(stats_by_trip, 0, size);
 	stats_yearly[0].is_year = TRUE;
 
 	/* this relies on the fact that the dives in the dive_table
@@ -156,6 +153,24 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 		}
 		stats_yearly[year_iter].selection_size++;
 		stats_yearly[year_iter].period = current_year;
+
+		if (dp->divetrip != NULL) {
+			if (trip_ptr != dp->divetrip) {
+				trip_ptr = dp->divetrip;
+				trip_iter++;
+			}
+
+			/* stats_by_trip[0] is all the dives combined */
+			stats_by_trip[0].selection_size++;
+			process_dive(dp, &(stats_by_trip[0]));
+			stats_by_trip[0].is_trip = TRUE;
+			stats_by_trip[0].location = strdup("All (by trip stats)");
+
+			process_dive(dp, &(stats_by_trip[trip_iter]));
+			stats_by_trip[trip_iter].selection_size++;
+			stats_by_trip[trip_iter].is_trip = TRUE;
+			stats_by_trip[trip_iter].location = dp->divetrip->location;
+		}
 
 		/* monthly statistics */
 		if (current_month == 0) {
@@ -215,14 +230,14 @@ static void get_ranges(char *buffer, int size)
 	int i, len;
 	int first, last = -1;
 
-	snprintf(buffer, size, translate("gettextFromC","for dives #"));
+	snprintf(buffer, size, "%s", translate("gettextFromC","for dives #"));
 	for (i = 0; i < dive_table.nr; i++) {
 		struct dive *dive = get_dive(i);
 		if (! dive->selected)
 			continue;
 		if (dive->number < 1) {
 			/* uhh - weird numbers - bail */
-			snprintf(buffer, size, translate("gettextFromC","for selected dives"));
+			snprintf(buffer, size, "%s", translate("gettextFromC","for selected dives"));
 			return;
 		}
 		len = strlen(buffer);
@@ -259,11 +274,11 @@ void get_selected_dives_text(char *buffer, int size)
 		if (current_dive)
 			snprintf(buffer, size, translate("gettextFromC","for dive #%d"), current_dive->number);
 		else
-			snprintf(buffer, size, translate("gettextFromC","for selected dive"));
+			snprintf(buffer, size, "%s", translate("gettextFromC","for selected dive"));
 	} else if (amount_selected == dive_table.nr) {
-		snprintf(buffer, size, translate("gettextFromC","for all dives"));
+		snprintf(buffer, size, "%s", translate("gettextFromC","for all dives"));
 	} else if (amount_selected == 0) {
-		snprintf(buffer, size, translate("gettextFromC","(no dives)"));
+		snprintf(buffer, size, "%s", translate("gettextFromC","(no dives)"));
 	} else {
 		get_ranges(buffer, size);
 		if (strlen(buffer) == size -1) {
@@ -277,67 +292,44 @@ void get_selected_dives_text(char *buffer, int size)
 	}
 }
 
-volume_t get_gas_used(struct dive *dive)
+static bool is_gas_used(struct dive *dive, int idx)
+{
+	struct divecomputer *dc = &dive->dc;
+	bool firstGasExplicit = FALSE;
+	if (cylinder_none(&dive->cylinder[idx]))
+		return FALSE;
+
+	while (dc) {
+		struct event *event = get_next_event(dc->events, "gaschange");
+		while (event) {
+			if (event->time.seconds < 30)
+				firstGasExplicit = TRUE;
+			if (get_cylinder_index(dive, event) == idx)
+				return TRUE;
+			event = get_next_event(event->next, "gaschange");
+		}
+		dc = dc->next;
+	}
+	if (idx == 0 && !firstGasExplicit)
+		return TRUE;
+	return FALSE;
+}
+
+void get_gas_used(struct dive *dive, volume_t gases[MAX_CYLINDERS])
 {
 	int idx;
-	volume_t gas_used = { 0 };
 	for (idx = 0; idx < MAX_CYLINDERS; idx++) {
 		cylinder_t *cyl = &dive->cylinder[idx];
 		pressure_t start, end;
 
+		if (!is_gas_used(dive, idx))
+			continue;
+
 		start = cyl->start.mbar ? cyl->start : cyl->sample_start;
 		end = cyl->end.mbar ? cyl->end : cyl->sample_end;
 		if (start.mbar && end.mbar)
-			gas_used.mliter += gas_volume(cyl, start) - gas_volume(cyl, end);
+			gases[idx].mliter = gas_volume(cyl, start) - gas_volume(cyl, end);
 	}
-	return gas_used;
-}
-
-bool is_gas_used(struct dive *dive, int idx)
-{
-	cylinder_t *cyl = &dive->cylinder[idx];
-	int o2, he;
-	struct divecomputer *dc;
-	bool used = FALSE;
-	bool firstGasExplicit = FALSE;
-	if (cylinder_none(cyl))
-		return FALSE;
-
-	o2 = get_o2(&cyl->gasmix);
-	he = get_he(&cyl->gasmix);
-	dc = &dive->dc;
-	while (dc) {
-		struct event *event = dc->events;
-		while (event) {
-			if (event->value) {
-				if (event->name && !strcmp(event->name, "gaschange")) {
-					unsigned int event_he = event->value >> 16;
-					unsigned int event_o2 = event->value & 0xffff;
-					if (event->time.seconds < 30)
-						firstGasExplicit = TRUE;
-					if (is_air(o2, he)) {
-						if (is_air(event_o2 * 10, event_he * 10))
-							used = TRUE;
-					} else if (event->type == 25 && he == event_he * 10 && o2 == event_o2 * 10) {
-						/* SAMPLE_EVENT_GASCHANGE2(25) contains both o2 and he */
-						used = TRUE;
-					} else if (o2 == event_o2 * 10) {
-						/* SAMPLE_EVENT_GASCHANGE(11) only contains o2 */
-						used = TRUE;
-					}
-				}
-			}
-			if (used)
-				break;
-			event = event->next;
-		}
-		if (used)
-			break;
-		dc = dc->next;
-	}
-	if (idx == 0 && !firstGasExplicit)
-		used = TRUE;
-	return used;
 }
 
 #define MAXBUF 80
@@ -356,15 +348,19 @@ char *get_gaslist(struct dive *dive)
 		cyl = &dive->cylinder[idx];
 		o2 = get_o2(&cyl->gasmix);
 		he = get_he(&cyl->gasmix);
+		if (offset > 0) {
+			strncpy(buf + offset, "\n", MAXBUF - offset);
+			offset = strlen(buf);
+		}
 		if (is_air(o2, he))
-			snprintf(buf + offset, MAXBUF - offset, (offset > 0) ? ", %s" : "%s", translate("gettextFromC","air"));
+			strncpy(buf + offset, translate("gettextFromC","air"), MAXBUF - offset);
 		else
 			if (he == 0)
-				snprintf(buf + offset, MAXBUF - offset, (offset > 0) ? translate("gettextFromC",", EAN%d") : translate("gettextFromC","EAN%d"),
-					 (o2 + 5) / 10);
+				snprintf(buf + offset, MAXBUF - offset,
+					translate("gettextFromC","EAN%d"), (o2 + 5) / 10);
 			else
-				snprintf(buf + offset, MAXBUF - offset, (offset > 0) ? ", %d/%d" : "%d/%d",
-				 (o2 + 5) / 10, (he + 5) / 10);
+				snprintf(buf + offset, MAXBUF - offset,
+					"%d/%d", (o2 + 5) / 10, (he + 5) / 10);
 		offset = strlen(buf);
 	}
 	if (*buf == '\0')

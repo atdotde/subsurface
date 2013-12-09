@@ -6,6 +6,7 @@
 #include <errno.h>
 #include "gettext.h"
 #include <zip.h>
+#include <time.h>
 
 #include "dive.h"
 #include "file.h"
@@ -260,8 +261,12 @@ static int open_by_filename(const char *filename, const char *fmt, struct memblo
 		return try_to_open_zip(filename, mem, error);
 
 	/* CSV files */
-	if (!strcasecmp(fmt, "CSV"))
-		return try_to_xslt_open_csv(filename, mem, error);
+	if (!strcasecmp(fmt, "CSV")) {
+		int len = strlen(translate("gettextFromC","Failed to read '%s'. Use import for CSV files.")) + strlen(filename);
+		*error = malloc(len);
+		snprintf(*error, len, translate("gettextFromC","Failed to read '%s'. Use import for CSV files."), filename);
+		return 1;
+	}
 
 #if ONCE_COCHRAN_IS_SUPPORTED
 	/* Truly nasty intentionally obfuscated Cochran Anal software */
@@ -322,32 +327,64 @@ void parse_file(const char *filename, char **error)
 
 #define MAXCOLDIGITS 3
 #define MAXCOLS 100
-void parse_csv_file(const char *filename, int time, int depth, int temp, char **error)
+void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, char **error)
 {
 	struct memblock mem;
-	char *params[7];
+	int pnr=0;
+	char *params[19];
 	char timebuf[MAXCOLDIGITS];
 	char depthbuf[MAXCOLDIGITS];
 	char tempbuf[MAXCOLDIGITS];
+	char po2buf[MAXCOLDIGITS];
+	char cnsbuf[MAXCOLDIGITS];
+	char stopdepthbuf[MAXCOLDIGITS];
+	char separator_index[MAXCOLDIGITS];
+	time_t now;
+	struct tm *timep;
+	char curdate[9];
+	char curtime[6];
 
-	if (time >= MAXCOLS || depth >= MAXCOLS || temp >= MAXCOLS) {
+	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS ) {
 		int len = strlen(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d")) + MAXCOLDIGITS;
 		*error = malloc(len);
 		snprintf(*error, len, translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
 
 		return;
 	}
-	snprintf(timebuf, MAXCOLDIGITS, "%d", time);
-	snprintf(depthbuf, MAXCOLDIGITS, "%d", depth);
-	snprintf(tempbuf, MAXCOLDIGITS, "%d", temp);
+	snprintf(timebuf, MAXCOLDIGITS, "%d", timef);
+	snprintf(depthbuf, MAXCOLDIGITS, "%d", depthf);
+	snprintf(tempbuf, MAXCOLDIGITS, "%d", tempf);
+	snprintf(po2buf, MAXCOLDIGITS, "%d", po2f);
+	snprintf(cnsbuf, MAXCOLDIGITS, "%d", cnsf);
+	snprintf(stopdepthbuf, MAXCOLDIGITS, "%d", stopdepthf);
+	snprintf(separator_index, MAXCOLDIGITS, "%d", sepidx);
+	time(&now);
+	timep = localtime(&now);
+	strftime(curdate, sizeof(curdate), "%Y%m%d", timep);
 
-	params[0] = "timeField";
-	params[1] = timebuf;
-	params[2] = "depthField";
-	params[3] = depthbuf;
-	params[4] = "tempField";
-	params[5] = tempbuf;
-	params[6] = NULL;
+	/* As the parameter is numeric, we need to ensure that the leading zero
+	* is not discarded during the transform, thus prepend time with 1 */
+	strftime(curtime, sizeof(curtime), "1%H%M", timep);
+
+	params[pnr++] = "timeField";
+	params[pnr++] = timebuf;
+	params[pnr++] = "depthField";
+	params[pnr++] = depthbuf;
+	params[pnr++] = "tempField";
+	params[pnr++] = tempbuf;
+	params[pnr++] = "po2Field";
+	params[pnr++] = po2buf;
+	params[pnr++] = "cnsField";
+	params[pnr++] = cnsbuf;
+	params[pnr++] = "stopdepthField";
+	params[pnr++] = stopdepthbuf;
+	params[pnr++] = "date";
+	params[pnr++] = curdate;
+	params[pnr++] = "time";
+	params[pnr++] = curtime;
+	params[pnr++] = "separatorIndex";
+	params[pnr++] = separator_index;
+	params[pnr++] = NULL;
 
 	if (filename == NULL)
 		return;

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "dive.h"
 #include "device.h"
@@ -152,13 +153,16 @@ static void save_depths(FILE *f, struct divecomputer *dc)
 
 static void save_dive_temperature(FILE *f, struct dive *dive)
 {
-	if (!dive->airtemp.mkelvin)
+	if (!dive->airtemp.mkelvin && !dive->watertemp.mkelvin)
 		return;
-	if (dive->airtemp.mkelvin == dc_airtemp(&dive->dc))
+	if (dive->airtemp.mkelvin == dc_airtemp(&dive->dc) && dive->watertemp.mkelvin == dc_watertemp(&dive->dc))
 		return;
 
 	fputs("  <divetemperature", f);
-	show_temperature(f, dive->airtemp, " air='", "'");
+	if (dive->airtemp.mkelvin && dive->airtemp.mkelvin != dc_airtemp(&dive->dc))
+		show_temperature(f, dive->airtemp, " air='", "'");
+	if (dive->watertemp.mkelvin && dive->watertemp.mkelvin != dc_watertemp(&dive->dc))
+		show_temperature(f, dive->watertemp, " water='", "'");
 	fputs("/>\n", f);
 }
 
@@ -300,18 +304,29 @@ static void save_cylinder_info(FILE *f, struct dive *dive)
 	}
 }
 
+static int nr_weightsystems(struct dive *dive)
+{
+	int nr;
+
+	for (nr = MAX_WEIGHTSYSTEMS; nr; --nr) {
+		weightsystem_t *ws = dive->weightsystem+nr-1;
+		if (!weightsystem_none(ws))
+			break;
+	}
+	return nr;
+}
+
 static void save_weightsystem_info(FILE *f, struct dive *dive)
 {
-	int i;
+	int i, nr;
 
-	for (i = 0; i < MAX_WEIGHTSYSTEMS; i++) {
+	nr = nr_weightsystems(dive);
+
+	for (i = 0; i < nr; i++) {
 		weightsystem_t *ws = dive->weightsystem+i;
 		int grams = ws->weight.grams;
 		const char *description = ws->description;
 
-		/* No weight information at all? */
-		if (grams == 0)
-			return;
 		fprintf(f, "  <weightsystem");
 		show_milli(f, " weight='", grams, " kg", "'");
 		show_utf8(f, description, " description='", "'", 1);
@@ -391,20 +406,28 @@ static void save_events(FILE *f, struct event *ev)
 	}
 }
 
-static void save_tags(FILE *f, int tags)
+static void save_tags(FILE *f, struct tag_entry *tag_list)
 {
-	int i, more = 0;
+	int more = 0;
+	struct tag_entry *tmp = tag_list->next;
 
-	fprintf(f, " tags='");
-	for (i = 0; i < DTAG_NR; i++) {
-		if (tags & (1 << i)) {
+	/* Only write tag attribute if the list contains at least one item  */
+	if (tmp != NULL) {
+		fprintf(f, " tags='");
+
+		while (tmp != NULL) {
 			if (more)
 				fprintf(f, ", ");
-			fprintf(f, "%s", dtag_names[i]);
+			/* If the tag has been translated, write the source to the xml file */
+			if (tmp->tag->source != NULL)
+				quote(f, tmp->tag->source, 0);
+			else
+				quote(f, tmp->tag->name, 0);
+			tmp = tmp->next;
 			more = 1;
 		}
+		fprintf(f, "'");
 	}
-	fprintf(f, "'");
 }
 
 static void show_date(FILE *f, timestamp_t when)
@@ -467,8 +490,8 @@ void save_dive(FILE *f, struct dive *dive)
 		fprintf(f, " rating='%d'", dive->rating);
 	if (dive->visibility)
 		fprintf(f, " visibility='%d'", dive->visibility);
-	if (dive->dive_tags)
-		save_tags(f, dive->dive_tags);
+	if (dive->tag_list != NULL)
+		save_tags(f, dive->tag_list);
 
 	show_date(f, dive->when);
 	fprintf(f, " duration='%u:%02u min'>\n",
@@ -599,5 +622,64 @@ void save_dives_logic(const char *filename, const bool select_only)
 		}
 	}
 	fprintf(f, "</dives>\n</divelog>\n");
+	fclose(f);
+}
+
+void export_dives_uddf(const char *filename, const bool selected)
+{
+	FILE *f;
+	size_t streamsize;
+	char *membuf;
+	xmlDoc *doc;
+	xsltStylesheetPtr xslt = NULL;
+	xmlDoc *transformed;
+
+	if (!filename)
+		return;
+
+	/* Save XML to file and convert it into a memory buffer */
+	save_dives_logic(filename, selected);
+	f = fopen(filename, "r");
+	fseek(f, 0, SEEK_END);
+	streamsize = ftell(f);
+	rewind(f);
+
+	membuf = malloc(streamsize + 1);
+	if (!membuf || !fread(membuf, streamsize, 1, f)) {
+		fprintf(stderr, "Failed to read memory buffer\n");
+		return;
+	}
+	membuf[streamsize] = 0;
+	fclose(f);
+	unlink(filename);
+
+	/*
+	 * Parse the memory buffer into XML document and
+	 * transform it to UDDF format, finally dumping
+	 * the XML into a character buffer.
+	 */
+	doc = xmlReadMemory(membuf, strlen(membuf), "divelog", NULL, 0);
+	if (!doc) {
+		fprintf(stderr, "Failed to read XML memory\n");
+		return;
+	}
+	free((void *)membuf);
+
+	/* Convert to UDDF format */
+	xslt = get_stylesheet("uddf-export.xslt");
+
+	if (!xslt) {
+		fprintf(stderr, "Failed to open UDDF conversion stylesheet\n");
+		return;
+	}
+	transformed = xsltApplyStylesheet(xslt, doc, NULL);
+	xsltFreeStylesheet(xslt);
+	xmlFreeDoc(doc);
+
+	/* Write the transformed XML to file */
+	f = fopen(filename, "w");
+	xmlDocFormatDump(f, transformed, 1);
+	xmlFreeDoc(transformed);
+
 	fclose(f);
 }

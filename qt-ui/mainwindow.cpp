@@ -17,6 +17,7 @@
 #include <QWebView>
 #include <QTableView>
 #include <QDesktopWidget>
+#include <QDesktopServices>
 #include "divelistview.h"
 #include "starwidget.h"
 
@@ -53,24 +54,31 @@ MainWindow::MainWindow() : helpView(0)
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(update()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(reloadHeaderActions()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ProfileWidget, SLOT(refresh()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.InfoWidget, SLOT(updateDiveInfo()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlanner, SLOT(settingsChanged()));
+
 	ui.mainErrorMessage->hide();
-	ui.ListWidget->reload(DiveTripModel::TREE);
 	initialUiSetup();
 	readSettings();
+	ui.ListWidget->reload(DiveTripModel::TREE);
 	ui.ListWidget->reloadHeaderActions();
 	ui.ListWidget->setFocus();
 	ui.globe->reload();
+	ui.ListWidget->expand(ui.ListWidget->model()->index(0,0));
+	ui.ListWidget->scrollTo(ui.ListWidget->model()->index(0,0), QAbstractItemView::PositionAtCenter);
+	ui.divePlanner->settingsChanged();
 }
 
 // this gets called after we download dives from a divecomputer
-void MainWindow::refreshDisplay()
+void MainWindow::refreshDisplay(bool recreateDiveList)
 {
 	ui.InfoWidget->reload();
+	ui.ProfileWidget->refresh();
 	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
+	if (recreateDiveList)
+		ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	WSInfoModel::instance()->updateInfo();
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -78,8 +86,8 @@ void MainWindow::current_dive_changed(int divenr)
 	if (divenr >= 0) {
 		select_dive(divenr);
 		ui.globe->centerOn(get_dive(selected_dive));
-		redrawProfile();
 	}
+	redrawProfile();
 	ui.InfoWidget->updateDiveInfo(divenr);
 }
 
@@ -95,30 +103,15 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-	QSettings settings;
-	QString lastDir = QDir::homePath();
-
-	settings.beginGroup("FileDialog");
-	if (settings.contains("LastDir")) {
-		if(QDir::setCurrent(settings.value("LastDir").toString())) {
-			lastDir = settings.value("LastDir").toString();
-		}
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before opening a new file."));
+		return;
 	}
-	settings.endGroup();
-
-	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastDir, filter());
+	QString filename = QFileDialog::getOpenFileName(this, tr("Open File"), lastUsedDir(), filter());
 	if (filename.isEmpty())
 		return;
-
-	// Keep last open dir
-	QFileInfo fileInfo(filename);
-	settings.beginGroup("FileDialog");
-	settings.setValue("LastDir",fileInfo.dir().path());
-	settings.endGroup();
-
-	// Needed to convert to char*
-	QByteArray fileNamePtr = filename.toLocal8Bit();
-
+	updateLastUsedDir(QFileInfo(filename).dir().path());
 	on_actionClose_triggered();
 	loadFiles( QStringList() << filename );
 }
@@ -142,11 +135,17 @@ void MainWindow::cleanUpEmpty()
 	ui.ProfileWidget->clear();
 	ui.ListWidget->reload(DiveTripModel::TREE);
 	ui.globe->reload();
-	setTitle(MWTF_DEFAULT);
+	if (!existing_filename)
+		setTitle(MWTF_DEFAULT);
 }
 
 void MainWindow::on_actionClose_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 
@@ -154,9 +153,11 @@ void MainWindow::on_actionClose_triggered()
 	while (dive_table.nr)
 		delete_single_dive(0);
 
+	dive_list()->clearSelection();
 	/* clear the selection and the statistics */
 	selected_dive = -1;
 
+	existing_filename = NULL;
 	cleanUpEmpty();
 	mark_divelist_changed(FALSE);
 
@@ -165,6 +166,15 @@ void MainWindow::on_actionClose_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
+	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import Files"), lastUsedDir(), filter());
+	if (!fileNames.size())
+		return; // no selection
+	updateLastUsedDir(QFileInfo(fileNames.at(0)).dir().path());
+	importFiles(fileNames);
+}
+
+QString MainWindow::lastUsedDir()
+{
 	QSettings settings;
 	QString lastDir = QDir::homePath();
 
@@ -172,24 +182,23 @@ void MainWindow::on_actionImport_triggered()
 	if (settings.contains("LastDir"))
 		if (QDir::setCurrent(settings.value("LastDir").toString()))
 			lastDir = settings.value("LastDir").toString();
-	settings.endGroup();
+	return lastDir;
+}
 
-	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import Files"), lastDir, filter());
-	if (!fileNames.size())
-		return; // no selection
-
-	// Keep last open dir
-	QFileInfo fileInfo(fileNames.at(0));
-	settings.beginGroup("FileDialog");
-	settings.setValue("LastDir", fileInfo.dir().path());
-	settings.endGroup();
-
-	importFiles(fileNames);
+void MainWindow::updateLastUsedDir(const QString& dir)
+{
+	QSettings s;
+	s.beginGroup("FileDialog");
+	s.setValue("LastDir", dir);
 }
 
 void MainWindow::on_actionExportUDDF_triggered()
 {
-	qDebug("actionExportUDDF");
+	QFileInfo fi(system_default_filename());
+	QString filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+						tr("UDDF files (*.uddf *.UDDF)"));
+	if (!filename.isNull() && !filename.isEmpty())
+		export_dives_uddf(filename.toUtf8(), false);
 }
 
 void MainWindow::on_actionPrint_triggered()
@@ -211,8 +220,15 @@ void MainWindow::enableDcShortcuts()
 
 void MainWindow::on_actionDivePlanner_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before trying to plan a dive."));
+		return;
+	}
 	disableDcShortcuts();
-	DivePlannerPointsModel::instance()->setPlanMode(true);
+	DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::PLAN);
+	DivePlannerPointsModel::instance()->clear();
+	CylindersModel::instance()->clear();
 	ui.stackedWidget->setCurrentIndex(PLANNERPROFILE);
 	ui.infoPane->setCurrentIndex(PLANNERWIDGET);
 }
@@ -224,7 +240,6 @@ void MainWindow::showProfile()
 	ui.infoPane->setCurrentIndex(MAINTAB);
 }
 
-
 void MainWindow::on_actionPreferences_triggered()
 {
 	PreferencesDialog::instance()->show();
@@ -232,6 +247,11 @@ void MainWindow::on_actionPreferences_triggered()
 
 void MainWindow::on_actionQuit_triggered()
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
+		return;
+	}
 	if (unsaved_changes() && (askSaveChanges() == FALSE))
 		return;
 	writeSettings();
@@ -246,7 +266,12 @@ void MainWindow::on_actionDownloadDC_triggered()
 
 void MainWindow::on_actionDownloadWeb_triggered()
 {
-	SubsurfaceWebServices::instance()->runDialog();
+	SubsurfaceWebServices::instance()->exec();
+}
+
+void MainWindow::on_actionDivelogs_de_triggered()
+{
+	DivelogsDeWebServices::instance()->downloadDives();
 }
 
 void MainWindow::on_actionEditDeviceNames_triggered()
@@ -258,26 +283,35 @@ void MainWindow::on_actionEditDeviceNames_triggered()
 
 void MainWindow::on_actionAddDive_triggered()
 {
-	// clear the selection
-	for (int i = 0; i < dive_table.nr; i++) {
-		struct dive *d = get_dive(i);
-		if (d && d->selected)
-			deselect_dive(i);
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before trying to add a dive."));
+		return;
 	}
+	dive_list()->rememberSelection();
+	dive_list()->unselectDives();
 	disableDcShortcuts();
-	DivePlannerPointsModel::instance()->setPlanMode(false);
+	DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::ADD);
+
 	// now cheat - create one dive that we use to store the info tab data in
 	struct dive *dive = alloc_dive();
-	dive->when = QDateTime::currentMSecsSinceEpoch() / 1000L;
-	dive->dc.model = tr("manually added dive").toLocal8Bit().constData(); // do not use tr here since it expects a char*.
+	dive->when = QDateTime::currentMSecsSinceEpoch() / 1000L + gettimezoneoffset();
+	dive->dc.model = "manually added dive"; // don't translate! this is stored in the XML file
+
+	dive->latitude.udeg = 0;
+	dive->longitude.udeg = 0;
 	record_dive(dive);
+	// this isn't in the UI yet, so let's call the C helper function - we'll fix this up when
+	// accepting the dive
 	select_dive(get_divenr(dive));
+	ui.InfoWidget->setCurrentIndex(0);
 	ui.InfoWidget->updateDiveInfo(selected_dive);
+	ui.InfoWidget->addDiveStarted();
 	ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
 	ui.infoPane->setCurrentIndex(MAINTAB);
+	DivePlannerPointsModel::instance()->clear();
 	DivePlannerPointsModel::instance()->createSimpleDive();
-	refreshDisplay();
-	ui.InfoWidget->addDiveStarted();
+	ui.ListWidget->reload(DiveTripModel::CURRENT);
 }
 
 void MainWindow::on_actionRenumber_triggered()
@@ -287,7 +321,13 @@ void MainWindow::on_actionRenumber_triggered()
 
 void MainWindow::on_actionAutoGroup_triggered()
 {
-	qDebug("actionAutoGroup");
+	autogroup = ui.actionAutoGroup->isChecked();
+	if (autogroup)
+		autogroup_dives();
+	else
+		remove_autogen_trips();
+	refreshDisplay();
+	mark_divelist_changed(true);
 }
 
 void MainWindow::on_actionToggleZoom_triggered()
@@ -332,12 +372,14 @@ void MainWindow::on_infoProfileSplitter_splitterMoved(int pos, int idx)
 #define BEHAVIOR QList<int>()
 void MainWindow::on_actionViewList_triggered()
 {
+	beginChangeState(LIST_MAXIMIZED);
 	ui.listGlobeSplitter->setSizes( BEHAVIOR << EXPANDED << COLLAPSED);
 	ui.mainSplitter->setSizes( BEHAVIOR << COLLAPSED << EXPANDED);
 }
 
 void MainWindow::on_actionViewProfile_triggered()
 {
+	beginChangeState(PROFILE_MAXIMIZED);
 	ui.infoProfileSplitter->setSizes(BEHAVIOR << COLLAPSED << EXPANDED);
 	ui.mainSplitter->setSizes( BEHAVIOR << EXPANDED << COLLAPSED);
 	redrawProfile();
@@ -345,12 +387,14 @@ void MainWindow::on_actionViewProfile_triggered()
 
 void MainWindow::on_actionViewInfo_triggered()
 {
+	beginChangeState(INFO_MAXIMIZED);
 	ui.infoProfileSplitter->setSizes(BEHAVIOR << EXPANDED << COLLAPSED);
 	ui.mainSplitter->setSizes( BEHAVIOR << EXPANDED << COLLAPSED);
 }
 
 void MainWindow::on_actionViewGlobe_triggered()
 {
+	beginChangeState(GLOBE_MAXIMIZED);
 	ui.mainSplitter->setSizes(BEHAVIOR << COLLAPSED << EXPANDED);
 	ui.listGlobeSplitter->setSizes(BEHAVIOR << COLLAPSED << EXPANDED);
 }
@@ -358,26 +402,73 @@ void MainWindow::on_actionViewGlobe_triggered()
 
 void MainWindow::on_actionViewAll_triggered()
 {
-	// big number squash the info profile to it's minimum.
-	ui.infoProfileSplitter->setSizes(QList<int>() << 1 << 20000);
+	beginChangeState(VIEWALL);
+	static QList<int> mainSizes;
+	const int appH = qApp->desktop()->size().height();
+	const int appW = qApp->desktop()->size().width();
+	if (mainSizes.empty()){
+		mainSizes.append( appH * 0.7 );
+		mainSizes.append( appH * 0.3 );
+	}
+	static QList<int> infoProfileSizes;
+	if (infoProfileSizes.empty()){
+		infoProfileSizes.append( appW * 0.3 );
+		infoProfileSizes.append( appW * 0.7 );
+	}
 
-	// big number squash the globe view.
-	ui.listGlobeSplitter->setSizes(QList<int>() << 2000 << 1 );
+	static QList<int> listGlobeSizes;
+	if(listGlobeSizes.empty()){
+		listGlobeSizes.append( appW * 0.7 );
+		listGlobeSizes.append( appW * 0.3 );
+	}
 
-	// half and half?
-	ui.mainSplitter->setSizes( QList<int>() << 1 << 1);
+	QSettings settings;
+	settings.beginGroup("MainWindow");
+	if (settings.value("mainSplitter").isValid()){
+		ui.mainSplitter->restoreState(settings.value("mainSplitter").toByteArray());
+		ui.infoProfileSplitter->restoreState(settings.value("infoProfileSplitter").toByteArray());
+		ui.listGlobeSplitter->restoreState(settings.value("listGlobeSplitter").toByteArray());
+		if(ui.mainSplitter->sizes().first() == 0 || ui.mainSplitter->sizes().last() == 0)
+			ui.mainSplitter->setSizes(mainSizes);
+		if(ui.infoProfileSplitter->sizes().first() == 0 || ui.infoProfileSplitter->sizes().last() == 0)
+			ui.infoProfileSplitter->setSizes(infoProfileSizes);
+		if(ui.listGlobeSplitter->sizes().first() == 0 || ui.listGlobeSplitter->sizes().last() == 0)
+			ui.listGlobeSplitter->setSizes(listGlobeSizes);
+
+	} else {
+		ui.mainSplitter->setSizes( mainSizes );
+		ui.infoProfileSplitter->setSizes(infoProfileSizes);
+		ui.listGlobeSplitter->setSizes(listGlobeSizes);
+	}
 	redrawProfile();
+}
+
+void MainWindow::beginChangeState(CurrentState s){
+	if (state == VIEWALL && state != s){
+		saveSplitterSizes();
+	}
+	state = s;
+}
+
+void MainWindow::saveSplitterSizes(){
+	QSettings settings;
+	settings.beginGroup("MainWindow");
+	settings.setValue("mainSplitter", ui.mainSplitter->saveState());
+	settings.setValue("infoProfileSplitter", ui.infoProfileSplitter->saveState());
+	settings.setValue("listGlobeSplitter", ui.listGlobeSplitter->saveState());
 }
 
 void MainWindow::on_actionPreviousDC_triggered()
 {
 	dc_number--;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 
 void MainWindow::on_actionNextDC_triggered()
 {
 	dc_number++;
+	ui.InfoWidget->updateDiveInfo(selected_dive);
 	redrawProfile();
 }
 
@@ -400,10 +491,14 @@ void MainWindow::on_actionUserManual_triggered()
 {
 	if(!helpView){
 		helpView = new QWebView();
+		helpView->page()->setLinkDelegationPolicy(QWebPage::DelegateExternalLinks);
+		connect(helpView, SIGNAL(linkClicked(QUrl)), this, SLOT(linkClickedSlot(QUrl)));
 	}
 	QString searchPath = getSubsurfaceDataPath("Documentation");
 	if (searchPath != "") {
 		QUrl url(searchPath.append("/user-manual.html"));
+		helpView->setWindowTitle(tr("User Manual"));
+		helpView->setWindowIcon(QIcon(":/subsurface-icon"));
 		helpView->setUrl(url);
 	} else {
 		helpView->setHtml(tr("Cannot find the Subsurface manual"));
@@ -411,16 +506,17 @@ void MainWindow::on_actionUserManual_triggered()
 	helpView->show();
 }
 
+void MainWindow::linkClickedSlot(QUrl url)
+{
+	QDesktopServices::openUrl(url);
+}
+
 QString MainWindow::filter()
 {
 	QString f;
 	f += "ALL ( *.ssrf *.xml *.XML *.uddf *.udcf *.UDFC *.jlb *.JLB ";
-#ifdef LIBZIP
 	f += "*.sde *.SDE *.dld *.DLD ";
-#endif
-#ifdef SQLITE3
 	f += "*.db";
-#endif
 	f += ");;";
 
 	f += "Subsurface (*.ssrf);;";
@@ -429,13 +525,9 @@ QString MainWindow::filter()
 	f += "UDCF (*.udcf *.UDCF);;";
 	f += "JLB  (*.jlb *.JLB);;";
 
-#ifdef LIBZIP
 	f += "SDE (*.sde *.SDE);;";
 	f += "DLD (*.dld *.DLD);;";
-#endif
-#ifdef SQLITE3
 	f += "DB (*.db)";
-#endif
 
 	return f;
 }
@@ -496,53 +588,39 @@ bool MainWindow::askSaveChanges()
 	else							\
 		prefs.field = default_prefs.field
 
+#define GET_TXT(name, field)					\
+	v = s.value(QString(name));				\
+	if (v.isValid())					\
+		prefs.field = strdup(v.toString().toUtf8().constData());			\
+	else							\
+		prefs.field = default_prefs.field
+
+#define GET_TXT(name, field)					\
+	v = s.value(QString(name));				\
+	if (v.isValid())					\
+		prefs.field = strdup(v.toString().toUtf8().constData());			\
+	else							\
+		prefs.field = default_prefs.field
+
 
 void MainWindow::initialUiSetup()
 {
 	QSettings settings;
-	int i;
-
 	settings.beginGroup("MainWindow");
 	QSize sz = settings.value("size", qApp->desktop()->size()).value<QSize>();
-	resize(sz);
+	if (settings.value("maximized", isMaximized()).value<bool>())
+		showMaximized();
+	else
+		resize(sz);
 
-	if (settings.value("mainSplitter").isValid()){
-		ui.mainSplitter->restoreState(settings.value("mainSplitter").toByteArray());
-		ui.infoProfileSplitter->restoreState(settings.value("infoProfileSplitter").toByteArray());
-		ui.listGlobeSplitter->restoreState(settings.value("listGlobeSplitter").toByteArray());
-	} else {
-		QList<int> mainSizes;
-		mainSizes.append( qApp->desktop()->size().height() * 0.7 );
-		mainSizes.append( qApp->desktop()->size().height() * 0.3 );
-		ui.mainSplitter->setSizes( mainSizes );
-
-		QList<int> infoProfileSizes;
-		infoProfileSizes.append( qApp->desktop()->size().width() * 0.3 );
-		infoProfileSizes.append( qApp->desktop()->size().width() * 0.7 );
-		ui.infoProfileSplitter->setSizes(infoProfileSizes);
-
-		QList<int> listGlobeSizes;
-		listGlobeSizes.append( qApp->desktop()->size().width() * 0.7 );
-		listGlobeSizes.append( qApp->desktop()->size().width() * 0.3 );
-		ui.listGlobeSplitter->setSizes(listGlobeSizes);
+	state = (CurrentState) settings.value("lastState", 0).toInt();
+	switch(state){
+		case VIEWALL: on_actionViewAll_triggered(); break;
+		case GLOBE_MAXIMIZED : on_actionViewGlobe_triggered(); break;
+		case INFO_MAXIMIZED : on_actionViewInfo_triggered(); break;
+		case LIST_MAXIMIZED : on_actionViewList_triggered(); break;
+		case PROFILE_MAXIMIZED : on_actionViewProfile_triggered(); break;
 	}
-
-	settings.endGroup();
-
-	settings.beginGroup("ListWidget");
-	/* if no width are set, use the calculated width for each column;
-	 * for that to work we need to temporarily expand all rows */
-	ui.ListWidget->expandAll();
-	for (i = DiveTripModel::NR; i < DiveTripModel::COLUMNS; i++) {
-		QVariant width = settings.value(QString("colwidth%1").arg(i));
-		if (width.isValid())
-			ui.ListWidget->setColumnWidth(i, width.toInt());
-		else
-			ui.ListWidget->resizeColumnToContents(i);
-	}
-	ui.ListWidget->collapseAll();
-	ui.ListWidget->expand(ui.ListWidget->model()->index(0,0));
-	ui.ListWidget->scrollTo(ui.ListWidget->model()->index(0,0), QAbstractItemView::PositionAtCenter);
 	settings.endGroup();
 }
 
@@ -582,70 +660,39 @@ void MainWindow::readSettings()
 	GET_BOOL("dcceiling", profile_dc_ceiling);
 	GET_BOOL("calcceiling", profile_calc_ceiling);
 	GET_BOOL("calcceiling3m", calc_ceiling_3m_incr);
+	GET_BOOL("calcndltts", calc_ndl_tts);
 	GET_BOOL("calcalltissues", calc_all_tissues);
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
-	set_gf(prefs.gflow, prefs.gfhigh);
-	GET_BOOL("show_time", show_time);
+	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
+	set_gf(prefs.gflow, prefs.gfhigh, prefs.gf_low_at_maxdepth);
+	GET_BOOL("show_sac", show_sac);
+	s.endGroup();
+
+	s.beginGroup("GeneralSettings");
+	GET_TXT("default_filename", default_filename);
+	GET_TXT("default_cylinder", default_cylinder);
 	s.endGroup();
 
 	s.beginGroup("Display");
-	v = s.value(QString("divelist_font"));
-	if (v.isValid())
-		prefs.divelist_font = strdup(v.toString().toUtf8().data());
+	GET_TXT("divelist_font", divelist_font);
+	GET_INT("font_size", font_size);
+	GET_INT("displayinvalid", display_invalid_dives);
+	s.endGroup();
 }
-
-#define SAVE_VALUE(name, field)				\
-	if (prefs.field != default_prefs.field)		\
-		settings.setValue(name, prefs.field);	\
-	else						\
-		settings.remove(name)
 
 void MainWindow::writeSettings()
 {
-	int i;
 	QSettings settings;
 
 	settings.beginGroup("MainWindow");
-	settings.setValue("size",size());
-	settings.setValue("mainSplitter", ui.mainSplitter->saveState());
-	settings.setValue("infoProfileSplitter", ui.infoProfileSplitter->saveState());
-	settings.setValue("listGlobeSplitter", ui.listGlobeSplitter->saveState());
-	settings.endGroup();
-
-	settings.beginGroup("ListWidget");
-	for (i = DiveTripModel::NR; i < DiveTripModel::COLUMNS; i++)
-		if (!ui.ListWidget->isColumnHidden(i))
-			settings.setValue(QString("colwidth%1").arg(i), ui.ListWidget->columnWidth(i));
-	settings.endGroup();
-	settings.beginGroup("Units");
-	SAVE_VALUE("length", units.length);
-	SAVE_VALUE("pressure", units.pressure);
-	SAVE_VALUE("volume", units.volume);
-	SAVE_VALUE("temperature", units.temperature);
-	SAVE_VALUE("weight", units.weight);
-	SAVE_VALUE("vertical_speed_time", units.vertical_speed_time);
-	settings.endGroup();
-	settings.beginGroup("TecDetails");
-	SAVE_VALUE("po2graph", pp_graphs.po2);
-	SAVE_VALUE("pn2graph", pp_graphs.pn2);
-	SAVE_VALUE("phegraph", pp_graphs.phe);
-	SAVE_VALUE("po2threshold", pp_graphs.po2_threshold);
-	SAVE_VALUE("pn2threshold", pp_graphs.pn2_threshold);
-	SAVE_VALUE("phethreshold", pp_graphs.phe_threshold);
-	SAVE_VALUE("mod", mod);
-	SAVE_VALUE("modppO2", mod_ppO2);
-	SAVE_VALUE("ead", ead);
-	SAVE_VALUE("redceiling", profile_red_ceiling);
-	SAVE_VALUE("calcceiling", profile_calc_ceiling);
-	SAVE_VALUE("calcceiling3m", calc_ceiling_3m_incr);
-	SAVE_VALUE("calcalltissues", calc_all_tissues);
-	SAVE_VALUE("dcceiling", profile_dc_ceiling);
-	SAVE_VALUE("gflow", gflow);
-	SAVE_VALUE("gfhigh", gfhigh);
-	settings.endGroup();
-	settings.beginGroup("GeneralSettings");
-	SAVE_VALUE("default_filename", default_filename);
+	settings.setValue("lastState", (int) state);
+	settings.setValue("maximized", isMaximized());
+	if (!isMaximized())
+		settings.setValue("size", size());
+	if (state == VIEWALL){
+		saveSplitterSizes();
+	}
 	settings.endGroup();
 }
 
@@ -696,6 +743,10 @@ void MainWindow::file_save_as(void)
 	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), default_filename,
 						tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
 	if (!filename.isNull() && !filename.isEmpty()) {
+
+		if(ui.InfoWidget->isEditing())
+			ui.InfoWidget->acceptChanges();
+
 		save_dives(filename.toUtf8().data());
 		set_filename(filename.toUtf8().data(), TRUE);
 		setTitle(MWTF_FILENAME);
@@ -709,6 +760,9 @@ void MainWindow::file_save(void)
 
 	if (!existing_filename)
 		return file_save_as();
+
+	if(ui.InfoWidget->isEditing())
+		ui.InfoWidget->acceptChanges();
 
 	current_default = prefs.default_filename;
 	if (strcmp(existing_filename, current_default) ==  0) {
@@ -739,6 +793,10 @@ void MainWindow::setTitle(enum MainWindowTitleFormat format)
 		setWindowTitle("Subsurface");
 		break;
 	case MWTF_FILENAME:
+		if (!existing_filename) {
+			setTitle(MWTF_DEFAULT);
+			return;
+		}
 		QFile f(existing_filename);
 		QFileInfo fileInfo(f);
 		QString fileName(fileInfo.fileName());
@@ -764,13 +822,7 @@ void MainWindow::importFiles(const QStringList fileNames)
 		}
 	}
 	process_dives(TRUE, FALSE);
-
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	refreshDisplay();
 }
 
 void MainWindow::loadFiles(const QStringList fileNames)
@@ -795,24 +847,42 @@ void MainWindow::loadFiles(const QStringList fileNames)
 
 	process_dives(FALSE, FALSE);
 
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+	refreshDisplay();
+	ui.actionAutoGroup->setChecked(autogroup);
 }
 
 void MainWindow::on_actionImportCSV_triggered()
 {
-	CSVImportDialog *csvImport = new(CSVImportDialog);
+	CSVImportDialog *csvImport = new CSVImportDialog();
 	csvImport->show();
 	process_dives(TRUE, FALSE);
+	refreshDisplay();
+}
 
-	ui.InfoWidget->reload();
-	ui.globe->reload();
-	ui.ListWidget->reload(DiveTripModel::TREE);
-	ui.ListWidget->setFocus();
-	WSInfoModel *wsim = WSInfoModel::instance();
-	wsim->updateInfo();
+void MainWindow::editCurrentDive()
+{
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
+		QMessageBox::warning(this, tr("Warning"), tr("First finish the current edition before trying to do another."));
+		return;
+	}
+
+	struct dive *d = current_dive;
+	QString defaultDC(d->dc.model);
+	DivePlannerPointsModel::instance()->clear();
+	if (defaultDC == "manually added dive"){
+		disableDcShortcuts();
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::ADD);
+		ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
+		ui.infoPane->setCurrentIndex(MAINTAB);
+		DivePlannerPointsModel::instance()->loadFromDive(d);
+		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
+	}
+	else if (defaultDC == "planned dive"){
+		disableDcShortcuts();
+		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::PLAN);
+		ui.stackedWidget->setCurrentIndex(PLANNERPROFILE); // Planner.
+		ui.infoPane->setCurrentIndex(PLANNERWIDGET);
+		DivePlannerPointsModel::instance()->loadFromDive(d);
+		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
+	}
 }

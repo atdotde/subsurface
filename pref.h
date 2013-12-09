@@ -18,6 +18,7 @@ typedef struct {
 struct preferences {
 	const char *divelist_font;
 	const char *default_filename;
+	const char *default_cylinder;
 	double font_size;
 	partial_pressure_graphs_t pp_graphs;
 	short mod;
@@ -28,14 +29,14 @@ struct preferences {
 	short profile_calc_ceiling;
 	short calc_ceiling_3m_incr;
 	short calc_all_tissues;
+	short calc_ndl_tts;
 	short gflow;
 	short gfhigh;
-	int map_provider;
+	bool gf_low_at_maxdepth;
 	short display_invalid_dives;
-	short show_invalid;
 	short unit_system;
 	struct units units;
-	short show_time;
+	short show_sac;
 };
 enum unit_system_values { METRIC, IMPERIAL, PERSONALIZE };
 

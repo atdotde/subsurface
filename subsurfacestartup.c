@@ -24,11 +24,13 @@ struct preferences default_prefs = {
 	.profile_red_ceiling  = FALSE,
 	.profile_calc_ceiling = FALSE,
 	.calc_ceiling_3m_incr = FALSE,
+	.calc_ndl_tts = FALSE,
 	.gflow = 30,
 	.gfhigh = 75,
+	.gf_low_at_maxdepth = FALSE,
 	.font_size = 14.0,
-	.show_invalid = FALSE,
-	.show_time = FALSE,
+	.display_invalid_dives = FALSE,
+	.show_sac = FALSE,
 };
 
 struct units *get_units()
@@ -80,7 +82,8 @@ bool imported = FALSE;
 
 static void print_version() {
 	printf("Subsurface v%s, ", VERSION_STRING);
-	printf("built with libdivecomputer v%s\n", dc_version(NULL));
+	//	printf("built with libdivecomputer v%s\n", dc_version(NULL));
+	printf("libdivecomputer version x\n");
 }
 
 static void print_help() {
@@ -104,6 +107,9 @@ void parse_argument(const char *arg)
 			exit(0);
 		case 'v':
 			verbose++;
+			continue;
+		case 'q':
+			quit++;
 			continue;
 		case '-':
 			/* long options with -- */

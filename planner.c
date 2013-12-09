@@ -4,6 +4,7 @@
  *
  * (c) Dirk Hohndel 2013
  */
+#include <assert.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
@@ -57,6 +58,8 @@ void set_last_stop(bool last_stop_6m)
 
 void get_gas_from_events(struct divecomputer *dc, int time, int *o2, int *he)
 {
+	// we don't modify the values passed in if nothing is found
+	// so don't call with uninitialized o2/he !
 	struct event *event = dc->events;
 	while (event && event->time.seconds <= time) {
 		if (!strcmp(event->name, "gaschange")) {
@@ -74,7 +77,7 @@ static inline bool match_percent(int a, int b)
 	return (a + 5) / 10 == (b + 5) / 10;
 }
 
-static int get_gasidx(struct dive *dive, int o2, int he)
+int get_gasidx(struct dive *dive, int o2, int he)
 {
 	int gasidx = -1;
 
@@ -91,7 +94,7 @@ static int get_gasidx(struct dive *dive, int o2, int he)
 void get_gas_string(int o2, int he, char *text, int len)
 {
 	if (is_air(o2, he))
-		snprintf(text, len, translate("gettextFromC","air"));
+		snprintf(text, len, "%s", translate("gettextFromC","air"));
 	else if (he == 0)
 		snprintf(text, len, translate("gettextFromC","EAN%d"), (o2 + 5) / 10);
 	else
@@ -168,7 +171,33 @@ static int time_at_last_depth(struct dive *dive, int o2, int he, unsigned int ne
 	return wait;
 }
 
-int add_gas(struct dive *dive, int o2, int he)
+void fill_default_cylinder(cylinder_t *cyl)
+{
+	const char *cyl_name = prefs.default_cylinder != NULL ? prefs.default_cylinder : "AL80";
+	struct tank_info_t *ti = tank_info;
+	struct tank_info_t *al80 = NULL;
+
+	while (ti->name != NULL) {
+		if (strcmp(ti->name, cyl_name) == 0)
+			break;
+		if (strcmp(ti->name, "AL80") == 0)
+			al80 = ti;
+		ti++;
+	}
+	if (ti->name == NULL)
+		ti = al80;
+	cyl->type.description = strdup(ti->name);
+	if (ti->ml) {
+		cyl->type.size.mliter = ti->ml;
+		cyl->type.workingpressure.mbar = ti->bar * 1000;
+	} else {
+		cyl->type.workingpressure.mbar = psi_to_mbar(ti->psi);
+		if (ti->psi)
+			cyl->type.size.mliter = cuft_to_l(ti->cuft) * 1000 / bar_to_atm(psi_to_bar(ti->psi));
+	}
+}
+
+static int add_gas(struct dive *dive, int o2, int he)
 {
 	int i;
 	struct gasmix *mix;
@@ -185,11 +214,10 @@ int add_gas(struct dive *dive, int o2, int he)
 	if (i == MAX_CYLINDERS) {
 		return -1;
 	}
+	/* let's make it our default cylinder */
+	fill_default_cylinder(cyl);
 	mix->o2.permille = o2;
 	mix->he.permille = he;
-	/* since air is stored as 0/0 we need to set a name or an air cylinder
-	 * would be seen as unset (by cylinder_nodata()) */
-	cyl->type.description = strdup(translate("gettextFromC","Cylinder for planning"));
 	return i;
 }
 
@@ -214,7 +242,7 @@ struct dive *create_dive_from_plan(struct diveplan *diveplan, const char **error
 	dive->when = diveplan->when;
 	dive->dc.surface_pressure.mbar = diveplan->surface_pressure;
 	dc = &dive->dc;
-	dc->model = strdup(translate("gettextFromC","Simulated Dive"));
+	dc->model = "planned dive"; /* do not translate here ! */
 	dp = diveplan->dp;
 
 	/* let's start with the gas given on the first segment */
@@ -259,11 +287,10 @@ struct dive *create_dive_from_plan(struct diveplan *diveplan, const char **error
 		if (o2 != oldo2 || he != oldhe) {
 			int plano2 = (o2 + 5) / 10 * 10;
 			int planhe = (he + 5) / 10 * 10;
-			int value;
-			if (add_gas(dive, plano2, planhe) < 0)
+			int idx;
+	    if ((idx = add_gas(dive, plano2, planhe)) < 0)
 				goto gas_error_exit;
-			value = (plano2 / 10) | ((planhe / 10) << 16);
-			add_event(dc, lasttime, 25, 0, value, "gaschange"); // SAMPLE_EVENT_GASCHANGE2
+			add_gas_switch_event(dive, dc, lasttime, idx);
 			oldo2 = o2; oldhe = he;
 		}
 		/* Create sample */
@@ -348,7 +375,7 @@ void add_to_end_of_diveplan(struct diveplan *diveplan, struct divedatapoint *dp)
 		lastdp = &(*lastdp)->next;
 	}
 	*lastdp = dp;
-	if (ldp)
+	if (ldp && dp->time != 0)
 		dp->time += lasttime;
 }
 
@@ -383,6 +410,7 @@ static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive
 				i++;
 			}
 			gaschanges[i].depth = dp->depth;
+			gaschanges[i].gasidx = -1;
 			do {
 				if (dive->cylinder[j].gasmix.o2.permille == dp->o2 &&
 				    dive->cylinder[j].gasmix.he.permille == dp->he) {
@@ -391,6 +419,7 @@ static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive
 				}
 				j++;
 			} while (j < MAX_CYLINDERS);
+			assert(gaschanges[i].gasidx != -1);
 		}
 		dp = dp->next;
 	}
@@ -563,11 +592,11 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	int transitiontime, gi;
 	unsigned int stopidx, depth, ceiling;
 	double tissue_tolerance;
-	struct gaschanges *gaschanges;
+	struct gaschanges *gaschanges = NULL;
 	int gaschangenr;
-	unsigned int *stoplevels;
+	unsigned int *stoplevels = NULL;
 
-	set_gf(diveplan->gflow, diveplan->gfhigh);
+	set_gf(diveplan->gflow, diveplan->gfhigh, default_prefs.gf_low_at_maxdepth);
 	if (!diveplan->surface_pressure)
 		diveplan->surface_pressure = SURFACE_PRESSURE;
 	if (*divep)
@@ -611,10 +640,13 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 #endif
 	if (depth < ceiling) /* that's not good... */
 		depth = ceiling;
+	if (depth == 0 && ceiling == 0) /* we are done here */
+		goto done;
 	for (stopidx = 0; stopidx < sizeof(decostoplevels) / sizeof(int); stopidx++)
-		if (decostoplevels[stopidx] >= depth)
+		if (decostoplevels[stopidx] >= ceiling)
 			break;
-	stopidx--;
+	if (stopidx > 0)
+		stopidx--;
 
 	/* so now we know the first decostop level above us
 	 * NOTE, this could be the surface or a long list of potential stops
@@ -683,6 +715,8 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		record_dive(dive);
 		stopidx--;
 	}
+
+done:
 
 #if DO_WE_WANT_THIS_IN_QT
 	add_plan_to_notes(diveplan, dive);

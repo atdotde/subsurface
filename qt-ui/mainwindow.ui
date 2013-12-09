@@ -10,9 +10,6 @@
     <height>548</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>MainWindow</string>
-  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <property name="spacing">
@@ -169,47 +166,38 @@
      <x>0</x>
      <y>0</y>
      <width>763</width>
-     <height>23</height>
+     <height>32</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
-     <string>File</string>
+     <string>&amp;File</string>
     </property>
     <addaction name="actionNew"/>
     <addaction name="actionOpen"/>
     <addaction name="actionSave"/>
     <addaction name="actionSaveAs"/>
+    <addaction name="separator"/>
     <addaction name="actionClose"/>
-    <addaction name="separator"/>
-    <addaction name="actionImport"/>
-    <addaction name="actionImportCSV"/>
     <addaction name="actionExportUDDF"/>
-    <addaction name="separator"/>
     <addaction name="actionPrint"/>
-    <addaction name="separator"/>
     <addaction name="actionPreferences"/>
-    <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menuLog">
     <property name="title">
-     <string>Log</string>
+     <string>&amp;Log</string>
     </property>
-    <addaction name="actionDownloadDC"/>
-    <addaction name="actionDownloadWeb"/>
-    <addaction name="actionEditDeviceNames"/>
-    <addaction name="separator"/>
     <addaction name="actionAddDive"/>
     <addaction name="separator"/>
     <addaction name="actionRenumber"/>
     <addaction name="actionAutoGroup"/>
-    <addaction name="actionToggleZoom"/>
-    <addaction name="actionYearlyStatistics"/>
+    <addaction name="separator"/>
+    <addaction name="actionEditDeviceNames"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>View</string>
+     <string>&amp;View</string>
     </property>
     <addaction name="actionViewAll"/>
     <addaction name="actionViewList"/>
@@ -217,10 +205,10 @@
     <addaction name="actionViewInfo"/>
     <addaction name="actionViewGlobe"/>
     <addaction name="separator"/>
+    <addaction name="actionYearlyStatistics"/>
     <addaction name="actionPreviousDC"/>
     <addaction name="actionNextDC"/>
     <addaction name="separator"/>
-    <addaction name="actionDivePlanner"/>
    </widget>
    <widget class="QMenu" name="menuFilter">
     <property name="title">
@@ -230,12 +218,23 @@
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
-     <string>Help</string>
+     <string>&amp;Help</string>
     </property>
     <addaction name="actionAboutSubsurface"/>
     <addaction name="actionUserManual"/>
    </widget>
+   <widget class="QMenu" name="menuImport">
+    <property name="title">
+     <string>&amp;Import</string>
+    </property>
+    <addaction name="actionDownloadDC"/>
+    <addaction name="actionImport"/>
+    <addaction name="actionImportCSV"/>
+    <addaction name="actionDownloadWeb"/>
+    <addaction name="actionDivelogs_de"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuImport"/>
    <addaction name="menuLog"/>
    <addaction name="menuView"/>
    <addaction name="menuFilter"/>
@@ -243,6 +242,9 @@
   </widget>
   <action name="actionNew">
    <property name="text">
+    <string>&amp;New logbook</string>
+   </property>
+   <property name="toolTip">
     <string>New</string>
    </property>
    <property name="shortcut">
@@ -251,6 +253,9 @@
   </action>
   <action name="actionOpen">
    <property name="text">
+    <string>&amp;Open logbook</string>
+   </property>
+   <property name="toolTip">
     <string>Open</string>
    </property>
    <property name="shortcut">
@@ -259,6 +264,9 @@
   </action>
   <action name="actionSave">
    <property name="text">
+    <string>&amp;Save</string>
+   </property>
+   <property name="toolTip">
     <string>Save</string>
    </property>
    <property name="shortcut">
@@ -269,12 +277,18 @@
    <property name="text">
     <string>Save as</string>
    </property>
+   <property name="toolTip">
+    <string>Save as</string>
+   </property>
    <property name="shortcut">
     <string>Ctrl+Shift+S</string>
    </property>
   </action>
   <action name="actionClose">
    <property name="text">
+    <string>Close</string>
+   </property>
+   <property name="toolTip">
     <string>Close</string>
    </property>
    <property name="shortcut">
@@ -285,18 +299,24 @@
    <property name="text">
     <string>Import Files</string>
    </property>
+   <property name="toolTip">
+    <string>Import Files</string>
+   </property>
    <property name="shortcut">
     <string>Ctrl+I</string>
    </property>
   </action>
   <action name="actionExportUDDF">
    <property name="text">
-    <string>Export UDDF</string>
+    <string>Export &amp;UDDF</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
    </property>
   </action>
   <action name="actionPrint">
    <property name="text">
-    <string>Print</string>
+    <string>&amp;Print</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+P</string>
@@ -306,18 +326,27 @@
    <property name="text">
     <string>Preferences</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+,</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionQuit">
    <property name="text">
-    <string>Quit</string>
+    <string>&amp;Quit</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Q</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::QuitRole</enum>
+   </property>
   </action>
   <action name="actionDownloadDC">
    <property name="text">
-    <string>Download from Dive computer</string>
+    <string>Import from &amp;dive computer</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+D</string>
@@ -325,42 +354,57 @@
   </action>
   <action name="actionDownloadWeb">
    <property name="text">
-    <string>Download from Web Service</string>
+    <string>Import &amp;GPS data from Subsurface Service</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
    </property>
   </action>
   <action name="actionEditDeviceNames">
    <property name="text">
-    <string>Edit Device Names</string>
+    <string>&amp;Edit Device Names</string>
    </property>
   </action>
   <action name="actionAddDive">
    <property name="text">
     <string>Add Dive</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl++</string>
+   </property>
   </action>
   <action name="actionRenumber">
    <property name="text">
-    <string>Renumber</string>
+    <string>&amp;Renumber</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
    </property>
   </action>
   <action name="actionAutoGroup">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>Auto Group</string>
    </property>
   </action>
   <action name="actionToggleZoom">
    <property name="text">
-    <string>Toggle Zoom</string>
+    <string>Toggle &amp;Zoom</string>
    </property>
   </action>
   <action name="actionYearlyStatistics">
    <property name="text">
-    <string>Yearly Statistics</string>
+    <string>&amp;Yearly Statistics</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
    </property>
   </action>
   <action name="actionViewList">
    <property name="text">
-    <string>View List</string>
+    <string>Dive List</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+2</string>
@@ -368,7 +412,7 @@
   </action>
   <action name="actionViewProfile">
    <property name="text">
-    <string>View Profile</string>
+    <string>Profile</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+3</string>
@@ -376,7 +420,7 @@
   </action>
   <action name="actionViewInfo">
    <property name="text">
-    <string>View Info</string>
+    <string>Info</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+4</string>
@@ -384,7 +428,7 @@
   </action>
   <action name="actionViewAll">
    <property name="text">
-    <string>View All</string>
+    <string>All</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+1</string>
@@ -420,10 +464,13 @@
    <property name="text">
     <string>About Subsurface</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::AboutRole</enum>
+   </property>
   </action>
   <action name="actionUserManual">
    <property name="text">
-    <string>User Manual</string>
+    <string>User &amp;Manual</string>
    </property>
    <property name="shortcut">
     <string>F1</string>
@@ -431,7 +478,7 @@
   </action>
   <action name="actionViewGlobe">
    <property name="text">
-    <string>View Globe</string>
+    <string>Globe</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+5</string>
@@ -439,15 +486,24 @@
   </action>
   <action name="actionDivePlanner">
    <property name="text">
-    <string>Dive Planner</string>
+    <string>P&amp;lan Dive</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
    </property>
   </action>
   <action name="actionImportCSV">
-    <property name="text">
-      <string>Import CSV</string>
-    </property>
-      <property name="toolTip">
-    </property>
+   <property name="text">
+    <string>Import CSV</string>
+   </property>
+   <property name="toolTip">
+    <string>Import CS&amp;V</string>
+   </property>
+  </action>
+  <action name="actionDivelogs_de">
+   <property name="text">
+    <string>Import from Divelogs.de</string>
+   </property>
   </action>
  </widget>
  <customwidgets>

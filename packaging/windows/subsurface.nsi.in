@@ -98,33 +98,30 @@ Section
     Delete "$INSTDIR\*.dll"
 
     # Files to include in installer
-    File ..\..\subsurface.exe
-    File /r ..\..\xslt
-    File dll\iconv.dll
-    File dll\libdivecomputer-0.dll
-    File dll\libintl-8.dll
-    File dll\libpng15-15.dll
-    File dll\libusb-1.0.dll
-    File dll\libxml2-2.dll
-    File dll\libxslt-1.dll
-    File dll\zlib1.dll
-    File dll\libzip-2.dll
-    File dll\libsqlite3-0.dll
-    File dll\libgcc_s_sjlj-1.dll
-    File dll\libstdc++-6.dll
-    File dll\QtCore4.dll
-    File dll\QtGui4.dll
-    File dll\QtNetwork4.dll
-    File dll\QtSvg4.dll
-    File dll\QtWebKit4.dll
-    File dll\QtDeclarative4.dll
-    File dll\QtScript4.dll
-    File dll\QtSql4.dll
-    File dll\QtXmlPatterns4.dll
-    File dll\QtXml4.dll
-    File dll\libmarblewidget.dll
+    File subsurface.exe
+    File /r xslt
+    File /r data
+    File /r images
+    File /r icons
+    File /r plugins
+    File /r Documentation
+    File /r translations
+    File iconv.dll
+    File libdivecomputer-0.dll
+    File libpng15-15.dll
+    File libjpeg-*.dll
+    File libusb-1.0.dll
+    File libxml2-2.dll
+    File libxslt-1.dll
+    File zlib1.dll
+    File libzip*.dll
+    File libsqlite3-0.dll
+    File libgcc_s_sjlj-1.dll
+    File libstdc++-6.dll
+    File libmarblewidget*dll
+    File Qt*4.dll
     File subsurface.ico
-    File /r share
+    File qt.conf
 
     # Store installation folder in registry
     WriteRegStr HKCU "Software\Subsurface" "" $INSTDIR
@@ -132,9 +129,9 @@ Section
     # Create shortcuts
     !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
         CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
-        CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Subsurface.lnk" "$INSTDIR\subsurface.exe"
+        CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Subsurface.lnk" "$INSTDIR\subsurface.exe" "" "$INSTDIR\subsurface.ico" 0
         CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall Subsurface.lnk" "$INSTDIR\Uninstall.exe"
-        CreateShortCut "$DESKTOP\Subsurface.lnk" "$INSTDIR\subsurface.exe" ""
+        CreateShortCut "$DESKTOP\Subsurface.lnk" "$INSTDIR\subsurface.exe" "" "$INSTDIR\subsurface.ico" 0
     !insertmacro MUI_STARTMENU_WRITE_END
 
     # Create the uninstaller
@@ -164,8 +161,16 @@ Section "Uninstall"
     Delete "$INSTDIR\subsurface.exe"
     Delete "$INSTDIR\subsurface.ico"
     Delete "$INSTDIR\Uninstall.exe"
+    Delete "$INSTDIR\qt.conf"
     RMDir /r "$INSTDIR\share"
     RMDir /r "$INSTDIR\xslt"
+    RMDir /r "$INSTDIR\data"
+    RMDir /r "$INSTDIR\icons"
+    RMDir /r "$INSTDIR\images"
+    RMDir /r "$INSTDIR\translations"
+    RMDir /r "$INSTDIR\oldshare"
+    RMDir /r "$INSTDIR\plugins"
+    RMDir /r "$INSTDIR\Documentation"
     RMDir "$INSTDIR"
 
     # Remove shortcuts
