@@ -1002,6 +1002,12 @@ DivePlannerWidget::DivePlannerWidget(QWidget* parent, Qt::WindowFlags f): QWidge
 	setMinimumHeight(0);
 }
 
+void DivePlannerWidget::settingsChanged()
+{
+	ui.gflow->setValue(prefs.gflow);
+	ui.gfhigh->setValue(prefs.gfhigh);
+}
+
 void DivePlannerPointsModel::addCylinder_clicked()
 {
 	CylindersModel::instance()->add();
@@ -1111,8 +1117,9 @@ int DivePlannerPointsModel::rowCount(const QModelIndex& parent) const
 	return divepoints.count();
 }
 
-DivePlannerPointsModel::DivePlannerPointsModel(QObject* parent): QAbstractTableModel(parent), mode(NOTHING)
+DivePlannerPointsModel::DivePlannerPointsModel(QObject* parent): QAbstractTableModel(parent), mode(NOTHING), stagingDive(NULL)
 {
+	diveplan.dp = NULL;
 }
 
 DivePlannerPointsModel* DivePlannerPointsModel::instance()
@@ -1389,9 +1396,11 @@ void DivePlannerPointsModel::clear()
 		memset(stagingDive->cylinder, 0, MAX_CYLINDERS * sizeof(cylinder_t));
 	}
 	CylindersModel::instance()->setDive(stagingDive);
-	beginRemoveRows(QModelIndex(), 0, rowCount()-1);
-	divepoints.clear();
-	endRemoveRows();
+	if (rowCount() > 0) {
+		beginRemoveRows(QModelIndex(), 0, rowCount() - 1);
+		divepoints.clear();
+		endRemoveRows();
+	}
 	CylindersModel::instance()->clear();
 }
 
@@ -1402,6 +1411,9 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	// Get the user-input and calculate the dive info
 	// Not sure if this is the place to create the diveplan...
 	// We just start with a surface node at time = 0
+	if (!stagingDive)
+		return;
+
 	diveplan.dp = NULL;
 	int lastIndex = -1;
 	for (int i = 0; i < rowCount(); i++) {

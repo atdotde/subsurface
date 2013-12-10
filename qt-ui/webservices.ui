@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Download Location Data</string>
+   <string>Webservice Connection</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -97,6 +97,13 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>userID</tabstop>
+  <tabstop>password</tabstop>
+  <tabstop>download</tabstop>
+  <tabstop>upload</tabstop>
+  <tabstop>buttonBox</tabstop>
+ </tabstops>
  <resources>
   <include location="../subsurface.qrc"/>
  </resources>
