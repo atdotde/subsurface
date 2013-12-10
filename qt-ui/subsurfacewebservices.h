@@ -41,6 +41,7 @@ protected:
 	QNetworkReply *reply;
 	QTimer timeout;
 	QByteArray downloadedData;
+	QString defaultApplyText;
 };
 
 class SubsurfaceWebServices : public WebServices {
@@ -66,7 +67,7 @@ class DivelogsDeWebServices : public WebServices {
 public:
 	static DivelogsDeWebServices * instance();
 	void downloadDives();
-	void uploadDives(QIODevice *dldContent);
+	void prepareDivesForUpload();
 
 private slots:
 	void startDownload();
@@ -79,6 +80,7 @@ private slots:
 	void uploadError(QNetworkReply::NetworkError error);
 	void startUpload();
 private:
+	void uploadDives(QIODevice *dldContent);
 	explicit DivelogsDeWebServices (QWidget* parent = 0, Qt::WindowFlags f = 0);
 	void setStatusText(int status);
 	void download_dialog_traverse_xml(xmlNodePtr node, unsigned int *download_status);
@@ -86,6 +88,7 @@ private:
 
 	QHttpMultiPart *multipart;
 	QTemporaryFile zipFile;
+	bool uploadMode;
 };
 
 #endif

@@ -150,8 +150,6 @@ private:
 	double min;
 	double max;
 	double interval;
-	double posBegin;
-	double posEnd;
 	double tickSize;
 	QColor textColor;
 };
@@ -236,6 +234,7 @@ public:
     explicit DivePlannerWidget(QWidget* parent = 0, Qt::WindowFlags f = 0);
 
 public slots:
+	void settingsChanged();
 	void atmPressureChanged(const QString& pressure);
 	void bottomSacChanged(const QString& bottomSac);
 	void decoSacChanged(const QString& decosac);
