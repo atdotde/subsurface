@@ -100,30 +100,38 @@ static void clear_table(struct dive_table *table)
 
 static char *prepare_dives_for_divelogs(const bool selected)
 {
+	static const char errPrefix[] = "divelog.de-upload:";
+	if (!amount_selected) {
+		qDebug() << errPrefix << "no dives selected";
+		return NULL;
+	}
+
 	int i;
 	struct dive *dive;
 	FILE *f;
 	char filename[PATH_MAX], *tempfile;
-	size_t streamsize;
+	int streamsize;
 	char *membuf;
 	xmlDoc *doc;
 	xsltStylesheetPtr xslt = NULL;
 	xmlDoc *transformed;
 	struct zip_source *s[dive_table.nr];
 	struct zip *zip;
-	const QString errPrefix("divelog.de-upload:");
+
+	xslt = get_stylesheet("divelogs-export.xslt");
+	if (!xslt) {
+		qDebug() << errPrefix << "missing stylesheet";
+		return NULL;
+	}
 
 	/* generate a random filename and create/open that file with zip_open */
 	QString tempfileQ = QDir::tempPath() + "/import-" + QString::number(qrand() % 99999999) + ".dld";
-	tempfile = tempfileQ.toLocal8Bit().data();
+	tempfile = strdup(tempfileQ.toLocal8Bit().data());
 	zip = zip_open(tempfile, ZIP_CREATE, NULL);
 
 	if (!zip) {
 		qDebug() << errPrefix << "cannot open file as zip";
-		return NULL;
-	}
-	if (!amount_selected) {
-		qDebug() << errPrefix << "no dives selected";
+		free((void *)tempfile);
 		return NULL;
 	}
 
@@ -137,7 +145,7 @@ static char *prepare_dives_for_divelogs(const bool selected)
 		f = tmpfile();
 		if (!f) {
 			qDebug() << errPrefix << "cannot create temp file";
-			return NULL;
+			goto error_close_zip;
 		}
 		save_dive(f, dive);
 		fseek(f, 0, SEEK_END);
@@ -146,7 +154,9 @@ static char *prepare_dives_for_divelogs(const bool selected)
 		membuf = (char *)malloc(streamsize + 1);
 		if (!membuf || !fread(membuf, streamsize, 1, f)) {
 			qDebug() << errPrefix << "memory error";
-			return NULL;
+			fclose(f);
+			free((void *)membuf);
+			goto error_close_zip;
 		}
 		membuf[streamsize] = 0;
 		fclose(f);
@@ -155,21 +165,15 @@ static char *prepare_dives_for_divelogs(const bool selected)
 		 * transform it to divelogs.de format, finally dumping
 		 * the XML into a character buffer.
 		 */
-		doc = xmlReadMemory(membuf, strlen(membuf), "divelog", NULL, 0);
+		xmlDoc *doc = xmlReadMemory(membuf, streamsize, "divelog", NULL, 0);
 		if (!doc) {
 			qDebug() << errPrefix << "xml error";
-			return NULL;
+			free((void *)membuf);
+			goto error_close_zip;
 		}
 		free((void *)membuf);
-		// this call is overriding our local variable tempfile! not a good sign!
-		xslt = get_stylesheet("divelogs-export.xslt");
-		if (!xslt) {
-			qDebug() << errPrefix << "missing stylesheet";
-			return NULL;
-		}
 		transformed = xsltApplyStylesheet(xslt, doc, NULL);
-		xsltFreeStylesheet(xslt);
-		xmlDocDumpMemory(transformed, (xmlChar **) &membuf, (int *)&streamsize);
+		xmlDocDumpMemory(transformed, (xmlChar **) &membuf, &streamsize);
 		xmlFreeDoc(doc);
 		xmlFreeDoc(transformed);
 		/*
@@ -184,9 +188,15 @@ static char *prepare_dives_for_divelogs(const bool selected)
 		}
 	}
 	zip_close(zip);
-	/* let's call this again */
-	tempfile = tempfileQ.toLocal8Bit().data();
+	xsltFreeStylesheet(xslt);
 	return tempfile;
+
+error_close_zip:
+	zip_close(zip);
+	QFile::remove(tempfileQ);
+	free(tempfile);
+	xsltFreeStylesheet(xslt);
+	return NULL;
 }
 
 WebServices::WebServices(QWidget* parent, Qt::WindowFlags f): QDialog(parent, f)
@@ -549,14 +559,15 @@ void DivelogsDeWebServices::prepareDivesForUpload()
 	char *filename = prepare_dives_for_divelogs(true);
 	if (filename) {
 		QFile f(filename);
-		if (f.exists()) {
-			f.open(QIODevice::ReadOnly);
+		if (f.open(QIODevice::ReadOnly)) {
 			uploadDives((QIODevice *)&f);
 			f.close();
 			f.remove();
+			free((void *)filename);
 			return;
 		}
 		mainWindow()->showError(errorText.append(": ").append(filename));
+		free((void *)filename);
 		return;
 	}
 	mainWindow()->showError(errorText.append("!"));
@@ -753,6 +764,15 @@ void DivelogsDeWebServices::downloadFinished()
 	}
 	// now allow the user to cancel or accept
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(true);
+
+	quint64 entries;
+#if defined(LIBZIP_VERSION_MAJOR)
+        entries = zip_get_num_entries(zip, 0);
+#else
+        // old version of libzip
+	entries = zip_get_num_files(zip);
+#endif
+
 
 	zip_close(zip);
 	zipFile.close();

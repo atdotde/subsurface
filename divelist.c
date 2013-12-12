@@ -266,10 +266,12 @@ static int calculate_cns(struct dive *dive)
 	divenr = get_divenr(dive);
 	if (divenr) {
 		prev_dive = get_dive(divenr -1 );
-		endtime = prev_dive->when + prev_dive->duration.seconds;
-		if (prev_dive && dive->when < (endtime + 3600 * 12)) {
-			cns = calculate_cns(prev_dive);
-			cns = cns * 1/pow(2, (dive->when - endtime) / (90.0 * 60.0));
+		if (prev_dive) {
+			endtime = prev_dive->when + prev_dive->duration.seconds;
+			if (dive->when < (endtime + 3600 * 12)) {
+				cns = calculate_cns(prev_dive);
+				cns = cns * 1/pow(2, (dive->when - endtime) / (90.0 * 60.0));
+			}
 		}
 	}
 	/* Caclulate the cns for each sample in this dive and sum them */
@@ -386,6 +388,7 @@ double init_decompression(struct dive *dive)
 	timestamp_t when, lasttime = 0;
 	bool deco_init = FALSE;
 	double tissue_tolerance, surface_pressure;
+	tissue_tolerance = surface_pressure = get_surface_pressure_in_mbar(dive, TRUE) / 1000.0;
 
 	if (!dive)
 		return 0.0;
@@ -442,7 +445,7 @@ double init_decompression(struct dive *dive)
 #endif
 	}
 	if (!deco_init) {
-		double surface_pressure = get_surface_pressure_in_mbar(dive, TRUE) / 1000.0;
+		surface_pressure = get_surface_pressure_in_mbar(dive, TRUE) / 1000.0;
 		clear_deco(surface_pressure);
 #if DECO_CALC_DEBUG & 2
 		printf("no previous dive\n");

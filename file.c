@@ -117,13 +117,17 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char
 	 */
 	buf = realloc(mem->buffer, mem->size + strlen("<csv></csv>"));
 	if (buf != NULL) {
-		memmove(buf + 5, mem->buffer, mem->size);
+		memmove(buf + 5, buf, mem->size);
 		memcpy(buf, "<csv>", 5);
-		memcpy(mem->buffer + mem->size + 5, "</csv>", 7);
-		mem->buffer = buf;
+		memcpy(buf + mem->size + 5, "</csv>", 7);
 		mem->size += strlen("<csv></csv>");
-	} else
+		mem->buffer = buf;
+	} else {
+		/* we can atleast try to strdup a error... */
+		*error = strdup("realloc failed in __func__\n");
+		free(mem->buffer);
 		return 1;
+	}
 
 	return 0;
 }
@@ -391,16 +395,6 @@ void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int 
 
 	if (filename == NULL)
 		return;
-
-	if (readfile(filename, &mem) < 0) {
-		if (error) {
-			int len = strlen(translate("gettextFromC","Failed to read '%s'")) + strlen(filename);
-			*error = malloc(len);
-			snprintf(*error, len, translate("gettextFromC","Failed to read '%s'"), filename);
-		}
-
-		return;
-	}
 
 	if (try_to_xslt_open_csv(filename, &mem, error))
 		return;

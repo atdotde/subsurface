@@ -19,6 +19,11 @@
 #include <QStringListModel>
 #include <QApplication>
 
+QSize DiveListDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+	return QSize(50,22);
+}
+
 // Gets the index of the model in the currentRow and column.
 // currCombo is defined below.
 #define IDX( XX ) mymodel->index(currCombo.currRow, XX)
@@ -41,12 +46,13 @@ void StarWidgetsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& o
 		return;
 
 	int rating = value.toInt();
+	int deltaY = option.rect.height()/2 - StarWidget::starActive().height() /2 ;
 	painter->save();
 	painter->setRenderHint(QPainter::Antialiasing, true);
 	for(int i = 0; i < rating; i++)
-		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y(), StarWidget::starActive());
+		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y() + deltaY, StarWidget::starActive());
 	for(int i = rating; i < TOTALSTARS; i++)
-		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y(), StarWidget::starInactive());
+		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y() + deltaY, StarWidget::starInactive());
 	painter->restore();
 }
 
@@ -256,7 +262,11 @@ struct RevertWeightData {
 
 void WSInfoDelegate::revertModelData(QWidget* widget, QAbstractItemDelegate::EndEditHint hint)
 {
-	if (hint == QAbstractItemDelegate::NoHint || hint == QAbstractItemDelegate::RevertModelCache){
+	if (
+#if !defined __APPLE__
+	    hint == QAbstractItemDelegate::NoHint ||
+#endif
+	    hint == QAbstractItemDelegate::RevertModelCache) {
 		WeightModel *mymodel = qobject_cast<WeightModel *>(currCombo.model);
 		mymodel->setData(IDX(WeightModel::TYPE), currWeight.type, Qt::EditRole);
 		mymodel->passInData(IDX(WeightModel::WEIGHT), currWeight.weight);

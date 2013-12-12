@@ -1344,8 +1344,10 @@ void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int 
 
 	if (bufsize > 0)
 		buf[0] = '\0';
-	if (e1 == NULL || e2 == NULL)
+	if (e1 == NULL || e2 == NULL) {
+		free(buf2);
 		return;
+	}
 
 	if (e1->sec < e2->sec) {
 		start = e1;
@@ -1354,6 +1356,7 @@ void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int 
 		start = e2;
 		stop = e1;
 	} else {
+		free(buf2);
 		return;
 	}
 	count = 0;
@@ -1390,11 +1393,8 @@ void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int 
 		if (data->depth > max_depth)
 			max_depth = data->depth;
 		/* Try to detect gas changes */
-		if (GET_PRESSURE(data) > last_pressure+2000)
-			last_pressure = GET_PRESSURE(data);
-		else
+		if (GET_PRESSURE(data) < last_pressure+2000)
 			bar_used += last_pressure-GET_PRESSURE(data);
-
 
 		count+=1;
 		last_sec = data->sec;

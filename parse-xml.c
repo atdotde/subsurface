@@ -218,7 +218,6 @@ enum ParseState {FINDSTART, FINDEND};
 static void divetags(char *buffer, void *_tags)
 {
 	struct tag_entry *tags = _tags;
-	char tag[128];
 	int i = 0, start = 0, end = 0;
 	enum ParseState state = FINDEND;
 	i=0;
@@ -230,10 +229,9 @@ static void divetags(char *buffer, void *_tags)
 				/* Found end of tag */
 				if (i > 1) {
 					if(buffer[i-1] != '\\') {
-						strncpy(tag, buffer+start, end-start+1);
-						tag[end-start+1] = '\0';
+						buffer[end-start+1] = '\0';
 						state=FINDSTART;
-						taglist_add_tag(tags, tag);
+						taglist_add_tag(tags, buffer+start);
 					}
 				} else {
 					state=FINDSTART;
@@ -251,16 +249,16 @@ static void divetags(char *buffer, void *_tags)
 			}
 		}
 		i++;
-    }
-    if (state == FINDEND) {
-	    if (end < start)
-		    end = strlen(buffer)-1;
-	    if (strlen(buffer) > 0) {
-		    strncpy(tag, buffer+start, end-start+1);
-		    tag[end-start+1] = '\0';
-		    taglist_add_tag(tags, tag);
-	    }
-    }
+	}
+	if (state == FINDEND) {
+		if (end < start)
+			end = strlen(buffer)-1;
+		if (strlen(buffer) > 0) {
+			buffer[end-start+1] = '\0';
+			state=FINDSTART;
+			taglist_add_tag(tags, buffer+start);
+		}
+	}
 }
 
 enum number_type {
@@ -516,7 +514,7 @@ static void temperature(char *buffer, void *_temperature)
 	}
 	/* temperatures outside -40C .. +70C should be ignored */
 	if (temperature->mkelvin < ZERO_C_IN_MKELVIN - 40000 ||
-	    temperature->mkelvin > ZERO_C_IN_MKELVIN + 70000)
+		temperature->mkelvin > ZERO_C_IN_MKELVIN + 70000)
 		temperature->mkelvin = 0;
 }
 
@@ -550,6 +548,7 @@ static void duration(char *buffer, void *_time)
 		char *dot = strchr(mybuffer,'.');
 		*dot = ':';
 		sampletime(mybuffer, _time);
+		free(mybuffer);
 	} else {
 		sampletime(buffer, _time);
 	}
