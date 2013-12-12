@@ -956,7 +956,7 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 {
 	int i;
 	struct plot_info *pi = &gc.pi;
-	struct plot_data *entry;
+	struct plot_data *entry = NULL;
 
 	/* is plotting of this event disabled? */
 	if (ev->name) {
@@ -980,6 +980,10 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 		if (ev->time.seconds < entry->sec)
 			break;
 	}
+
+	/* If we didn't find the right event, don't dereference null */
+	if (entry == NULL)
+		return;
 
 	/* draw a little triangular marker and attach tooltip */
 
@@ -1094,7 +1098,7 @@ void ProfileGraphicsView::plot_depth_profile()
 	 * we double the interval if this still doesn't get us to 12 or fewer
 	 * time markers */
 	i = 0;
-	while (maxtime / increments[i] > 12 && i < 7)
+	while (i < 7 && maxtime / increments[i] > 12)
 		i++;
 	incr = increments[i];
 	while (maxtime / incr > 12)
