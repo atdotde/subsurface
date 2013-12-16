@@ -28,10 +28,9 @@ mac {
 	datadir = Contents/Resources/share
 	marbledir.path = Contents/Resources/data
 	xslt.path = $$datadir
-	doc.path = $$datadir/doc
+	doc.path = $$datadir/Documentation
 	translation.path = Contents/Resources/translations
 	qttranslation.path = Contents/Resources/translations
-	doc.files = $$files($$doc.files)
 	QMAKE_BUNDLE_DATA += marbledir xslt doc translation qttranslation
 
 	mac_deploy.target = mac-deploy
@@ -131,7 +130,7 @@ mac {
 	dummy.commands  = $${nl}prefix = /usr$${nl}\
 BINDIR = $(prefix)/bin$${nl}\
 DATADIR = $(prefix)/share$${nl}\
-DOCDIR = $(DATADIR)/doc/subsurface$${nl}\
+DOCDIR = $(DATADIR)/subsurface/Documentation$${nl}\
 DESKTOPDIR = $(DATADIR)/applications$${nl}\
 MANDIR = $(DATADIR)/man/man1$${nl}\
 XSLTDIR = $(DATADIR)/subsurface
