@@ -98,68 +98,72 @@ static void clear_table(struct dive_table *table)
 	table->nr = 0;
 }
 
-static char *prepare_dives_for_divelogs(const bool selected)
+bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, const bool selected, QString *errorMsg)
 {
 	static const char errPrefix[] = "divelog.de-upload:";
 	if (!amount_selected) {
-		qDebug() << errPrefix << "no dives selected";
-		return NULL;
+		*errorMsg = tr("no dives were selected");
+		return false;
 	}
 
-	int i;
-	struct dive *dive;
-	FILE *f;
-	char filename[PATH_MAX], *tempfile;
-	int streamsize;
-	char *membuf;
-	xmlDoc *doc;
 	xsltStylesheetPtr xslt = NULL;
-	xmlDoc *transformed;
-	struct zip_source *s[dive_table.nr];
 	struct zip *zip;
 
 	xslt = get_stylesheet("divelogs-export.xslt");
 	if (!xslt) {
 		qDebug() << errPrefix << "missing stylesheet";
-		return NULL;
+		return false;
 	}
 
-	/* generate a random filename and create/open that file with zip_open */
-	QString tempfileQ = QDir::tempPath() + "/import-" + QString::number(qrand() % 99999999) + ".dld";
-	tempfile = strdup(tempfileQ.toLocal8Bit().data());
-	zip = zip_open(tempfile, ZIP_CREATE, NULL);
 
+	int error_code;
+	zip = zip_open(QFile::encodeName(tempfile), ZIP_CREATE, &error_code);
 	if (!zip) {
-		qDebug() << errPrefix << "cannot open file as zip";
-		free((void *)tempfile);
-		return NULL;
+		char buffer[1024];
+		zip_error_to_str(buffer, sizeof buffer, error_code, errno);
+		*errorMsg = tr("failed to create zip file for upload: %1")
+			    .arg(QString::fromLocal8Bit(buffer));
+		return false;
 	}
 
 	/* walk the dive list in chronological order */
-	for (i = 0; i < dive_table.nr; i++) {
-		dive = get_dive(i);
+	for (int i = 0; i < dive_table.nr; i++) {
+		FILE *f;
+		char filename[PATH_MAX];
+		int streamsize;
+		char *membuf;
+		xmlDoc *transformed;
+		struct zip_source *s;
+
+		/*
+		 * Get the i'th dive in XML format so we can process it.
+		 * We need to save to a file before we can reload it back into memory...
+		 */
+		struct dive *dive = get_dive(i);
 		if (!dive)
 			continue;
 		if (selected && !dive->selected)
 			continue;
 		f = tmpfile();
 		if (!f) {
-			qDebug() << errPrefix << "cannot create temp file";
+			*errorMsg = tr("cannot create temporary file: %1").arg(qt_error_string());
 			goto error_close_zip;
 		}
 		save_dive(f, dive);
 		fseek(f, 0, SEEK_END);
 		streamsize = ftell(f);
 		rewind(f);
+
 		membuf = (char *)malloc(streamsize + 1);
 		if (!membuf || !fread(membuf, streamsize, 1, f)) {
-			qDebug() << errPrefix << "memory error";
+			*errorMsg = tr("internal error: %1").arg(qt_error_string());
 			fclose(f);
 			free((void *)membuf);
 			goto error_close_zip;
 		}
 		membuf[streamsize] = 0;
 		fclose(f);
+
 		/*
 		 * Parse the memory buffer into XML document and
 		 * transform it to divelogs.de format, finally dumping
@@ -167,36 +171,38 @@ static char *prepare_dives_for_divelogs(const bool selected)
 		 */
 		xmlDoc *doc = xmlReadMemory(membuf, streamsize, "divelog", NULL, 0);
 		if (!doc) {
-			qDebug() << errPrefix << "xml error";
+			qWarning() << errPrefix << "could not parse back into memory the XML file we've just created!";
+			*errorMsg = tr("internal error");
 			free((void *)membuf);
 			goto error_close_zip;
 		}
 		free((void *)membuf);
+
 		transformed = xsltApplyStylesheet(xslt, doc, NULL);
 		xmlDocDumpMemory(transformed, (xmlChar **) &membuf, &streamsize);
 		xmlFreeDoc(doc);
 		xmlFreeDoc(transformed);
+
 		/*
 		 * Save the XML document into a zip file.
 		 */
 		snprintf(filename, PATH_MAX, "%d.xml", i + 1);
-		s[i] = zip_source_buffer(zip, membuf, streamsize, 1);
-		if (s[i]) {
-			int64_t ret = zip_add(zip, filename, s[i]);
+		s = zip_source_buffer(zip, membuf, streamsize, 1);
+		if (s) {
+			int64_t ret = zip_add(zip, filename, s);
 			if (ret == -1)
 				qDebug() << errPrefix << "failed to include dive:" << i;
 		}
 	}
 	zip_close(zip);
 	xsltFreeStylesheet(xslt);
-	return tempfile;
+	return true;
 
 error_close_zip:
 	zip_close(zip);
-	QFile::remove(tempfileQ);
-	free(tempfile);
+	QFile::remove(tempfile);
 	xsltFreeStylesheet(xslt);
-	return NULL;
+	return false;
 }
 
 WebServices::WebServices(QWidget* parent, Qt::WindowFlags f): QDialog(parent, f)
@@ -555,22 +561,20 @@ void DivelogsDeWebServices::downloadDives()
 
 void DivelogsDeWebServices::prepareDivesForUpload()
 {
-	QString errorText(tr("Cannot create DLD file"));
-	char *filename = prepare_dives_for_divelogs(true);
-	if (filename) {
+	QString errorText;
+
+	/* generate a random filename and create/open that file with zip_open */
+	QString filename = QDir::tempPath() + "/import-" + QString::number(qrand() % 99999999) + ".dld";
+	if (prepare_dives_for_divelogs(filename, true, &errorText)) {
 		QFile f(filename);
 		if (f.open(QIODevice::ReadOnly)) {
 			uploadDives((QIODevice *)&f);
 			f.close();
 			f.remove();
-			free((void *)filename);
 			return;
 		}
-		mainWindow()->showError(errorText.append(": ").append(filename));
-		free((void *)filename);
-		return;
 	}
-	mainWindow()->showError(errorText.append("!"));
+	mainWindow()->showError(errorText);
 }
 
 void DivelogsDeWebServices::uploadDives(QIODevice *dldContent)
@@ -624,7 +628,11 @@ void DivelogsDeWebServices::startUpload()
 	ui.password->setEnabled(false);
 
 	QNetworkRequest request;
+#ifdef WIN32
+	request.setUrl(QUrl("http://divelogs.de/DivelogsDirectImport.php"));
+#else
 	request.setUrl(QUrl("https://divelogs.de/DivelogsDirectImport.php"));
+#endif
 	request.setRawHeader("Accept", "text/xml, application/xml");
 
 	QHttpPart part;
@@ -655,7 +663,11 @@ void DivelogsDeWebServices::startDownload()
 	ui.password->setEnabled(false);
 
 	QNetworkRequest request;
+#ifdef WIN32
+	request.setUrl(QUrl("http://divelogs.de/xml_available_dives.php"));
+#else
 	request.setUrl(QUrl("https://divelogs.de/xml_available_dives.php"));
+#endif
 	request.setRawHeader("Accept", "text/xml, application/xml");
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
@@ -746,13 +758,13 @@ void DivelogsDeWebServices::downloadFinished()
 
 	int errorcode;
 	zipFile.seek(0);
-#ifdef Q_OS_UNIX
+#if defined(Q_OS_UNIX) && defined(LIBZIP_VERSION_MAJOR)
 	int duppedfd = dup(zipFile.handle());
 	struct zip *zip = zip_fdopen(duppedfd, 0, &errorcode);
 	if (!zip)
 		::close(duppedfd);
 #else
-	struct zip *zip = zip_open(zipFile.fileName().toLocal8Bit().data(), 0, &errorcode);
+	struct zip *zip = zip_open(QFile::encodeName(zipFile.fileName()), 0, &errorcode);
 #endif
 	if (!zip) {
 		char buf[512];
@@ -764,15 +776,6 @@ void DivelogsDeWebServices::downloadFinished()
 	}
 	// now allow the user to cancel or accept
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(true);
-
-	quint64 entries;
-#if defined(LIBZIP_VERSION_MAJOR)
-        entries = zip_get_num_entries(zip, 0);
-#else
-        // old version of libzip
-	entries = zip_get_num_files(zip);
-#endif
-
 
 	zip_close(zip);
 	zipFile.close();
@@ -848,7 +851,7 @@ void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 		}
 		/* parse file and import dives */
 		char *error = NULL;
-		parse_file(zipFile.fileName().toLocal8Bit().data(), &error);
+		parse_file(QFile::encodeName(zipFile.fileName()), &error);
 		if (error != NULL) {
 			mainWindow()->showError(error);
 			free(error);

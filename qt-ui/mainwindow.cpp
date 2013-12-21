@@ -677,6 +677,9 @@ void MainWindow::readSettings()
 	s.endGroup();
 
 	s.beginGroup("Display");
+	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
+	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
+	qApp->setFont(defaultFont);
 	GET_TXT("divelist_font", divelist_font);
 	GET_INT("font_size", font_size);
 	GET_INT("displayinvalid", display_invalid_dives);
@@ -700,6 +703,13 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
+		event->ignore();
+		return;
+	}
+
 	if (helpView && helpView->isVisible()){
 		helpView->close();
 		helpView->deleteLater();
@@ -815,7 +825,7 @@ void MainWindow::importFiles(const QStringList fileNames)
 	QByteArray fileNamePtr;
 	char *error = NULL;
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = fileNames.at(i).toLocal8Bit();
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
 		parse_file(fileNamePtr.data(), &error);
 		if (error != NULL) {
 			showError(error);
@@ -836,7 +846,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	QByteArray fileNamePtr;
 
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = fileNames.at(i).toLocal8Bit();
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
 		parse_file(fileNamePtr.data(), &error);
 		set_filename(fileNamePtr.data(), TRUE);
 		setTitle(MWTF_FILENAME);
@@ -863,7 +873,7 @@ void MainWindow::on_actionImportCSV_triggered()
 
 void MainWindow::editCurrentDive()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
+	if(information()->isEditing() || DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
 		QMessageBox::warning(this, tr("Warning"), tr("First finish the current edition before trying to do another."));
 		return;
 	}

@@ -9,6 +9,8 @@
 #include <sys/time.h>
 #include <ctype.h>
 
+#include <libxslt/documents.h>
+
 #include "dive.h"
 #include "divelist.h"
 #include "display.h"
@@ -35,6 +37,7 @@
 #include <QNetworkProxy>
 #include <QDateTime>
 #include <QRegExp>
+#include <QResource>
 #include <QLibraryInfo>
 
 #include <gettextfromc.h>
@@ -63,6 +66,18 @@ const char *getSetting(QSettings &s, QString name)
 	return NULL;
 }
 
+#ifdef Q_OS_WIN
+static QByteArray encodeUtf8(const QString &fname)
+{
+	return fname.toUtf8();
+}
+
+static QString decodeUtf8(const QByteArray &fname)
+{
+	return QString::fromUtf8(fname);
+}
+#endif
+
 void init_ui(int *argcp, char ***argvp)
 {
 	QVariant v;
@@ -79,13 +94,16 @@ void init_ui(int *argcp, char ***argvp)
 	// 106 is "UTF-8", this is faster than lookup by name
 	// [http://www.iana.org/assignments/character-sets/character-sets.xml]
 	QTextCodec::setCodecForCStrings(QTextCodec::codecForMib(106));
+#  ifdef Q_OS_WIN
+	QFile::setDecodingFunction(decodeUtf8);
+	QFile::setEncodingFunction(encodeUtf8);
+#  endif
 #endif
 	QCoreApplication::setOrganizationName("Subsurface");
 	QCoreApplication::setOrganizationDomain("subsurface.hohndel.org");
 	QCoreApplication::setApplicationName("Subsurface");
 	// find plugins installed in the application directory (without this SVGs don't work on Windows)
 	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
-	xslt_path = strdup(getSubsurfaceDataPath("xslt").toAscii().data());
 
 	QSettings s;
 	s.beginGroup("Language");
@@ -410,9 +428,13 @@ QString getSubsurfaceDataPath(QString folderToFind)
 		if (folder.exists())
 			return folder.absolutePath();
 	}
-	// then look for the usual location on a Mac
+	// then look for the usual locations on a Mac
 	execdir = QCoreApplication::applicationDirPath();
 	folder = QDir(execdir.append("/../Resources/share/").append(folderToFind));
+	if (folder.exists())
+		return folder.absolutePath();
+	execdir = QCoreApplication::applicationDirPath();
+	folder = QDir(execdir.append("/../Resources/").append(folderToFind));
 	if (folder.exists())
 		return folder.absolutePath();
 	return QString("");
@@ -502,4 +524,37 @@ QString get_trip_date_string(timestamp_t when, int nr)
 		return translate("gettextFromC", "%1 %2 (1 dive)")
 			.arg(monthname(tm.tm_mon))
 			.arg(tm.tm_year + 1900);
+}
+
+static xmlDocPtr get_stylesheet_doc(const xmlChar *uri, xmlDictPtr, int, void *, xsltLoadType)
+{
+	QFile f(QLatin1String(":/xslt/") + (const char *)uri);
+	if (!f.open(QIODevice::ReadOnly))
+		return NULL;
+
+	/* Load and parse the data */
+	QByteArray source = f.readAll();
+
+	xmlDocPtr doc = xmlParseMemory(source, source.size());
+	return doc;
+}
+
+xsltStylesheetPtr get_stylesheet(const char *name)
+{
+	// this needs to be done only once, but doesn't hurt to run every time
+	xsltSetLoaderFunc(get_stylesheet_doc);
+
+	// get main document:
+	xmlDocPtr doc = get_stylesheet_doc((const xmlChar *)name, NULL, 0, NULL, XSLT_LOAD_START);
+	if (!doc)
+		return NULL;
+
+//	xsltSetGenericErrorFunc(stderr, NULL);
+	xsltStylesheetPtr xslt = xsltParseStylesheetDoc(doc);
+	if (!xslt) {
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+
+	return xslt;
 }

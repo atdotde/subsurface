@@ -31,6 +31,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 				    editMode(NONE)
 {
 	ui.setupUi(this);
+	ui.tagWidget->setFocusPolicy(Qt::StrongFocus); // Don't get focus by 'Wheel'
 	ui.cylinders->setModel(cylindersModel);
 	ui.weights->setModel(weightModel);
 	closeMessage();
@@ -281,19 +282,21 @@ void MainTab::enableEdition(EditMode newEditMode)
 
 bool MainTab::eventFilter(QObject* object, QEvent* event)
 {
-	if (isEnabled() && event->type() == QEvent::KeyPress && object == ui.dateTimeEdit) {
-		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
-		enableEdition();
-	}
+	if (!isEnabled())
+		return false;
 
-	if (isEnabled() && event->type() == QEvent::FocusIn && (object == ui.rating ||
-								object == ui.visibility	||
-								object == ui.tagWidget)) {
-		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
-		enableEdition();
-	}
-
-	if (isEnabled() && event->type() == QEvent::MouseButtonPress ) {
+	if (editMode != NONE)
+		return false;
+	// for the dateTimeEdit widget we need to ignore Wheel events as well (as long as we aren't editing)
+	if (object->objectName() == "dateTimeEdit" &&
+	    (event->type() == QEvent::FocusIn || event->type() == QEvent::Wheel))
+		return true;
+	// MouseButtonPress in any widget (not all will ever get this), KeyPress in the dateTimeEdit,
+	// FocusIn for the starWidgets or RequestSoftwareInputPanel for tagWidget start the editing
+	if ((event->type() == QEvent::MouseButtonPress) ||
+	    (event->type() == QEvent::KeyPress && object == ui.dateTimeEdit) ||
+	    (event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility)) ||
+	    (event->type() == QEvent::RequestSoftwareInputPanel && object == ui.tagWidget)) {
 		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
 		enableEdition();
 	}
@@ -597,7 +600,11 @@ void MainTab::acceptChanges()
 			mark_divelist_changed(TRUE);
 			Q_FOREACH (dive *d, notesBackup.keys()) {
 				for (int i = 0; i < MAX_CYLINDERS; i++) {
-					d->cylinder[i] = multiEditEquipmentPlaceholder.cylinder[i];
+					if (notesBackup.keys().count() > 1)
+						// only copy the cylinder type, none of the other values
+						d->cylinder[i].type = multiEditEquipmentPlaceholder.cylinder[i].type;
+					else
+						d->cylinder[i] = multiEditEquipmentPlaceholder.cylinder[i];
 				}
 			}
 		}
@@ -661,6 +668,7 @@ void MainTab::acceptChanges()
 		mainWindow()->dive_list()->restoreSelection();
 	}
 	mainWindow()->dive_list()->verticalScrollBar()->setSliderPosition(scrolledBy);
+	mainWindow()->dive_list()->setFocus();
 }
 
 void MainTab::resetPallete()
@@ -679,12 +687,12 @@ void MainTab::resetPallete()
 }
 
 #define EDIT_TEXT2(what, text) \
-	textByteArray = text.toLocal8Bit(); \
+	textByteArray = text.toUtf8(); \
 	free(what);\
 	what = strdup(textByteArray.data());
 
 #define EDIT_TEXT(what, text) \
-	QByteArray textByteArray = text.toLocal8Bit(); \
+	QByteArray textByteArray = text.toUtf8(); \
 	free(what);\
 	what = strdup(textByteArray.data());
 
@@ -784,6 +792,7 @@ void MainTab::rejectChanges()
 		mainWindow()->refreshDisplay(false);
 		DivePlannerPointsModel::instance()->setPlanMode(DivePlannerPointsModel::NOTHING);
 	}
+	mainWindow()->dive_list()->setFocus();
 }
 #undef EDIT_TEXT2
 
@@ -968,8 +977,8 @@ QString MainTab::printGPSCoords(int lat, int lon)
 	ilatmin = (lat % 1000000) * 60;
 	ilonmin = (lon % 1000000) * 60;
 	result.sprintf("%s%u%s %2d.%05d\' , %s%u%s %2d.%05d\'",
-		       lath.toLocal8Bit().data(), latdeg, UTF8_DEGREE, ilatmin / 1000000, (ilatmin % 1000000) / 10,
-		       lonh.toLocal8Bit().data(), londeg, UTF8_DEGREE, ilonmin / 1000000, (ilonmin % 1000000) / 10);
+		       lath.toUtf8().data(), latdeg, UTF8_DEGREE, ilatmin / 1000000, (ilatmin % 1000000) / 10,
+		       lonh.toUtf8().data(), londeg, UTF8_DEGREE, ilonmin / 1000000, (ilonmin % 1000000) / 10);
 	return result;
 }
 

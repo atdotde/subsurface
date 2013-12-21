@@ -99,7 +99,6 @@ Section
 
     # Files to include in installer
     File subsurface.exe
-    File /r xslt
     File /r data
     File /r images
     File /r plugins
@@ -118,6 +117,7 @@ Section
     File libgcc_s_sjlj-1.dll
     File libstdc++-6.dll
     File libmarblewidget*dll
+    File libssl-10.dll
     File Qt*4.dll
     File subsurface.ico
     File qt.conf
@@ -155,14 +155,12 @@ Section "Uninstall"
 
     # Delete installed files
     Delete "$INSTDIR\*.dll"
-    Delete "$INSTDIR\xslt\*.xslt"
     Delete "$INSTDIR\freetype-config"
     Delete "$INSTDIR\subsurface.exe"
     Delete "$INSTDIR\subsurface.ico"
     Delete "$INSTDIR\Uninstall.exe"
     Delete "$INSTDIR\qt.conf"
     RMDir /r "$INSTDIR\share"
-    RMDir /r "$INSTDIR\xslt"
     RMDir /r "$INSTDIR\data"
     RMDir /r "$INSTDIR\images"
     RMDir /r "$INSTDIR\translations"

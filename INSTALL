@@ -18,7 +18,7 @@ here as well.
 Build options for Subsurface
 ----------------------------
 
-The following options are recognised when passed to qmake:
+The following options are recognized when passed to qmake:
 
  -config debug        Create a debug build
  -config release      Create a release build
@@ -28,7 +28,7 @@ The following options are recognised when passed to qmake:
  INCLUDEPATH+=xxx     Add xxx to the include paths to the compiler
 		      (pass the actual path, without -I)
  LIBS+=xxx            Add xxx to the linker flags. -l and -L options are
-		      recognised.
+		      recognized.
 
 The INCLUDEPATH and LIBS options are useful to tell the buildsystem
 about non-standard installation paths for the dependencies (such as
@@ -48,13 +48,14 @@ libxml2-devel, libxslt-devel, libsqlite3x-devel, libudev-devel. If you are going
 to compile libdivecomputer, you need libusb-devel, too.
 
 On Debian style distributions you can install the required development
-packages by running
-$ apt-get build-dep subsurface
+packages by running (once Qt version of subsurface is available in your
+distribution)
+$ sudo apt-get build-dep subsurface
 
 If you want to install the required packages individually instead you
-need libqt4-dev, libmarble-dev, libzip-dev, libxml2-dev,
-libsqlite3-dev, libxslt1-dev, libzip-dev (and libusb-1.0-0-dev if
-you're going to compile libdivecomputer).
+need libqt4-dev, qt4-qmake, libxml2-dev, libxslt1-dev, zlib1g-dev,
+libzip-dev, libmarble-dev, libsqlite3-dev, libqtwebkit-dev
+(and libusb-1.0-0-dev if you're going to compile libdivecomputer).
 
 Unfortunately the marble version in Debian stable (and possibly
 Ubuntu) appears to be missing essential header files used in

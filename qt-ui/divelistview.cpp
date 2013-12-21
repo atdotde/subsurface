@@ -548,7 +548,7 @@ void DiveListView::removeFromTrip()
 	struct dive *d;
 	for_each_dive(i, d) {
 		if (d->selected)
-			remove_dive_from_trip(d);
+			remove_dive_from_trip(d, FALSE);
 	}
 	rememberSelection();
 	reload(currentLayout, false);
@@ -581,7 +581,7 @@ void DiveListView::addToTripAbove()
 {
 	int idx, delta = (currentOrder == Qt::AscendingOrder) ? -1 : +1;
 	dive_trip_t *trip = NULL;
-	struct dive *pd;
+	struct dive *pd = NULL;
 	struct dive *d = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
 	if (!d) // shouldn't happen as we only are setting up this action if this is a dive
 		return;
@@ -765,7 +765,7 @@ void DiveListView::saveSelectedDivesAs()
 	settings.setValue("LastDir",fileInfo.dir().path());
 	settings.endGroup();
 
-	QByteArray bt = fileName.toLocal8Bit();
+	QByteArray bt = QFile::encodeName(fileName);
 	save_dives_logic(bt.data(), TRUE);
 }
 

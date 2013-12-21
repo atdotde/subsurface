@@ -30,8 +30,6 @@
 #define MAX_DEPTH M_OR_FT(150, 450)
 #define MIN_DEPTH M_OR_FT(20, 60)
 
-#define M_OR_FT(_m,_f) ((prefs.units.length == units::METERS) ? ((_m) * 1000) : (feet_to_mm(_f)))
-
 QString gasToStr(const int o2Permille, const int hePermille) {
 	uint o2 = (o2Permille + 5) / 10, he = (hePermille + 5) / 10;
 	QString result = is_air(o2Permille, hePermille) ? QObject::tr("AIR")
@@ -1422,8 +1420,6 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		lastIndex = i;
 		plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2);
 	}
-	if (!diveplan.dp)
-		return;
 	char *cache = NULL;
 	tempDive = NULL;
 	const char *errorString = NULL;
@@ -1432,7 +1428,10 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		cylinder_t *cyl = &stagingDive->cylinder[i];
 		if (cyl->depth.mm) {
 			dp = create_dp(0, cyl->depth.mm, cyl->gasmix.o2.permille, cyl->gasmix.he.permille, 0);
-			dp->next = diveplan.dp->next;
+			if (diveplan.dp)
+				dp->next = diveplan.dp->next;
+			else
+				dp->next = NULL;
 			diveplan.dp->next = dp;
 		}
 	}
