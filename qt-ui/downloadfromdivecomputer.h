@@ -40,10 +40,15 @@ public slots:
 	void on_ok_clicked();
 	void on_cancel_clicked();
 	void on_vendor_currentIndexChanged(const QString& vendor);
+	void on_product_currentIndexChanged();
 
 	void onDownloadThreadFinished();
 	void updateProgressBar();
 	void runDialog();
+	void checkLogFile(int state);
+	void checkDumpFile(int state);
+	void pickDumpFile();
+	void pickLogFile();
 
 private:
 	void markChildrenAsDisabled();
@@ -63,8 +68,10 @@ private:
 	QStringListModel *productModel;
 	void fill_computer_list();
 	void fill_device_list();
-
+	QString logFile;
+	QString dumpFile;
 	QTimer *timer;
+	bool dumpWarningShown;
 
 public:
 	bool preferDownloaded();

@@ -30,13 +30,9 @@ GlobeGPS::GlobeGPS(QWidget* parent) : MarbleWidget(parent), loadedDives(0), edit
 	// if not, check if they are in a known location
 	MapThemeManager mtm;
 	QStringList list = mtm.mapThemeIds();
-	QString theme, subsurfaceDataPath;
+	QString  subsurfaceDataPath;
 	QDir marble;
-	bool foundGoogleMap = false;
-	Q_FOREACH(theme, list)
-		if (theme == "earth/googlesat/googlesat.dgml")
-			foundGoogleMap = true;
-	if (!foundGoogleMap) {
+	if (!list.contains("earth/googlesat/googlesat.dgml")) {
 		subsurfaceDataPath = getSubsurfaceDataPath("marbledata");
 		if (subsurfaceDataPath != "") {
 			MarbleDirs::setMarbleDataPath(subsurfaceDataPath);
@@ -232,7 +228,7 @@ void GlobeGPS::centerOn(dive* dive)
 
 void GlobeGPS::fixZoom()
 {
-  zoomView(currentZoomLevel, Marble::Linear);
+	zoomView(currentZoomLevel, Marble::Linear);
 }
 
 void GlobeGPS::prepareForGetDiveCoordinates()

@@ -9,7 +9,6 @@
 #include "display.h"
 
 #include "libdivecomputer.h"
-#include "libdivecomputer/version.h"
 
 /* Christ. Libdivecomputer has the worst configuration system ever. */
 #ifdef HW_FROG_H
@@ -19,6 +18,8 @@
   #define NOT_FROG
 #endif
 
+char *dumpfile_name;
+char *logfile_name;
 const char *progress_bar_text = "";
 double progress_bar_fraction = 0.0;
 
@@ -516,12 +517,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	return 1;
 }
 
-
-static dc_status_t import_device_data(dc_device_t *device, device_data_t *devicedata)
-{
-	return dc_device_foreach(device, dive_cb, devicedata);
-}
-
 /*
  * The device ID for libdivecomputer devices is the first 32-bit word
  * of the SHA1 hash of the model/firmware/serial numbers.
@@ -677,7 +672,23 @@ static const char *do_device_import(device_data_t *data)
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Error registering the cancellation handler.");
 
-	rc = import_device_data(device, data);
+	if (data->libdc_dump) {
+		dc_buffer_t *buffer = dc_buffer_new (0);
+
+		rc = dc_device_dump (device, buffer);
+		if (rc == DC_STATUS_SUCCESS) {
+			FILE* fp = subsurface_fopen(dumpfile_name, "wb");
+			if (fp != NULL) {
+				fwrite (dc_buffer_get_data (buffer), 1, dc_buffer_get_size (buffer), fp);
+				fclose (fp);
+			}
+		}
+
+		dc_buffer_free (buffer);
+	} else {
+		rc = dc_device_foreach(device, dive_cb, data);
+	}
+
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Dive data import error");
 
@@ -685,26 +696,55 @@ static const char *do_device_import(device_data_t *data)
 	return NULL;
 }
 
+static void
+logfunc(dc_context_t *context, dc_loglevel_t loglevel, const char *file, unsigned int line, const char *function, const char *msg, void *userdata)
+{
+	const char *loglevels[] = {"NONE", "ERROR", "WARNING", "INFO", "DEBUG", "ALL"};
+
+	FILE *fp = (FILE *) userdata;
+
+	if (loglevel == DC_LOGLEVEL_ERROR || loglevel == DC_LOGLEVEL_WARNING) {
+		fprintf(fp, "%s: %s [in %s:%d (%s)]\n", loglevels[loglevel], msg, file, line, function);
+	} else {
+		fprintf(fp, "%s: %s\n", loglevels[loglevel], msg);
+	}
+}
+
 const char *do_libdivecomputer_import(device_data_t *data)
 {
 	dc_status_t rc;
 	const char *err;
+	FILE *fp = NULL;
 
 	import_dive_number = 0;
 	first_temp_is_air = 0;
 	data->device = NULL;
 	data->context = NULL;
 
+	if (data->libdc_log)
+		fp = subsurface_fopen(logfile_name, "w");
+
 	rc = dc_context_new(&data->context);
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Unable to create libdivecomputer context");
+
+	if (fp) {
+		dc_context_set_loglevel(data->context, DC_LOGLEVEL_ALL);
+		dc_context_set_logfunc(data->context, logfunc, fp);
+	}
 
 	err = translate("gettextFromC","Unable to open %s %s (%s)");
 	rc = dc_device_open(&data->device, data->context, data->descriptor, data->devname);
 	if (rc == DC_STATUS_SUCCESS) {
 		err = do_device_import(data);
+		/* TODO: Show the logfile to the user on error. */
 		dc_device_close(data->device);
 	}
 	dc_context_free(data->context);
+
+	if (fp) {
+		fclose(fp);
+	}
+
 	return err;
 }

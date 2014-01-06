@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QStringListModel>
 #include <QTimer>
+#include <QFileDialog>
 #include <QMessageBox>
 
 struct product {
@@ -43,8 +44,8 @@ DownloadFromDCWidget *DownloadFromDCWidget::instance()
 }
 
 DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
-    QDialog(parent, f), thread(0), timer(new QTimer(this)),
-	currentState(INITIAL)
+	QDialog(parent, f), thread(0), timer(new QTimer(this)),
+	dumpWarningShown(false), currentState(INITIAL)
 {
 	ui.setupUi(this);
 	ui.progressBar->hide();
@@ -54,6 +55,12 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 	fill_device_list();
 	fill_computer_list();
 
+	ui.chooseDumpFile->setEnabled(ui.dumpToFile->isChecked());
+	connect(ui.chooseDumpFile, SIGNAL(clicked()), this, SLOT(pickDumpFile()));
+	connect(ui.dumpToFile, SIGNAL(stateChanged(int)), this, SLOT(checkDumpFile(int)));
+	ui.chooseLogFile->setEnabled(ui.logToFile->isChecked());
+	connect(ui.chooseLogFile, SIGNAL(clicked()), this, SLOT(pickLogFile()));
+	connect(ui.logToFile, SIGNAL(stateChanged(int)), this, SLOT(checkLogFile(int)));
 	vendorModel = new QStringListModel(vendorList);
 	ui.vendor->setModel(vendorModel);
 	if (default_dive_computer_vendor) {
@@ -63,6 +70,7 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 		if (default_dive_computer_product)
 			ui.product->setCurrentIndex(ui.product->findText(default_dive_computer_product));
 	}
+	connect(ui.product, SIGNAL(currentIndexChanged(int)), this, SLOT(on_product_currentIndexChanged()), Qt::UniqueConnection);
 	if (default_dive_computer_device)
 		ui.device->setEditText(default_dive_computer_device);
 
@@ -161,6 +169,22 @@ void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString& vendor)
 	//currentModel->deleteLater();
 }
 
+void DownloadFromDCWidget::on_product_currentIndexChanged()
+{
+	// Set up the DC descriptor
+	dc_descriptor_t *descriptor = NULL;
+	descriptor = descriptorLookup[ui.vendor->currentText() + ui.product->currentText()];
+
+	// call dc_descriptor_get_transport to see if the dc_transport_t is DC_TRANSPORT_SERIAL
+	if (dc_descriptor_get_transport(descriptor) == DC_TRANSPORT_SERIAL) {
+		// if the dc_transport_t is DC_TRANSPORT_SERIAL, then enable the device node box.
+		ui.device->setEnabled(true);
+	} else {
+		// otherwise disable the device node box
+		ui.device->setEnabled(false);
+	}
+}
+
 void DownloadFromDCWidget::fill_computer_list()
 {
 	dc_iterator_t *iterator = NULL;
@@ -246,6 +270,52 @@ void DownloadFromDCWidget::on_ok_clicked()
 bool DownloadFromDCWidget::preferDownloaded()
 {
 	return ui.preferDownloaded->isChecked();
+}
+
+void DownloadFromDCWidget::checkLogFile(int state)
+{
+	ui.chooseLogFile->setEnabled(state == Qt::Checked);
+	data.libdc_log = (state == Qt::Checked);
+	if (state == Qt::Checked && logFile.isEmpty()) {
+		pickLogFile();
+	}
+}
+
+void DownloadFromDCWidget::pickLogFile()
+{
+	QString filename = existing_filename ? : prefs.default_filename;
+	QFileInfo fi(filename);
+	filename = fi.absolutePath().append(QDir::separator()).append("subsurface.log");
+	logFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer download logfile"),
+					       filename, tr("Log files (*.log)"));
+	if (!logFile.isEmpty())
+		logfile_name = strdup(logFile.toUtf8().data());
+}
+
+void DownloadFromDCWidget::checkDumpFile(int state)
+{
+	ui.chooseDumpFile->setEnabled(state == Qt::Checked);
+	data.libdc_dump = (state == Qt::Checked);
+	if (state == Qt::Checked) {
+		if (dumpFile.isEmpty())
+			pickDumpFile();
+		if (!dumpWarningShown) {
+			QMessageBox::warning(this, tr("Warning"),
+					     tr("Saving the libdivecomputer dump will NOT download dives to the dive list."));
+			dumpWarningShown = true;
+		}
+	}
+}
+
+void DownloadFromDCWidget::pickDumpFile()
+{
+	QString filename = existing_filename ? : prefs.default_filename;
+	QFileInfo fi(filename);
+	filename = fi.absolutePath().append(QDir::separator()).append("subsurface.bin");
+	dumpFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer binary dump file"),
+						filename, tr("Dump files (*.bin)"));
+	if (!dumpFile.isEmpty())
+		dumpfile_name = strdup(dumpFile.toUtf8().data());
 }
 
 void DownloadFromDCWidget::reject()

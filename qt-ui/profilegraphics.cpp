@@ -169,7 +169,7 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 		}
 	}
 	if (some_hidden) {
-		action = m.addAction(tr("Unhde all events"), this, SLOT(unhideEvents()));
+		action = m.addAction(tr("Unhide all events"), this, SLOT(unhideEvents()));
 		action->setData(event->globalPos());
 	}
 	m.exec(event->globalPos());
@@ -495,6 +495,8 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 
 	if (rulerEnabled && !printMode)
 		add_ruler();
+
+	gc.rightx = get_maxtime(&gc.pi);
 }
 
 void ProfileGraphicsView::plot_depth_scale()
@@ -1175,6 +1177,12 @@ void ProfileGraphicsView::plot_depth_profile()
 		pen.setColor(c);
 		item->setPen(pen);
 		scene()->addItem(item);
+
+		struct text_render_options tro = {DEPTH_TEXT_SIZE, MEAN_DEPTH, LEFT, TOP};
+		QString depthLabel = get_depth_string(gc.pi.meandepth, true, true);
+		plot_text(&tro, QPointF(gc.leftx, gc.pi.meandepth), depthLabel, item);
+		tro.hpos = RIGHT;
+		plot_text(&tro, QPointF(gc.pi.entry[gc.pi.nr - 1].sec, gc.pi.meandepth), depthLabel, item);
 	}
 
 #if 0
@@ -1638,7 +1646,7 @@ QColor EventItem::getColor(const color_indice_t i)
 
 EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPixmapItem(parent), ev(ev), isGrayscale(grayscale)
 {
-	if(ev->name && strcmp(ev->name, "bookmark") == 0) {
+	if(ev->name && (strcmp(ev->name, "bookmark") == 0 || strcmp(ev->name, "heading") == 0)) {
 		setPixmap( QPixmap(QString(":flag")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 	} else {
 		setPixmap( QPixmap(QString(":warning")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));

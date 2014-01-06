@@ -178,8 +178,7 @@ void MainTab::toggleTriggeredColumn()
 
 void MainTab::addDiveStarted()
 {
-	enableEdition();
-	editMode = ADD;
+	enableEdition(ADD);
 }
 
 void MainTab::addMessageAction(QAction* action)
@@ -221,9 +220,16 @@ void MainTab::displayMessage(QString str)
 
 void MainTab::enableEdition(EditMode newEditMode)
 {
-	if (selected_dive < 0 || editMode != NONE)
+	if (current_dive == NULL || editMode != NONE)
 		return;
-
+	if ((newEditMode == DIVE || newEditMode == NONE) &&
+	    current_dive->dc.model &&
+	    strcmp(current_dive->dc.model, "manually added dive") == 0) {
+		// editCurrentDive will call enableEdition with newEditMode == MANUALLY_ADDED_DIVE
+		// so exit this function here after editCurrentDive() returns
+		mainWindow()->editCurrentDive();
+		return;
+	}
 	mainWindow()->dive_list()->setEnabled(false);
 	mainWindow()->globe()->prepareForGetDiveCoordinates();
 	// We may be editing one or more dives here. backup everything.
@@ -357,7 +363,7 @@ bool MainTab::isEditing()
 void MainTab::updateDiveInfo(int dive)
 {
 	// don't execute this while adding a dive
-	if (editMode == ADD)
+	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE)
 		return;
 	if (!isEnabled() && dive != -1)
 		setEnabled(true);
@@ -372,6 +378,7 @@ void MainTab::updateDiveInfo(int dive)
 	temperature_t temp;
 	struct dive *prevd;
 	struct dive *d = get_dive(dive);
+	char buf[1024];
 
 	process_selected_dives();
 	process_all_dives(d, &prevd);
@@ -413,6 +420,8 @@ void MainTab::updateDiveInfo(int dive)
 			ui.location->setText(currentTrip->location);
 			ui.NotesLabel->setText(tr("Trip Notes"));
 			ui.notes->setText(currentTrip->notes);
+			clearEquipment();
+			ui.equipmentTab->setEnabled(false);
 		} else {
 			setTabText(0, tr("Dive Notes"));
 			// make all the fields visible writeable
@@ -440,6 +449,12 @@ void MainTab::updateDiveInfo(int dive)
 			// reset labels in case we last displayed trip notes
 			ui.LocationLabel->setText(tr("Location"));
 			ui.NotesLabel->setText(tr("Notes"));
+			ui.equipmentTab->setEnabled(true);
+			multiEditEquipmentPlaceholder = *d;
+			cylindersModel->setDive(&multiEditEquipmentPlaceholder);
+			weightModel->setDive(&multiEditEquipmentPlaceholder);
+			taglist_get_tagstring(d->tag_list, buf, 1024);
+			ui.tagWidget->setText(QString(buf));
 		}
 		ui.maximumDepthText->setText(get_depth_string(d->maxdepth, TRUE));
 		ui.averageDepthText->setText(get_depth_string(d->meandepth, TRUE));
@@ -512,15 +527,6 @@ void MainTab::updateDiveInfo(int dive)
 		ui.timeLimits->setAverage(get_time_string(seconds, 0));
 		ui.timeLimits->setMaximum(get_time_string(stats_selection.longest_time.seconds, 0));
 		ui.timeLimits->setMinimum(get_time_string(stats_selection.shortest_time.seconds, 0));
-
-
-		char buf[1024];
-		taglist_get_tagstring(d->tag_list, buf, 1024);
-		ui.tagWidget->setText(QString(buf));
-
-		multiEditEquipmentPlaceholder = *d;
-		cylindersModel->setDive(&multiEditEquipmentPlaceholder);
-		weightModel->setDive(&multiEditEquipmentPlaceholder);
 	} else {
 		/* clear the fields */
 		clearInfo();
@@ -564,6 +570,7 @@ void MainTab::acceptChanges()
 	tabBar()->setTabIcon(0, QIcon()); // Notes
 	tabBar()->setTabIcon(1, QIcon()); // Equipment
 	hideMessage();
+	ui.equipmentTab->setEnabled(true);
 	/* now figure out if things have changed */
 	if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1) {
 		if (notesBackup[NULL].notes != ui.notes->toPlainText() ||
@@ -813,7 +820,12 @@ void MainTab::rejectChanges()
 
 void markChangedWidget(QWidget *w){
 	QPalette p;
-	p.setBrush(QPalette::Base, QColor(Qt::yellow).lighter());
+	qreal h, s, l, a;
+	qApp->palette().color(QPalette::Text).getHslF(&h, &s, &l, &a);
+	p.setBrush(QPalette::Base, ( l <= 0.3 ) ? QColor(Qt::yellow).lighter()
+				  :( l <= 0.6 ) ? QColor(Qt::yellow).light()
+				  :/* else */     QColor(Qt::yellow).darker(300)
+				  );
 	w->setPalette(p);
 }
 
@@ -910,7 +922,7 @@ void MainTab::on_notes_textChanged()
 		// we are editing a trip
 		dive_trip_t *currentTrip = *mainWindow()->dive_list()->selectedTrips().begin();
 		EDIT_TEXT(currentTrip->notes, ui.notes->toPlainText());
-	} else if (editMode == DIVE || editMode == ADD) {
+	} else if (editMode == DIVE || editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		EDIT_SELECTED_DIVES( EDIT_TEXT(mydive->notes, ui.notes->toPlainText()) );
 	}
 	markChangedWidget(ui.notes);
@@ -920,11 +932,12 @@ void MainTab::on_notes_textChanged()
 
 void MainTab::on_coordinates_textChanged(const QString& text)
 {
-	bool gpsChanged = FALSE;
-	EDIT_SELECTED_DIVES(gpsChanged |= gpsHasChanged(mydive, NULL, text));
+	bool gpsChanged = false;
+	bool parsed = false;
+	EDIT_SELECTED_DIVES(gpsChanged |= gpsHasChanged(mydive, current_dive, text, &parsed));
 	if (gpsChanged) {
 		markChangedWidget(ui.coordinates);
-	} else {
+	} else if (!parsed) {
 		QPalette p;
 		p.setBrush(QPalette::Base, QColor(Qt::red).lighter());
 		ui.coordinates->setPalette(p);
@@ -962,7 +975,8 @@ void MainTab::editWeightWidget(const QModelIndex& index)
 QString MainTab::printGPSCoords(int lat, int lon)
 {
 	unsigned int latdeg, londeg;
-	unsigned int ilatmin, ilonmin;
+	unsigned int latmin, lonmin;
+	double  latsec, lonsec;
 	QString lath, lonh, result;
 
 	if (!lat && !lon)
@@ -974,11 +988,13 @@ QString MainTab::printGPSCoords(int lat, int lon)
 	lon = abs(lon);
 	latdeg = lat / 1000000;
 	londeg = lon / 1000000;
-	ilatmin = (lat % 1000000) * 60;
-	ilonmin = (lon % 1000000) * 60;
-	result.sprintf("%s%u%s %2d.%05d\' , %s%u%s %2d.%05d\'",
-		       lath.toUtf8().data(), latdeg, UTF8_DEGREE, ilatmin / 1000000, (ilatmin % 1000000) / 10,
-		       lonh.toUtf8().data(), londeg, UTF8_DEGREE, ilonmin / 1000000, (ilonmin % 1000000) / 10);
+	latmin = (lat % 1000000) * 60;
+	lonmin = (lon % 1000000) * 60;
+	latsec = (latmin % 1000000) * 60;
+	lonsec = (lonmin % 1000000) * 60;
+	result.sprintf("%u%s%02d\'%06.3f\"%s %u%s%02d\'%06.3f\"%s",
+		       latdeg, UTF8_DEGREE, latmin / 1000000, latsec / 1000000, lath.toUtf8().data(),
+		       londeg, UTF8_DEGREE, lonmin / 1000000, lonsec / 1000000, lonh.toUtf8().data());
 	return result;
 }
 
