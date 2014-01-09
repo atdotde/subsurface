@@ -1017,7 +1017,7 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	  printf("Image at %d,%d\n",x,y);
 	  QPixmap picture;
 	  picture.load("/Users/helling/subsurface/fish.jpg");
-	  scene()->addPixmap(picture.scaledToHeight(100));
+	  scene()->addPixmap(picture.scaledToHeight(100))->setPos(x, y + 10);
 	}
 	
 	EventItem *item = new EventItem(ev, 0, isGrayscale);
