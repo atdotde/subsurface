@@ -232,7 +232,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			printf("%02X", ((unsigned char *) value.vendor.data)[i]);
 		printf("</vendor>\n");
 		break;
-#if DC_VERSION_CHECK(0, 3, 0)
 	case DC_SAMPLE_SETPOINT:
 		/* for us a setpoint means constant pO2 from here */
 		sample->po2 = po2 = value.setpoint * 1000 + 0.5;
@@ -259,7 +258,6 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
 			sample->stoptime.seconds = stoptime = value.deco.time;
 		}
-#endif
 	default:
 		break;
 	}
@@ -460,7 +458,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 
-#if DC_VERSION_CHECK(0, 3, 0)
 	// Check if the libdivecomputer version already supports salinity & atmospheric
 	dc_salinity_t salinity = {
 		.type = DC_WATER_SALT,
@@ -482,7 +479,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		return rc;
 	}
 	dive->dc.surface_pressure.mbar = surface_pressure * 1000.0 + 0.5;
-#endif
 
 	rc = parse_gasmixes(devdata, dive, parser, ngases, data);
 	if (rc != DC_STATUS_SUCCESS) {
@@ -610,6 +606,7 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 	const dc_event_progress_t *progress = data;
 	const dc_event_devinfo_t *devinfo = data;
 	const dc_event_clock_t *clock = data;
+	const dc_event_vendor_t *vendor = data;
 	device_data_t *devdata = userdata;
 	unsigned int serial;
 
@@ -627,6 +624,12 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 			devinfo->model, devinfo->model,
 			devinfo->firmware, devinfo->firmware,
 			devinfo->serial, devinfo->serial);
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: model=%u (0x%08x), firmware=%u (0x%08x), serial=%u (0x%08x)\n",
+				devinfo->model, devinfo->model,
+				devinfo->firmware, devinfo->firmware,
+				devinfo->serial, devinfo->serial);
+		}
 		/*
 		 * libdivecomputer doesn't give serial numbers in the proper string form,
 		 * so we have to see if we can do some vendor-specific munging.
@@ -640,6 +643,18 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 	case DC_EVENT_CLOCK:
 			dev_info(devdata, translate("gettextFromC","Event: systime=%"PRId64", devtime=%u\n"),
 			(uint64_t)clock->systime, clock->devtime);
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: systime=%"PRId64", devtime=%u\n",
+				(uint64_t)clock->systime, clock->devtime);
+		}
+		break;
+	case DC_EVENT_VENDOR:
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: vendor=");
+			for (unsigned int i = 0; i < vendor->size; ++i)
+				fprintf(devdata->libdc_logfile, "%02X", vendor->data[i]);
+			fprintf(devdata->libdc_logfile,"\n");
+		}
 		break;
 	default:
 		break;
@@ -662,7 +677,7 @@ static const char *do_device_import(device_data_t *data)
 	data->model = str_printf("%s %s", data->vendor, data->product);
 
 	// Register the event handler.
-	int events = DC_EVENT_WAITING | DC_EVENT_PROGRESS | DC_EVENT_DEVINFO | DC_EVENT_CLOCK;
+	int events = DC_EVENT_WAITING | DC_EVENT_PROGRESS | DC_EVENT_DEVINFO | DC_EVENT_CLOCK | DC_EVENT_VENDOR;
 	rc = dc_device_set_events(device, events, event_cb, data);
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Error registering the event handler.");
@@ -676,7 +691,7 @@ static const char *do_device_import(device_data_t *data)
 		dc_buffer_t *buffer = dc_buffer_new (0);
 
 		rc = dc_device_dump (device, buffer);
-		if (rc == DC_STATUS_SUCCESS) {
+		if (rc == DC_STATUS_SUCCESS && dumpfile_name) {
 			FILE* fp = subsurface_fopen(dumpfile_name, "wb");
 			if (fp != NULL) {
 				fwrite (dc_buffer_get_data (buffer), 1, dc_buffer_get_size (buffer), fp);
@@ -721,8 +736,10 @@ const char *do_libdivecomputer_import(device_data_t *data)
 	data->device = NULL;
 	data->context = NULL;
 
-	if (data->libdc_log)
+	if (data->libdc_log && logfile_name)
 		fp = subsurface_fopen(logfile_name, "w");
+
+	data->libdc_logfile = fp;
 
 	rc = dc_context_new(&data->context);
 	if (rc != DC_STATUS_SUCCESS)

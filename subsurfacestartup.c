@@ -80,7 +80,8 @@ bool imported = FALSE;
 
 static void print_version() {
 	printf("Subsurface v%s, ", VERSION_STRING);
-	printf("built with libdivecomputer v%s\n", dc_version(NULL));
+	//	printf("built with libdivecomputer v%s\n", dc_version(NULL));
+	printf("libdivecomputer version x\n");
 }
 
 static void print_help() {
