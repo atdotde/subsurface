@@ -22,7 +22,6 @@
 int verbose, quit;
 
 static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **error);
-char *xslt_path;
 
 /* the dive table holds the overall dive list; target table points at
  * the table we are currently filling */
@@ -264,103 +263,7 @@ enum number_type {
 	FLOAT
 };
 
-double ascii_strtod(char *str, char **ptr)
-{
-	char *p = str, c, *ep;
-	double val = 0.0;
-	double decimal;
-	int sign = 0, esign = 0;
-	int numbers = 0, dot = 0;
-
-	/* skip spaces */
-	while (isspace(c = *p++))
-		/* */;
-
-	/* optional sign */
-	switch (c) {
-	case '-':
-		sign = 1;
-		/* fallthrough */
-	case '+':
-		c = *p++;
-	}
-
-	/* Mantissa */
-	for (;;c = *p++) {
-		if (c == '.') {
-			if (dot)
-				goto done;
-			dot = 1;
-			decimal = 1.0;
-			continue;
-		}
-		if (c >= '0' && c <= '9') {
-			numbers++;
-			if (dot) {
-				decimal /= 10;
-				val += (c - '0') * decimal;
-			} else {
-				val = (val * 10) + (c - '0');
-			}
-			continue;
-		}
-		if (c != 'e' && c != 'E')
-			goto done;
-		break;
-	}
-
-	if (!numbers)
-		goto done;
-
-	/* Exponent */
-	ep = p;
-	c = *ep++;
-	switch (c) {
-	case '-':
-		esign = 1;
-		/* fallthrough */
-	case '+':
-		c = *ep++;
-	}
-
-	if (c >= '0' && c <= '9') {
-		p = ep;
-		int exponent = c - '0';
-
-		for (;;) {
-			c = *p++;
-			if (c < '0' || c > '9')
-				break;
-			exponent *= 10;
-			exponent += c - '0';
-		}
-
-		/* We're not going to bother playing games */
-		if (exponent > 308)
-			exponent = 308;
-
-		while (exponent-- > 0) {
-			if (esign)
-				val /= 10;
-			else
-				val *= 10;
-		}
-	}
-
-done:
-	if (!numbers)
-		goto no_conversion;
-	if (ptr)
-		*ptr = p-1;
-	return sign ? -val : val;
-
-no_conversion:
-	if (ptr)
-		*ptr = str;
-	return 0.0;
-}
-
-static enum number_type parse_float(char *buffer, double *res, char **endp)
+static enum number_type parse_float(const char *buffer, double *res, const char **endp)
 {
 	double val;
 	static bool first_time = TRUE;
@@ -378,9 +281,8 @@ static enum number_type parse_float(char *buffer, double *res, char **endp)
 				fprintf(stderr, "Floating point value with decimal comma (%s)?\n", buffer);
 				first_time = FALSE;
 			}
-			/* Try again */
-			**endp = '.';
-			val = ascii_strtod(buffer, endp);
+			/* Try again in permissive mode*/
+			val = strtod_flags(buffer, endp, 0);
 		}
 	}
 
@@ -394,13 +296,13 @@ union int_or_float {
 
 static enum number_type integer_or_float(char *buffer, union int_or_float *res)
 {
-	char *end;
+	const char *end;
 	return parse_float(buffer, &res->fp, &end);
 }
 
 static void pressure(char *buffer, void *_press)
 {
-	double mbar;
+	double mbar = 0.0;
 	pressure_t *pressure = _press;
 	union int_or_float val;
 
@@ -556,7 +458,7 @@ static void percent(char *buffer, void *_fraction)
 {
 	fraction_t *fraction = _fraction;
 	double val;
-	char *end;
+	const char *end;
 
 	switch (parse_float(buffer, &val, &end)) {
 	case FLOAT:
@@ -1942,7 +1844,7 @@ int parse_dm4_buffer(const char *url, const char *buffer, int size,
 	 * time. We also need epoch, not seconds since year 1. */
 	char get_dives[] = "select D.DiveId,StartTime/10000000-62135596800,Note,Duration,SourceSerialNumber,Source,MaxDepth,SampleInterval,StartTemperature,BottomTemperature,D.StartPressure,D.EndPressure,Size,CylinderWorkPressure,SurfacePressure,DiveTime,SampleInterval,ProfileBlob,TemperatureBlob,PressureBlob,Oxygen,Helium,MIX.StartPressure,MIX.EndPressure FROM Dive AS D JOIN DiveMixture AS MIX ON D.DiveId=MIX.DiveId";
 
-	retval = sqlite3_open(url,&handle);
+	retval = sqlite3_open(url, &handle);
 
 	if(retval) {
 		fprintf(stderr, translate("gettextFromC","Database connection failed '%s'.\n"), url);
@@ -1968,57 +1870,6 @@ void parse_xml_init(void)
 void parse_xml_exit(void)
 {
 	xmlCleanupParser();
-}
-
-static xsltStylesheetPtr try_get_stylesheet(const char *path, int len, const char *name)
-{
-	xsltStylesheetPtr ret;
-	int namelen = strlen(name);
-	char *filename = malloc(len+1+namelen+1);
-
-	if (!filename)
-		return NULL;
-
-	memcpy(filename, path, len);
-#ifdef WIN32
-	filename[len] = '\\';
-#else
-	filename[len] = '/';
-#endif
-	memcpy(filename + len + 1, name, namelen+1);
-
-	ret = NULL;
-	if (!access(filename, R_OK))
-		ret = xsltParseStylesheetFile(filename);
-	free(filename);
-
-	return ret;
-}
-
-xsltStylesheetPtr get_stylesheet(const char *name)
-{
-	const char *path, *next;
-
-	path = getenv("SUBSURFACE_XSLT_PATH");
-	if (!path)
-		path = xslt_path;
-
-	do {
-		int len;
-		xsltStylesheetPtr ret;
-
-		next = strchr(path, ':');
-		len = strlen(path);
-		if (next) {
-			len = next - path;
-			next++;
-		}
-		ret = try_get_stylesheet(path, len, name);
-		if (ret)
-			return ret;
-	} while ((path = next) != NULL);
-
-	return NULL;
 }
 
 static struct xslt_files {
@@ -2063,7 +1914,7 @@ static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **err
 		xmlSubstituteEntitiesDefault(1);
 		xslt = get_stylesheet(info->file);
 		if (xslt == NULL) {
-			parser_error(error, translate("gettextFromC","Can't open stylesheet (%s)/%s"), xslt_path, info->file);
+			parser_error(error, translate("gettextFromC","Can't open stylesheet %s"), info->file);
 			return doc;
 		}
 		transformed = xsltApplyStylesheet(xslt, doc, params);

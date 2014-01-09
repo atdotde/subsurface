@@ -30,8 +30,6 @@
 #define MAX_DEPTH M_OR_FT(150, 450)
 #define MIN_DEPTH M_OR_FT(20, 60)
 
-#define M_OR_FT(_m,_f) ((prefs.units.length == units::METERS) ? ((_m) * 1000) : (feet_to_mm(_f)))
-
 QString gasToStr(const int o2Permille, const int hePermille) {
 	uint o2 = (o2Permille + 5) / 10, he = (hePermille + 5) / 10;
 	QString result = is_air(o2Permille, hePermille) ? QObject::tr("AIR")
@@ -1325,13 +1323,13 @@ DivePlannerPointsModel::Mode DivePlannerPointsModel::currentMode() const
 	return mode;
 }
 
-QList<QPair<int, int> > DivePlannerPointsModel::collectGases(struct dive *d)
+QVector<QPair<int, int> > DivePlannerPointsModel::collectGases(struct dive *d)
 {
-	QList<QPair<int, int> > l;
+	QVector<QPair<int, int> > l;
 	for (int i = 0; i < MAX_CYLINDERS; i++) {
 		cylinder_t *cyl = &d->cylinder[i];
 		if (!cylinder_nodata(cyl))
-			l.push_back(QPair<int, int>(cyl->gasmix.o2.permille, cyl->gasmix.he.permille));
+			l.push_back(qMakePair(cyl->gasmix.o2.permille, cyl->gasmix.he.permille));
 	}
 	return l;
 }
@@ -1359,10 +1357,10 @@ void DivePlannerPointsModel::tanksUpdated()
 	// "did a gas change on us". So we look through the diveplan to
 	// see if there is a gas that is now missing and if there is, we
 	// replace it with the matching new gas.
-	QList<QPair<int,int> > gases = collectGases(stagingDive);
-	if (gases.length() == oldGases.length()) {
+	QVector<QPair<int,int> > gases = collectGases(stagingDive);
+	if (gases.count() == oldGases.count()) {
 		// either nothing relevant changed, or exactly ONE gasmix changed
-		for (int i = 0; i < gases.length(); i++) {
+		for (int i = 0; i < gases.count(); i++) {
 			if (gases.at(i) != oldGases.at(i)) {
 				if (oldGases.count(oldGases.at(i)) > 1) {
 					// we had this gas more than once, so don't
@@ -1422,8 +1420,6 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		lastIndex = i;
 		plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2);
 	}
-	if (!diveplan.dp)
-		return;
 	char *cache = NULL;
 	tempDive = NULL;
 	const char *errorString = NULL;
@@ -1432,7 +1428,10 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		cylinder_t *cyl = &stagingDive->cylinder[i];
 		if (cyl->depth.mm) {
 			dp = create_dp(0, cyl->depth.mm, cyl->gasmix.o2.permille, cyl->gasmix.he.permille, 0);
-			dp->next = diveplan.dp->next;
+			if (diveplan.dp)
+				dp->next = diveplan.dp->next;
+			else
+				dp->next = NULL;
 			diveplan.dp->next = dp;
 		}
 	}

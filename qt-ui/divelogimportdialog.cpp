@@ -1,22 +1,23 @@
 #include <QtDebug>
 #include <QFileDialog>
-#include "csvimportdialog.h"
+#include "divelogimportdialog.h"
 #include "mainwindow.h"
-#include "ui_csvimportdialog.h"
+#include "ui_divelogimportdialog.h"
 
-const CSVImportDialog::CSVAppConfig CSVImportDialog::CSVApps[CSVAPPS] = {
+const DiveLogImportDialog::CSVAppConfig DiveLogImportDialog::CSVApps[CSVAPPS] = {
 		{"", },
-		{"APD Log Viewer", 0, 1, 15, 6, 17, 18, "Tab"},
-		{"XP5", 0, 1, 9, -1, -1, -1, "Tab"},
+		{"APD Log Viewer", 1, 2, 16, 7, 18, 19, "Tab"},
+		{"XP5", 1, 2, 10, -1, -1, -1, "Tab"},
 		{NULL,}
 };
 
-CSVImportDialog::CSVImportDialog(QWidget *parent) :
+DiveLogImportDialog::DiveLogImportDialog(QStringList *fn, QWidget *parent) :
 	QDialog(parent),
 	selector(true),
-	ui(new Ui::CSVImportDialog)
+	ui(new Ui::DiveLogImportDialog)
 {
 	ui->setupUi(this);
+	fileNames = *fn;
 
 	for (int i = 0; !CSVApps[i].name.isNull(); ++i)
 		ui->knownImports->addItem(CSVApps[i].name);
@@ -24,7 +25,6 @@ CSVImportDialog::CSVImportDialog(QWidget *parent) :
 	ui->CSVSeparator->addItem("Tab");
 	ui->CSVSeparator->addItem(",");
 	ui->knownImports->setCurrentIndex(1);
-	ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
 
 	connect(ui->CSVDepth, SIGNAL(valueChanged(int)), this, SLOT(unknownImports(int)));
 	connect(ui->CSVTime, SIGNAL(valueChanged(int)), this, SLOT(unknownImports(int)));
@@ -38,42 +38,33 @@ CSVImportDialog::CSVImportDialog(QWidget *parent) :
 	connect(ui->stopdepthCheckBox, SIGNAL(clicked(bool)), this, SLOT(unknownImports(bool)));
 }
 
-CSVImportDialog::~CSVImportDialog()
+DiveLogImportDialog::~DiveLogImportDialog()
 {
 	delete ui;
 }
 
-#define VALUE_IF_CHECKED(x) (ui->x->isEnabled() ? ui->x->value() : -1)
-void CSVImportDialog::on_buttonBox_accepted()
+#define VALUE_IF_CHECKED(x) (ui->x->isEnabled() ? ui->x->value() - 1: -1)
+void DiveLogImportDialog::on_buttonBox_accepted()
 {
 	char *error = NULL;
 
-	parse_csv_file(ui->CSVFile->text().toUtf8().data(), ui->CSVTime->value(),
-			ui->CSVDepth->value(), VALUE_IF_CHECKED(CSVTemperature),
-			VALUE_IF_CHECKED(CSVpo2),
-			VALUE_IF_CHECKED(CSVcns),
-			VALUE_IF_CHECKED(CSVstopdepth),
-			ui->CSVSeparator->currentIndex(),
-			&error);
-	if (error != NULL) {
-
-		mainWindow()->showError(error);
-		free(error);
-		error = NULL;
+	for (int i = 0; i < fileNames.size(); ++i) {
+		parse_csv_file(fileNames[i].toUtf8().data(), ui->CSVTime->value() - 1,
+				ui->CSVDepth->value() - 1, VALUE_IF_CHECKED(CSVTemperature),
+				VALUE_IF_CHECKED(CSVpo2),
+				VALUE_IF_CHECKED(CSVcns),
+				VALUE_IF_CHECKED(CSVstopdepth),
+				ui->CSVSeparator->currentIndex(),
+				&error);
+		if (error != NULL) {
+			mainWindow()->showError(error);
+			free(error);
+			error = NULL;
+		}
 	}
 	process_dives(TRUE, FALSE);
 
 	mainWindow()->refreshDisplay();
-}
-
-void CSVImportDialog::on_CSVFileSelector_clicked()
-{
-	QString filename = QFileDialog::getOpenFileName(this, tr("Open CSV Log File"), ".", tr("CSV Files (*.csv)"));
-	ui->CSVFile->setText(filename);
-	if (filename.isEmpty())
-		ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
-	else
-		ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(true);
 }
 
 #define SET_VALUE_AND_CHECKBOX(CSV, BOX, VAL) ({\
@@ -83,7 +74,7 @@ void CSVImportDialog::on_CSVFileSelector_clicked()
 		ui->BOX->setChecked(VAL >= 0);\
 		ui->CSV->blockSignals(false);\
 		})
-void CSVImportDialog::on_knownImports_currentIndexChanged(int index)
+void DiveLogImportDialog::on_knownImports_currentIndexChanged(int index)
 {
 	if (index == 0)
 		return;
@@ -100,25 +91,17 @@ void CSVImportDialog::on_knownImports_currentIndexChanged(int index)
 	SET_VALUE_AND_CHECKBOX(CSVstopdepth, stopdepthCheckBox, CSVApps[index].stopdepth);
 }
 
-void CSVImportDialog::unknownImports(bool arg1)
+void DiveLogImportDialog::unknownImports(bool arg1)
 {
 	unknownImports();
 }
 
-void CSVImportDialog::unknownImports(int arg1)
+void DiveLogImportDialog::unknownImports(int arg1)
 {
 	unknownImports();
 }
 
-void CSVImportDialog::unknownImports()
+void DiveLogImportDialog::unknownImports()
 {
 	ui->knownImports->setCurrentIndex(0);
-}
-
-void CSVImportDialog::on_CSVFile_textEdited()
-{
-	if (ui->CSVFile->text().isEmpty())
-		ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
-	else
-		ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(true);
 }

@@ -1,5 +1,5 @@
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
-  <xsl:import href="commonTemplates.xsl"/>
+  <xsl:include href="commonTemplates.xsl"/>
   <xsl:strip-space elements="*"/>
   <xsl:output method="xml" encoding="utf-8" indent="yes"/>
 
@@ -187,10 +187,130 @@
 
       <samples>
         <xsl:for-each select="./divecomputer[1]/sample">
+
+          <!-- Position of previous waypoint -->
+          <xsl:variable name="position">
+            <xsl:value-of select="position() - 1"/>
+          </xsl:variable>
+
+          <!-- Times of surrounding waypoints -->
+          <xsl:variable name="timefirst">
+            <xsl:call-template name="time2sec">
+              <xsl:with-param name="time">
+                <xsl:value-of select="//sample[position() = $position]/@time"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:variable>
+          <xsl:variable name="timesecond">
+            <xsl:call-template name="time2sec">
+              <xsl:with-param name="time">
+                <xsl:value-of select="./@time"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:variable>
+
+          <!-- Time difference between surrounding waypoints -->
+          <xsl:variable name="delta">
+            <xsl:choose>
+              <xsl:when test="$timefirst &gt;= 0">
+                <xsl:value-of select="$timesecond - $timefirst"/>
+              </xsl:when>
+              <xsl:otherwise>
+                <xsl:value-of select="0"/>
+              </xsl:otherwise>
+            </xsl:choose>
+          </xsl:variable>
+
+          <!-- Depths of surrounding waypoints -->
+          <xsl:variable name="depthfirst">
+            <xsl:call-template name="depth2mm">
+              <xsl:with-param name="depth">
+                <xsl:value-of select="//sample[position() = $position]/@depth"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:variable>
+          <xsl:variable name="depthsecond">
+            <xsl:call-template name="depth2mm">
+              <xsl:with-param name="depth">
+                <xsl:value-of select="./@depth"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:variable>
+
+          <!-- Approximated waypoints -->
+          <xsl:variable name="timesec">
+            <xsl:call-template name="time2sec">
+              <xsl:with-param name="time">
+                <xsl:value-of select="./@time"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:variable>
+
+          <!-- Crafting waypoints for events in-between samples -->
+          <xsl:for-each select="preceding-sibling::event[substring-before(@time, ':') * 60 + substring-before(substring-after(@time, ':'), ' ')&lt;$timesec and substring-before(@time, ':') * 60 + substring-before(substring-after(@time, ':'), ' ')&gt;($timesec - $delta)]">
+            <waypoint>
+              <depth>
+                <xsl:call-template name="approximatedepth">
+                  <xsl:with-param name="timefirst">
+                    <xsl:value-of select="$timefirst"/>
+                  </xsl:with-param>
+                  <xsl:with-param name="timesecond">
+                    <xsl:value-of select="$timesecond"/>
+                  </xsl:with-param>
+                  <xsl:with-param name="depthfirst">
+                    <xsl:value-of select="$depthfirst"/>
+                  </xsl:with-param>
+                  <xsl:with-param name="depthsecond">
+                    <xsl:value-of select="$depthsecond"/>
+                  </xsl:with-param>
+                  <xsl:with-param name="timeevent">
+                    <xsl:call-template name="time2sec">
+                      <xsl:with-param name="time">
+                        <xsl:value-of select="@time"/>
+                      </xsl:with-param>
+                    </xsl:call-template>
+                  </xsl:with-param>
+                </xsl:call-template>
+              </depth>
+
+              <divetime>
+                <xsl:call-template name="time2sec">
+                  <xsl:with-param name="time">
+                    <xsl:value-of select="@time"/>
+                  </xsl:with-param>
+                </xsl:call-template>
+              </divetime>
+
+              <xsl:if test="@name = 'gaschange'">
+                <switchmix>
+                  <xsl:attribute name="ref">
+                    <xsl:value-of select="@value"/>
+                  </xsl:attribute>
+                </switchmix>
+              </xsl:if>
+
+              <xsl:if test="@name = 'heading'">
+                <heading>
+                  <xsl:value-of select="@value"/>
+                </heading>
+              </xsl:if>
+
+              <xsl:if test="not(@name = 'heading') and not(@name = 'gaschange')">
+                <alarm>
+                  <xsl:value-of select="@name"/>
+                </alarm>
+              </xsl:if>
+
+            </waypoint>
+          </xsl:for-each>
+          <!-- Approximated waypoints -->
+
+          <!-- Recorded waypoints and events occurring at the exact same time -->
           <waypoint>
             <depth>
               <xsl:value-of select="substring-before(./@depth, ' ')"/>
             </depth>
+
             <divetime>
               <xsl:call-template name="time2sec">
                 <xsl:with-param name="time">
@@ -198,98 +318,99 @@
                 </xsl:with-param>
               </xsl:call-template>
             </divetime>
+
             <xsl:if test="./@pressure != ''">
               <tankpressure>
                 <xsl:value-of select="substring-before(./@pressure, ' ') * 100000"/>
               </tankpressure>
             </xsl:if>
+
             <xsl:if test="./@temp != ''">
               <temperature>
                 <xsl:value-of select="format-number(substring-before(./@temp, ' ') + 273.15, '0.00')"/>
               </temperature>
             </xsl:if>
 
-            <!-- We need to look up if there is an event at the time we
-                 are handling currently. And then translate that event
-                 to the one in UDDF specification.
-            -->
             <xsl:variable name="time">
-              <xsl:value-of select="./@time"/>
+              <xsl:value-of select="@time"/>
             </xsl:variable>
-            <xsl:if test="preceding-sibling::event/@time = $time">
-              <xsl:if test="preceding-sibling::event[@time=$time and @name='gaschange']/@name">
 
-                <!-- Gas change is a reference to the gases section, as
-                     the gases index was pure o2 value, we can directly
-                     use Subsurfaces reference here.
-                -->
-                <switchmix>
-                  <xsl:attribute name="ref">
-                    <xsl:value-of select="preceding-sibling::event[@time=$time and @name='gaschange']/@value"/>
-                  </xsl:attribute>
-                </switchmix>
-              </xsl:if>
+            <xsl:for-each select="preceding-sibling::event[@time = $time and @name='gaschange']/@value">
+              <switchmix>
+                <xsl:attribute name="ref">
+                  <xsl:value-of select="."/>
+                </xsl:attribute>
+              </switchmix>
+            </xsl:for-each>
 
-              <xsl:if test="preceding-sibling::event[@time=$time and @name='heading']/@name">
-                <heading>
-                  <xsl:value-of select="preceding-sibling::event[@time=$time and @name='heading']/@value"/>
-                </heading>
-              </xsl:if>
+            <xsl:for-each select="preceding-sibling::event[@time = $time and @name='heading']/@value">
+              <heading>
+                <xsl:value-of select="."/>
+              </heading>
+            </xsl:for-each>
 
-              <!-- We'll just print the alarm text from our event name
-                   as is, deco and surface are specified in UDDF
-                   specification but the rest is not recognized and
-                   there is no equivalent available.
-              -->
-              <xsl:if test="preceding-sibling::event[@time=$time and not(@name='heading' or @name='gaschange')]/@name">
-                <alarm>
-                  <xsl:for-each select="preceding-sibling::event[@time=$time and not(@name='heading' or @name='gaschange')]/@name">
-                    <xsl:value-of select="."/>
-                  </xsl:for-each>
-                </alarm>
-              </xsl:if>
-            </xsl:if>
+            <xsl:for-each select="preceding-sibling::event[@time = $time and not(@name='heading' or @name='gaschange')]/@name">
+              <alarm>
+                <xsl:value-of select="."/>
+              </alarm>
+            </xsl:for-each>
+            <!-- Recorded waypoints -->
           </waypoint>
         </xsl:for-each>
       </samples>
 
-      <tankdata>
-        <xsl:if test="cylinder[1]/@size">
-          <tankvolume>
-            <xsl:value-of select="substring-before(cylinder[1]/@size, ' ')"/>
-          </tankvolume>
-        </xsl:if>
-        <xsl:choose>
-          <xsl:when test="divecomputer[1]/sample/@pressure != ''">
-            <tankpressurebegin>
-              <xsl:value-of select="substring-before(divecomputer[1]/sample/@pressure[1], ' ') * 100000"/>
-            </tankpressurebegin>
-          </xsl:when>
-          <xsl:otherwise>
-            <xsl:if test="cylinder[1]/@start">
+      <xsl:for-each select="cylinder">
+        <tankdata>
+          <link>
+            <xsl:attribute name="ref">
+              <xsl:choose>
+                <xsl:when test="@o2 != ''">
+                  <xsl:value-of select="substring-before(@o2, '.')"/>
+                </xsl:when>
+                <xsl:otherwise>
+                  <xsl:value-of select="'21'"/>
+                </xsl:otherwise>
+              </xsl:choose>
+            </xsl:attribute>
+          </link>
+
+          <xsl:if test="@size">
+            <tankvolume>
+              <xsl:value-of select="substring-before(@size, ' ')"/>
+            </tankvolume>
+          </xsl:if>
+          <xsl:choose>
+            <xsl:when test="divecomputer[1]/sample/@pressure != ''">
               <tankpressurebegin>
-                <xsl:value-of select="substring-before(cylinder[1]/@start, ' ') * 100000"/>
+                <xsl:value-of select="substring-before(divecomputer[1]/sample/@pressure[1], ' ') * 100000"/>
               </tankpressurebegin>
-            </xsl:if>
-          </xsl:otherwise>
-        </xsl:choose>
+            </xsl:when>
+            <xsl:otherwise>
+              <xsl:if test="@start">
+                <tankpressurebegin>
+                  <xsl:value-of select="substring-before(@start, ' ') * 100000"/>
+                </tankpressurebegin>
+              </xsl:if>
+            </xsl:otherwise>
+          </xsl:choose>
 
-        <xsl:choose>
-          <xsl:when test="count(divecomputer[1]/sample[@pressure]) &gt; 0">
-            <tankpressureend>
-              <xsl:value-of select="substring-before(divecomputer[1]/sample[@pressure][last()]/@pressure, ' ') * 100000"/>
-            </tankpressureend>
-          </xsl:when>
-          <xsl:otherwise>
-            <xsl:if test="cylinder[1]/@end">
+          <xsl:choose>
+            <xsl:when test="count(divecomputer[1]/sample[@pressure]) &gt; 0">
               <tankpressureend>
-                <xsl:value-of select="substring-before(cylinder[1]/@end, ' ') * 100000"/>
+                <xsl:value-of select="substring-before(divecomputer[1]/sample[@pressure][last()]/@pressure, ' ') * 100000"/>
               </tankpressureend>
-            </xsl:if>
-          </xsl:otherwise>
-        </xsl:choose>
+            </xsl:when>
+            <xsl:otherwise>
+              <xsl:if test="@end">
+                <tankpressureend>
+                  <xsl:value-of select="substring-before(@end, ' ') * 100000"/>
+                </tankpressureend>
+              </xsl:if>
+            </xsl:otherwise>
+          </xsl:choose>
 
-      </tankdata>
+        </tankdata>
+      </xsl:for-each>
 
       <informationafterdive>
         <xsl:if test="node()/depth/@max != ''">
@@ -356,4 +477,28 @@
 
     </dive>
   </xsl:template>
+
+
+<!-- Approximate waypoint depth.
+     Parameters:
+     timefirst    Time of the previous waypoint in seconds
+     timesecond   Time of the current waypoint in seconds
+     depthfirst   Depth of the first waypoint in mm
+     depthsecond  Depth of the second waypoint in mm
+     timeevent    Time of the event
+
+     Returns:     Depth approximation of event in m
+     -->
+
+<xsl:template name="approximatedepth">
+  <xsl:param name="timefirst"/>
+  <xsl:param name="timesecond"/>
+  <xsl:param name="depthfirst"/>
+  <xsl:param name="depthsecond"/>
+  <xsl:param name="timeevent"/>
+
+  <xsl:value-of select="format-number((($timeevent - $timefirst) div ($timesecond - $timefirst) * ($depthsecond - $depthfirst) + $depthfirst) div 1000, '#.##')"/>
+
+</xsl:template>
+
 </xsl:stylesheet>

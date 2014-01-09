@@ -6,7 +6,7 @@ INCLUDEPATH += qt-ui $$PWD
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 4.0
+VERSION = 4.0.1
 
 HEADERS = \
 	color.h \
@@ -39,7 +39,6 @@ HEADERS = \
 	qt-ui/mainwindow.h \
 	qt-ui/modeldelegates.h \
 	qt-ui/models.h \
-	qt-ui/plotareascene.h \
 	qt-ui/preferences.h \
 	qt-ui/printdialog.h \
 	qt-ui/printlayout.h \
@@ -55,7 +54,7 @@ HEADERS = \
 	subsurfacestartup.h \
 	uemis.h \
 	webservice.h \
-	qt-ui/csvimportdialog.h \
+	qt-ui/divelogimportdialog.h \
 	qt-ui/tagwidget.h \
 	qt-ui/groupedlineedit.h
 
@@ -87,7 +86,6 @@ SOURCES =  \
 	qt-ui/mainwindow.cpp \
 	qt-ui/modeldelegates.cpp \
 	qt-ui/models.cpp \
-	qt-ui/plotareascene.cpp \
 	qt-ui/preferences.cpp \
 	qt-ui/printdialog.cpp \
 	qt-ui/printlayout.cpp \
@@ -100,11 +98,12 @@ SOURCES =  \
 	save-xml.c \
 	sha1.c \
 	statistics.c \
+	strtod.c \
 	subsurfacestartup.c \
 	time.c \
 	uemis.c \
 	uemis-downloader.c \
-	qt-ui/csvimportdialog.cpp \
+	qt-ui/divelogimportdialog.cpp \
 	qt-ui/tagwidget.cpp \
 	qt-ui/groupedlineedit.cpp
 
@@ -125,7 +124,7 @@ FORMS = \
 	qt-ui/shifttimes.ui \
 	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
-	qt-ui/csvimportdialog.ui
+	qt-ui/divelogimportdialog.ui
 
 RESOURCES = subsurface.qrc
 

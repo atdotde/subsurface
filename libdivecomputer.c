@@ -9,7 +9,6 @@
 #include "display.h"
 
 #include "libdivecomputer.h"
-#include "libdivecomputer/version.h"
 
 /* Christ. Libdivecomputer has the worst configuration system ever. */
 #ifdef HW_FROG_H
@@ -19,6 +18,8 @@
   #define NOT_FROG
 #endif
 
+char *dumpfile_name;
+char *logfile_name;
 const char *progress_bar_text = "";
 double progress_bar_fraction = 0.0;
 
@@ -512,12 +513,6 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	return 1;
 }
 
-
-static dc_status_t import_device_data(dc_device_t *device, device_data_t *devicedata)
-{
-	return dc_device_foreach(device, dive_cb, devicedata);
-}
-
 /*
  * The device ID for libdivecomputer devices is the first 32-bit word
  * of the SHA1 hash of the model/firmware/serial numbers.
@@ -611,6 +606,7 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 	const dc_event_progress_t *progress = data;
 	const dc_event_devinfo_t *devinfo = data;
 	const dc_event_clock_t *clock = data;
+	const dc_event_vendor_t *vendor = data;
 	device_data_t *devdata = userdata;
 	unsigned int serial;
 
@@ -628,6 +624,12 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 			devinfo->model, devinfo->model,
 			devinfo->firmware, devinfo->firmware,
 			devinfo->serial, devinfo->serial);
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: model=%u (0x%08x), firmware=%u (0x%08x), serial=%u (0x%08x)\n",
+				devinfo->model, devinfo->model,
+				devinfo->firmware, devinfo->firmware,
+				devinfo->serial, devinfo->serial);
+		}
 		/*
 		 * libdivecomputer doesn't give serial numbers in the proper string form,
 		 * so we have to see if we can do some vendor-specific munging.
@@ -641,6 +643,18 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 	case DC_EVENT_CLOCK:
 			dev_info(devdata, translate("gettextFromC","Event: systime=%"PRId64", devtime=%u\n"),
 			(uint64_t)clock->systime, clock->devtime);
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: systime=%"PRId64", devtime=%u\n",
+				(uint64_t)clock->systime, clock->devtime);
+		}
+		break;
+	case DC_EVENT_VENDOR:
+		if (devdata->libdc_logfile) {
+			fprintf(devdata->libdc_logfile, "Event: vendor=");
+			for (unsigned int i = 0; i < vendor->size; ++i)
+				fprintf(devdata->libdc_logfile, "%02X", vendor->data[i]);
+			fprintf(devdata->libdc_logfile,"\n");
+		}
 		break;
 	default:
 		break;
@@ -663,7 +677,7 @@ static const char *do_device_import(device_data_t *data)
 	data->model = str_printf("%s %s", data->vendor, data->product);
 
 	// Register the event handler.
-	int events = DC_EVENT_WAITING | DC_EVENT_PROGRESS | DC_EVENT_DEVINFO | DC_EVENT_CLOCK;
+	int events = DC_EVENT_WAITING | DC_EVENT_PROGRESS | DC_EVENT_DEVINFO | DC_EVENT_CLOCK | DC_EVENT_VENDOR;
 	rc = dc_device_set_events(device, events, event_cb, data);
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Error registering the event handler.");
@@ -673,7 +687,23 @@ static const char *do_device_import(device_data_t *data)
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Error registering the cancellation handler.");
 
-	rc = import_device_data(device, data);
+	if (data->libdc_dump) {
+		dc_buffer_t *buffer = dc_buffer_new (0);
+
+		rc = dc_device_dump (device, buffer);
+		if (rc == DC_STATUS_SUCCESS && dumpfile_name) {
+			FILE* fp = subsurface_fopen(dumpfile_name, "wb");
+			if (fp != NULL) {
+				fwrite (dc_buffer_get_data (buffer), 1, dc_buffer_get_size (buffer), fp);
+				fclose (fp);
+			}
+		}
+
+		dc_buffer_free (buffer);
+	} else {
+		rc = dc_device_foreach(device, dive_cb, data);
+	}
+
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Dive data import error");
 
@@ -681,26 +711,57 @@ static const char *do_device_import(device_data_t *data)
 	return NULL;
 }
 
+static void
+logfunc(dc_context_t *context, dc_loglevel_t loglevel, const char *file, unsigned int line, const char *function, const char *msg, void *userdata)
+{
+	const char *loglevels[] = {"NONE", "ERROR", "WARNING", "INFO", "DEBUG", "ALL"};
+
+	FILE *fp = (FILE *) userdata;
+
+	if (loglevel == DC_LOGLEVEL_ERROR || loglevel == DC_LOGLEVEL_WARNING) {
+		fprintf(fp, "%s: %s [in %s:%d (%s)]\n", loglevels[loglevel], msg, file, line, function);
+	} else {
+		fprintf(fp, "%s: %s\n", loglevels[loglevel], msg);
+	}
+}
+
 const char *do_libdivecomputer_import(device_data_t *data)
 {
 	dc_status_t rc;
 	const char *err;
+	FILE *fp = NULL;
 
 	import_dive_number = 0;
 	first_temp_is_air = 0;
 	data->device = NULL;
 	data->context = NULL;
 
+	if (data->libdc_log && logfile_name)
+		fp = subsurface_fopen(logfile_name, "w");
+
+	data->libdc_logfile = fp;
+
 	rc = dc_context_new(&data->context);
 	if (rc != DC_STATUS_SUCCESS)
 		return translate("gettextFromC","Unable to create libdivecomputer context");
+
+	if (fp) {
+		dc_context_set_loglevel(data->context, DC_LOGLEVEL_ALL);
+		dc_context_set_logfunc(data->context, logfunc, fp);
+	}
 
 	err = translate("gettextFromC","Unable to open %s %s (%s)");
 	rc = dc_device_open(&data->device, data->context, data->descriptor, data->devname);
 	if (rc == DC_STATUS_SUCCESS) {
 		err = do_device_import(data);
+		/* TODO: Show the logfile to the user on error. */
 		dc_device_close(data->device);
 	}
 	dc_context_free(data->context);
+
+	if (fp) {
+		fclose(fp);
+	}
+
 	return err;
 }

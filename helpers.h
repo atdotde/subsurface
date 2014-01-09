@@ -19,7 +19,7 @@ QString get_weight_unit();
 QString get_cylinder_used_gas_string(cylinder_t *cyl, bool showunit = false);
 QString get_temperature_string(temperature_t temp, bool showunit = false);
 QString get_temp_unit();
-QString get_volume_string(volume_t volume, bool showunit = false);
+QString get_volume_string(volume_t volume, bool showunit = false, unsigned int mbar = 0);
 QString get_volume_unit();
 QString get_pressure_string(pressure_t pressure, bool showunit = false);
 QString get_pressure_unit();
@@ -34,6 +34,8 @@ QString get_short_dive_date_string(timestamp_t when);
 QString get_trip_date_string(timestamp_t when, int nr);
 
 extern DiveComputerList dcList;
+
+#define M_OR_FT(_m,_f) ((prefs.units.length == units::METERS) ? ((_m) * 1000) : (feet_to_mm(_f)))
 
 #if defined __APPLE__
 #define TITLE_OR_TEXT(_t,_m) "", _t + "\n" + _m

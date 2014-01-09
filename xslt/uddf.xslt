@@ -4,7 +4,7 @@
   xmlns:u1="http://www.streit.cc/uddf/3.1/"
   exclude-result-prefixes="u u1"
   version="1.0">
-  <xsl:import href="commonTemplates.xsl"/>
+  <xsl:include href="commonTemplates.xsl"/>
   <xsl:strip-space elements="*"/>
   <xsl:output method="xml" indent="yes"/>
 
@@ -57,32 +57,6 @@
         <xsl:value-of select="application/version"/>
       </xsl:attribute>
     </xsl:if>
-  </xsl:template>
-
-  <xsl:template match="gasdefinitions|u:gasdefinitions|u1:gasdefinitions|gas_def">
-    <xsl:for-each select="mix|u:mix|u1:mix|gas_mix">
-      <cylinder>
-        <xsl:attribute name="description">
-          <xsl:value-of select="name|u:name|u1:name|mixname"/>
-        </xsl:attribute>
-
-        <xsl:attribute name="o2">
-          <xsl:call-template name="gasConvert">
-            <xsl:with-param name="mix">
-              <xsl:value-of select="o2|u:o2|u1:o2"/>
-            </xsl:with-param>
-          </xsl:call-template>
-        </xsl:attribute>
-
-        <xsl:attribute name="he">
-          <xsl:call-template name="gasConvert">
-            <xsl:with-param name="mix">
-              <xsl:value-of select="he|u:he|u1:he"/>
-            </xsl:with-param>
-          </xsl:call-template>
-        </xsl:attribute>
-      </cylinder>
-    </xsl:for-each>
   </xsl:template>
 
   <xsl:template match="dive|u:dive|u1:dive">
@@ -271,7 +245,39 @@
         </xsl:for-each>
       </xsl:if>
 
-      <xsl:apply-templates select="/uddf/gasdefinitions|/u:uddf/u:gasdefinitions|/u1:uddf/u1:gasdefinitions"/>
+      <xsl:for-each select="tankdata|u:tankdata|u1:tankdata">
+        <cylinder>
+          <xsl:variable name="gas">
+            <xsl:value-of select="link/@ref|u:link/@ref|u1:link/@ref"/>
+          </xsl:variable>
+
+          <xsl:if test="tankvolume|u:tankvolume|u1:tankvolume != ''">
+            <xsl:attribute name="size">
+              <xsl:value-of select="tankvolume|u:tankvolume|u1:tankvolume"/>
+            </xsl:attribute>
+          </xsl:if>
+
+          <xsl:attribute name="o2">
+            <xsl:value-of select="//gasdefinitions/mix[@id=$gas]/o2|//u:gasdefinitions/u:mix[@id=$gas]/u:o2|//u1:gasdefinitions/u1:mix[@id=$gas]/u1:o2"/>
+          </xsl:attribute>
+          <xsl:attribute name="he">
+            <xsl:value-of select="//gasdefinitions/mix[@id=$gas]/he|//u:gasdefinitions/u:mix[@id=$gas]/u:he|//u1:gasdefinitions/u1:mix[@id=$gas]/u1:he"/>
+          </xsl:attribute>
+
+          <xsl:if test="tankpressurebegin|u:tankpressurebegin|u1:tankpressurebegin != ''">
+            <xsl:attribute name="start">
+              <xsl:value-of select="concat(format-number(tankpressurebegin|u:tankpressurebegin|u1:tankpressurebegin div 100000, '#.#'), ' bar')"/>
+            </xsl:attribute>
+          </xsl:if>
+
+          <xsl:if test="tankpressureend|u:tankpressureend|u1:tankpressureend != ''">
+            <xsl:attribute name="end">
+              <xsl:value-of select="concat(format-number(tankpressureend|u:tankpressureend|u1:tankpressureend div 100000, '#.#'), ' bar')"/>
+            </xsl:attribute>
+          </xsl:if>
+        </cylinder>
+      </xsl:for-each>
+
       <depth>
         <xsl:for-each select="greatestdepth|informationafterdive/greatestdepth|u:greatestdepth|u:informationafterdive/u:greatestdepth|u1:greatestdepth|u1:informationafterdive/u1:greatestdepth|max_depth">
           <xsl:attribute name="max">
@@ -336,6 +342,38 @@
                 <xsl:value-of select="//gasdefinitions/mix[@id=$idx]/o2|//u:gasdefinitions/u:mix[@id=$idx]/u:o2|//u1:gasdefinitions/u1:mix[@id=$idx]/u1:o2"/>
               </xsl:with-param>
             </xsl:call-template>
+          </xsl:attribute>
+        </event>
+      </xsl:for-each>
+
+      <xsl:for-each select="samples/waypoint/alarm|u:samples/u:waypoint/u:alarm|u1:samples/u1:waypoint/u1:alarm">
+        <event>
+          <xsl:attribute name="time">
+            <xsl:call-template name="timeConvert">
+              <xsl:with-param name="timeSec">
+                <xsl:value-of select="preceding-sibling::divetime|preceding-sibling::u:divetime|preceding-sibling::u1:divetime"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:attribute>
+
+          <xsl:attribute name="name">
+            <xsl:value-of select="."/>
+          </xsl:attribute>
+        </event>
+      </xsl:for-each>
+
+      <xsl:for-each select="samples/waypoint/heading|u:samples/u:waypoint/u:heading|u1:samples/u1:waypoint/u1:heading">
+        <event name="heading">
+          <xsl:attribute name="time">
+            <xsl:call-template name="timeConvert">
+              <xsl:with-param name="timeSec">
+                <xsl:value-of select="preceding-sibling::divetime|preceding-sibling::u:divetime|preceding-sibling::u1:divetime"/>
+              </xsl:with-param>
+            </xsl:call-template>
+          </xsl:attribute>
+
+          <xsl:attribute name="value">
+            <xsl:value-of select="."/>
           </xsl:attribute>
         </event>
       </xsl:for-each>

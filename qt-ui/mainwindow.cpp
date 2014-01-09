@@ -35,7 +35,7 @@
 #include "diveplanner.h"
 #include "about.h"
 #include "printdialog.h"
-#include "csvimportdialog.h"
+#include "divelogimportdialog.h"
 
 static MainWindow* instance = 0;
 
@@ -75,6 +75,7 @@ MainWindow::MainWindow() : helpView(0)
 void MainWindow::refreshDisplay(bool recreateDiveList)
 {
 	ui.InfoWidget->reload();
+	TankInfoModel::instance()->update();
 	ui.ProfileWidget->refresh();
 	ui.globe->reload();
 	if (recreateDiveList)
@@ -164,15 +165,6 @@ void MainWindow::on_actionClose_triggered()
 	mark_divelist_changed(FALSE);
 
 	clear_events();
-}
-
-void MainWindow::on_actionImport_triggered()
-{
-	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import Files"), lastUsedDir(), filter());
-	if (!fileNames.size())
-		return; // no selection
-	updateLastUsedDir(QFileInfo(fileNames.at(0)).dir().path());
-	importFiles(fileNames);
 }
 
 QString MainWindow::lastUsedDir()
@@ -677,6 +669,9 @@ void MainWindow::readSettings()
 	s.endGroup();
 
 	s.beginGroup("Display");
+	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
+	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
+	qApp->setFont(defaultFont);
 	GET_TXT("divelist_font", divelist_font);
 	GET_INT("font_size", font_size);
 	GET_INT("displayinvalid", display_invalid_dives);
@@ -700,6 +695,13 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING ||
+	   ui.InfoWidget->isEditing()) {
+		QMessageBox::warning(this, tr("Warning"), tr("Please save or cancel the current dive edit before closing the file."));
+		event->ignore();
+		return;
+	}
+
 	if (helpView && helpView->isVisible()){
 		helpView->close();
 		helpView->deleteLater();
@@ -815,7 +817,7 @@ void MainWindow::importFiles(const QStringList fileNames)
 	QByteArray fileNamePtr;
 	char *error = NULL;
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = fileNames.at(i).toLocal8Bit();
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
 		parse_file(fileNamePtr.data(), &error);
 		if (error != NULL) {
 			showError(error);
@@ -836,7 +838,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	QByteArray fileNamePtr;
 
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = fileNames.at(i).toLocal8Bit();
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
 		parse_file(fileNamePtr.data(), &error);
 		set_filename(fileNamePtr.data(), TRUE);
 		setTitle(MWTF_FILENAME);
@@ -853,17 +855,31 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	ui.actionAutoGroup->setChecked(autogroup);
 }
 
-void MainWindow::on_actionImportCSV_triggered()
+void MainWindow::on_actionImportDiveLog_triggered()
 {
-	CSVImportDialog *csvImport = new CSVImportDialog();
-	csvImport->show();
-	process_dives(TRUE, FALSE);
-	refreshDisplay();
+	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Dive Log File"), lastUsedDir(), tr("Dive Log Files (*.xml *.uddf *.udcf *.csv *.jlb *.dld *.sde *.db);;XML Files (*.xml);;UDDF/UDCF Files(*.uddf *.udcf);;JDiveLog Files(*.jlb);;Suunto Files(*.sde *.db);;CSV Files(*.csv);;All Files(*)"));
+
+	if (fileNames.isEmpty())
+		return;
+	updateLastUsedDir(QFileInfo(fileNames[0]).dir().path());
+
+	QStringList logFiles = fileNames.filter( QRegExp("^.*\\.(?!csv)", Qt::CaseInsensitive) ) ;
+	QStringList csvFiles = fileNames.filter(".csv", Qt::CaseInsensitive);
+	if (logFiles.size()) {
+		importFiles(logFiles);
+	}
+
+	if (csvFiles.size()) {
+		DiveLogImportDialog *diveLogImport = new DiveLogImportDialog(&csvFiles);
+		diveLogImport->show();
+		process_dives(TRUE, FALSE);
+		refreshDisplay();
+	}
 }
 
 void MainWindow::editCurrentDive()
 {
-	if(DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
+	if(information()->isEditing() || DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING){
 		QMessageBox::warning(this, tr("Warning"), tr("First finish the current edition before trying to do another."));
 		return;
 	}

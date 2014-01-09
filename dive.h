@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <math.h>
+#include <zip.h>
 
 /* Windows has no MIN/MAX macros - so let's just roll our own */
 #define MIN(x, y) ({                \
@@ -366,7 +367,7 @@ struct divecomputer {
 };
 
 #define MAX_CYLINDERS (8)
-#define MAX_WEIGHTSYSTEMS (4)
+#define MAX_WEIGHTSYSTEMS (6)
 #define W_IDX_PRIMARY 0
 #define W_IDX_SECONDARY 1
 
@@ -411,9 +412,10 @@ struct dive {
 	pressure_t surface_pressure;
 	duration_t duration;
 	int salinity; // kg per 10000 l
-	struct tag_entry *tag_list;
 
+	struct tag_entry *tag_list;
 	struct divecomputer dc;
+	int id; // unique ID for this dive
 };
 
 static inline int dive_has_gps_location(struct dive *dive)
@@ -610,6 +612,21 @@ static inline struct dive *get_dive_by_diveid(uint32_t diveid, uint32_t deviceid
 	}
 	return NULL;
 }
+// this is very different from get_dive_by_diveid() (which is only used
+// by the UEMIS downloader) -- this uses the unique diveID to allow us
+// to hold an identifier for a dive across operations that might change
+// the dive_table
+static inline struct dive *getDiveById(int id)
+{
+	int i;
+	struct dive *dive = NULL;
+
+	for_each_dive(i, dive) {
+		if (dive->id == id)
+			break;
+	}
+	return dive;
+}
 extern struct dive *find_dive_including(timestamp_t when);
 extern bool dive_within_time_range(struct dive *dive, timestamp_t when, timestamp_t offset);
 struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset);
@@ -617,7 +634,6 @@ struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset);
 /* Check if two dive computer entries are the exact same dive (-1=no/0=maybe/1=yes) */
 extern int match_one_dc(struct divecomputer *a, struct divecomputer *b);
 
-extern double ascii_strtod(char *, char **);
 extern void parse_xml_init(void);
 extern void parse_xml_buffer(const char *url, const char *buf, int size, struct dive_table *table, const char **params, char **error);
 extern void parse_xml_exit(void);
@@ -633,11 +649,15 @@ extern void save_dives_logic(const char *filename, bool select_only);
 extern void save_dive(FILE *f, struct dive *dive);
 extern void export_dives_uddf(const char *filename, const bool selected);
 
+extern int subsurface_open(const char *path, int oflags, mode_t mode);
+extern FILE *subsurface_fopen(const char *path, const char *mode);
+extern void *subsurface_opendir(const char *path);
+extern struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *errorp);
+extern int subsurface_zip_close(struct zip *zip);
+
 extern void shift_times(const timestamp_t amount);
 
 extern xsltStylesheetPtr get_stylesheet(const char *name);
-
-extern char *xslt_path;
 
 extern timestamp_t utc_mktime(struct tm *tm);
 extern void utc_mkdate(timestamp_t, struct tm *tm);
@@ -650,6 +670,7 @@ extern void finish_sample(struct divecomputer *dc);
 
 extern void sort_table(struct dive_table *table);
 extern struct dive *fixup_dive(struct dive *dive);
+extern int getUniqID(struct dive *d);
 extern unsigned int dc_airtemp(struct divecomputer *dc);
 extern unsigned int dc_watertemp(struct divecomputer *dc);
 extern struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer_downloaded);
@@ -778,9 +799,28 @@ extern bool weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
 extern void remove_cylinder(struct dive *dive, int idx);
 extern void remove_weightsystem(struct dive *dive, int idx);
 
+/*
+ * String handling.
+ */
+#define STRTOD_NO_SIGN		0x01
+#define STRTOD_NO_DOT		0x02
+#define STRTOD_NO_COMMA		0x04
+#define STRTOD_NO_EXPONENT	0x08
+extern double strtod_flags(const char *str, const char **ptr, unsigned int flags);
+
+#define STRTOD_ASCII (STRTOD_NO_COMMA)
+
+#define ascii_strtod(str,ptr) strtod_flags(str,ptr,STRTOD_ASCII)
+
 #ifdef __cplusplus
 }
 #endif
+
+extern weight_t string_to_weight(const char *str);
+extern depth_t string_to_depth(const char *str);
+extern pressure_t string_to_pressure(const char *str);
+extern volume_t string_to_volume(const char *str, pressure_t workp);
+extern fraction_t string_to_fraction(const char *str);
 
 #include "pref.h"
 

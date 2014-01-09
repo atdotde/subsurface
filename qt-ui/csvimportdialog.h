@@ -7,16 +7,16 @@
 #include "../divelist.h"
 
 namespace Ui {
-class CSVImportDialog;
+class DiveLogImportDialog;
 }
 
-class CSVImportDialog : public QDialog
+class DiveLogImportDialog : public QDialog
 {
 	Q_OBJECT
 
 public:
-	explicit CSVImportDialog(QWidget *parent = 0);
-	~CSVImportDialog();
+	explicit DiveLogImportDialog(QWidget *parent = 0);
+	~DiveLogImportDialog();
 
 private slots:
 	void on_buttonBox_accepted();
@@ -26,11 +26,14 @@ private slots:
 	void unknownImports(int);
 	void unknownImports(bool);
 
+	void on_DiveLogFileSelector_clicked();
+	void on_DiveLogFile_editingFinished();
+
 private:
 	void unknownImports();
 
 	bool selector;
-	Ui::CSVImportDialog *ui;
+	Ui::DiveLogImportDialog *ui;
 
 	struct CSVAppConfig {
 		QString name;

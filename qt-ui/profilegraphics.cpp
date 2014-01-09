@@ -52,7 +52,7 @@ extern int evn_used;
 QPoint(viewport()->geometry().width() - toolBarProxy->boundingRect().width(), \
 viewport()->geometry().height() - toolBarProxy->boundingRect().height() )
 
-ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , dive(0), diveDC(0), rulerItem(0), toolBarProxy(0)
+ProfileGraphicsView::ProfileGraphicsView(QWidget* parent) : QGraphicsView(parent), toolTip(0) , diveId(0), diveDC(0), rulerItem(0), toolBarProxy(0)
 {
 	printMode = false;
 	isGrayscale = false;
@@ -161,6 +161,17 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 		m.addAction(action);
 		break;
 	}
+	bool some_hidden = false;
+	for (int i = 0; i < evn_used; i++) {
+		if (ev_namelist[i].plot_ev == false) {
+			some_hidden = true;
+			break;
+		}
+	}
+	if (some_hidden) {
+		action = m.addAction(tr("Unhide all events"), this, SLOT(unhideEvents()));
+		action->setData(event->globalPos());
+	}
 	m.exec(event->globalPos());
 }
 
@@ -211,6 +222,14 @@ void ProfileGraphicsView::hideEvents()
 		}
 		plot(current_dive, TRUE);
 	}
+}
+
+void ProfileGraphicsView::unhideEvents()
+{
+	for (int i = 0; i < evn_used; i++) {
+		ev_namelist[i].plot_ev = true;
+	}
+	plot(current_dive, TRUE);
 }
 
 void ProfileGraphicsView::removeEvent()
@@ -294,8 +313,8 @@ void ProfileGraphicsView::showEvent(QShowEvent* event)
 	// but the dive was not ploted.
 	// force a replot by modifying the dive
 	// hold by the view, and issuing a plot.
-	if (dive && !scene()->items().count()) {
-		dive = 0;
+	if (diveId && !scene()->items().count()) {
+		diveId = 0;
 		plot(get_dive(selected_dive));
 	}
 	if (toolBarProxy)
@@ -350,14 +369,14 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	if (d)
 		dc = select_dc(&d->dc);
 
-	if (!forceRedraw && dive == d && (d && dc == diveDC))
+	if (!forceRedraw && getDiveById(diveId) == d && (d && dc == diveDC))
 		return;
 
 	clear();
-	dive = d;
+	diveId = d ? d->id : 0;
 	diveDC = d ? dc : NULL;
 
-	if (!isVisible() || !dive || !mainWindow()) {
+	if (!isVisible() || !d || !mainWindow()) {
 		return;
 	}
 	setBackgroundBrush(getColor(BACKGROUND));
@@ -396,14 +415,14 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	 * Set up limits that are independent of
 	 * the dive computer
 	 */
-	calculate_max_limits(dive, dc, &gc);
+	calculate_max_limits(d, dc, &gc);
 
 	QRectF profile_grid_area = scene()->sceneRect();
 	gc.maxx = (profile_grid_area.width() - 2 * profile_grid_area.x());
 	gc.maxy = (profile_grid_area.height() - 2 * profile_grid_area.y());
 
 	/* This is per-dive-computer */
-	gc.pi = *create_plot_info(dive, dc, &gc, printMode);
+	gc.pi = *create_plot_info(d, dc, &gc, printMode);
 
 	/* Bounding box */
 	QPen pen = defaultPen;
@@ -464,7 +483,7 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 
 	if(mode == PLAN){
 		timeEditor = new GraphicsTextEditor();
-		timeEditor->setPlainText( dive->duration.seconds ? QString::number(dive->duration.seconds/60) : tr("Set Duration: 10 minutes"));
+		timeEditor->setPlainText(d->duration.seconds ? QString::number(d->duration.seconds/60) : tr("Set Duration: 10 minutes"));
 		timeEditor->setPos(profile_grid_area.width() - timeEditor->boundingRect().width(), timeMarkers->y());
 		timeEditor->document();
 		connect(timeEditor, SIGNAL(editingFinished(QString)), this, SLOT(edit_dive_time(QString)));
@@ -476,6 +495,8 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 
 	if (rulerEnabled && !printMode)
 		add_ruler();
+
+	gc.rightx = get_maxtime(&gc.pi);
 }
 
 void ProfileGraphicsView::plot_depth_scale()
@@ -486,11 +507,7 @@ void ProfileGraphicsView::plot_depth_scale()
 	/* Depth markers: every 30 ft or 10 m*/
 	maxdepth = get_maxdepth(&gc.pi);
 	gc.topy = 0; gc.bottomy = maxdepth;
-
-	switch (prefs.units.length) {
-		case units::METERS: marker = 10000; break;
-		case units::FEET: marker = 9144; break;	/* 30 ft */
-	}
+	marker = M_OR_FT(10,30);
 
 	/* don't write depth labels all the way to the bottom as
 	 * there may be other graphs below the depth plot (like
@@ -703,6 +720,8 @@ void ProfileGraphicsView::plot_cylinder_pressure_text()
 	int last_time[MAX_CYLINDERS] = { 0, };
 	struct plot_data *entry;
 	struct plot_info *pi = &gc.pi;
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 
 	if (!get_cylinder_pressure_range(&gc))
 		return;
@@ -871,6 +890,8 @@ void ProfileGraphicsView::plot_cylinder_pressure()
 	if (!get_cylinder_pressure_range(&gc))
 		return;
 
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	QPointF from, to;
 	for (i = 0; i < gc.pi.nr; i++) {
 		int mbar;
@@ -989,7 +1010,8 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 
 	int x = SCALEXGC(ev->time.seconds);
 	int y = SCALEYGC(entry->depth);
-
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	EventItem *item = new EventItem(ev, 0, isGrayscale);
 	item->setPos(x, y);
 	scene()->addItem(item);
@@ -1136,14 +1158,7 @@ void ProfileGraphicsView::plot_depth_profile()
 	/* Depth markers: every 30 ft or 10 m*/
 	gc.leftx = 0; gc.rightx = 1.0;
 	gc.topy = 0; gc.bottomy = maxdepth;
-	switch (prefs.units.length) {
-	case units::METERS:
-		marker = 10000;
-		break;
-	case units::FEET:
-		marker = 9144;
-		break;	/* 30 ft */
-	}
+	marker = M_OR_FT(10,30);
 	maxline = qMax(gc.pi.maxdepth + marker, maxdepth * 2 / 3);
 
 	c = getColor(DEPTH_GRID);
@@ -1167,6 +1182,12 @@ void ProfileGraphicsView::plot_depth_profile()
 		pen.setColor(c);
 		item->setPen(pen);
 		scene()->addItem(item);
+
+		struct text_render_options tro = {DEPTH_TEXT_SIZE, MEAN_DEPTH, LEFT, TOP};
+		QString depthLabel = get_depth_string(gc.pi.meandepth, true, true);
+		plot_text(&tro, QPointF(gc.leftx, gc.pi.meandepth), depthLabel, item);
+		tro.hpos = RIGHT;
+		plot_text(&tro, QPointF(gc.pi.entry[gc.pi.nr - 1].sec, gc.pi.meandepth), depthLabel, item);
 	}
 
 #if 0
@@ -1630,7 +1651,7 @@ QColor EventItem::getColor(const color_indice_t i)
 
 EventItem::EventItem(struct event *ev, QGraphicsItem* parent, bool grayscale): QGraphicsPixmapItem(parent), ev(ev), isGrayscale(grayscale)
 {
-	if(ev->name && strcmp(ev->name, "bookmark") == 0) {
+	if(ev->name && (strcmp(ev->name, "bookmark") == 0 || strcmp(ev->name, "heading") == 0)) {
 		setPixmap( QPixmap(QString(":flag")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 	} else {
 		setPixmap( QPixmap(QString(":warning")).scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));

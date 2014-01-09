@@ -45,7 +45,7 @@ public slots:
 
 private:
 	typedef QPair<QGraphicsPixmapItem*, QGraphicsSimpleTextItem*> ToolTip;
-	QList<ToolTip> toolTips;
+	QVector<ToolTip> toolTips;
 	QGraphicsPathItem *background;
 	QGraphicsLineItem *separator;
 	QGraphicsSimpleTextItem *title;
@@ -150,6 +150,7 @@ public slots:
 	void on_scaleAction();
 	void changeGas();
 	void hideEvents();
+	void unhideEvents();
 	void removeEvent();
 	void addBookmark();
 private:
@@ -189,7 +190,7 @@ private:
 	QBrush defaultBrush;
 	ToolTipItem *toolTip;
 	graphics_context gc;
-	struct dive *dive;
+	int diveId;
 	struct divecomputer *diveDC;
 	int zoomLevel;
 

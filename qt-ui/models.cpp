@@ -111,11 +111,8 @@ QVariant CylindersModel::data(const QModelIndex& index, int role) const
 			ret = QString(cyl->type.description);
 			break;
 		case SIZE:
-			// we can't use get_volume_string because the idiotic imperial tank
-			// sizes take working pressure into account...
-			if (cyl->type.size.mliter) {
-				ret = get_volume_string(cyl->type.size, TRUE);
-			}
+			if (cyl->type.size.mliter)
+				ret = get_volume_string(cyl->type.size, TRUE, cyl->type.workingpressure.mbar);
 			break;
 		case WORKINGPRESS:
 			if (cyl->type.workingpressure.mbar)
@@ -185,12 +182,13 @@ void CylindersModel::passInData(const QModelIndex& index, const QVariant& value)
 	}
 }
 
-#define CHANGED(_t,_u1,_u2) \
-	value.toString().remove(_u1).remove(_u2)._t() !=  \
-	data(index, role).toString().remove(_u1).remove(_u2)._t()
+/* Has the string value changed */
+#define CHANGED() \
+	(vString = value.toString()) != data(index, role).toString()
 
 bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
+	QString vString;
 	bool addDiveMode = DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING;
 	if (addDiveMode)
 		DivePlannerPointsModel::instance()->rememberTanks();
@@ -208,97 +206,54 @@ bool CylindersModel::setData(const QModelIndex& index, const QVariant& value, in
 		}
 		break;
 	case SIZE:
-		if (CHANGED(toDouble, "cuft", "l")) {
-			// if units are CUFT then this value is meaningless until we have working pressure
-			if (value.toDouble() != 0.0) {
-				TankInfoModel *tanks = TankInfoModel::instance();
-				QModelIndexList matches = tanks->match(tanks->index(0,0), Qt::DisplayRole, cyl->type.description);
-				int mbar = cyl->type.workingpressure.mbar;
-				int mliter;
+		if (CHANGED()) {
+			TankInfoModel *tanks = TankInfoModel::instance();
+			QModelIndexList matches = tanks->match(tanks->index(0,0), Qt::DisplayRole, cyl->type.description);
 
-				if (mbar && prefs.units.volume == prefs.units.CUFT) {
-					double liters = cuft_to_l(value.toDouble());
-					liters /= bar_to_atm(mbar / 1000.0);
-					mliter = rint(liters * 1000);
-				} else {
-					mliter = rint(value.toDouble() * 1000);
-				}
-				if (cyl->type.size.mliter != mliter) {
-					mark_divelist_changed(TRUE);
-					cyl->type.size.mliter = mliter;
-					if (!matches.isEmpty())
-						tanks->setData(tanks->index(matches.first().row(), TankInfoModel::ML), cyl->type.size.mliter);
-				}
-				changed = true;
-			}
+			cyl->type.size = string_to_volume(vString.toUtf8().data(), cyl->type.workingpressure);
+			mark_divelist_changed(TRUE);
+			if (!matches.isEmpty())
+				tanks->setData(tanks->index(matches.first().row(), TankInfoModel::ML), cyl->type.size.mliter);
+			changed = true;
 		}
 		break;
 	case WORKINGPRESS:
-		if (CHANGED(toDouble, "psi", "bar")) {
-			QString vString = value.toString();
-			vString.remove("psi").remove("bar");
-			if (vString.toDouble() != 0.0) {
-				TankInfoModel *tanks = TankInfoModel::instance();
-				QModelIndexList matches = tanks->match(tanks->index(0,0), Qt::DisplayRole, cyl->type.description);
-				if (prefs.units.pressure == prefs.units.PSI)
-					cyl->type.workingpressure.mbar = psi_to_mbar(vString.toDouble());
-				else
-					cyl->type.workingpressure.mbar = vString.toDouble() * 1000;
-				if (!matches.isEmpty())
-					tanks->setData(tanks->index(matches.first().row(), TankInfoModel::BAR), cyl->type.workingpressure.mbar / 1000.0);
-				changed = true;
-			}
+		if (CHANGED()) {
+			TankInfoModel *tanks = TankInfoModel::instance();
+			QModelIndexList matches = tanks->match(tanks->index(0,0), Qt::DisplayRole, cyl->type.description);
+			cyl->type.workingpressure = string_to_pressure(vString.toUtf8().data());
+			if (!matches.isEmpty())
+				tanks->setData(tanks->index(matches.first().row(), TankInfoModel::BAR), cyl->type.workingpressure.mbar / 1000.0);
+			changed = true;
 		}
 		break;
 	case START:
-		if (CHANGED(toDouble, "psi", "bar")) {
-			if (value.toDouble() != 0.0) {
-				if (prefs.units.pressure == prefs.units.PSI)
-					cyl->start.mbar = psi_to_mbar(value.toDouble());
-				else
-					cyl->start.mbar = value.toDouble() * 1000;
-				changed = true;
-			}
+		if (CHANGED()) {
+			cyl->start = string_to_pressure(vString.toUtf8().data());
+			changed = true;
 		}
 		break;
 	case END:
-		if (CHANGED(toDouble, "psi", "bar")) {
-			if (value.toDouble() != 0.0) {
-				if (prefs.units.pressure == prefs.units.PSI)
-					cyl->end.mbar = psi_to_mbar(value.toDouble());
-				else
-					cyl->end.mbar = value.toDouble() * 1000;
-				changed = true;
-			}
+		if (CHANGED()) {
+			cyl->end = string_to_pressure(vString.toUtf8().data());
+			changed = true;
 		}
 		break;
 	case O2:
-		if (CHANGED(toDouble, "%", "%")) {
-			int o2 = value.toString().remove('%').toDouble() * 10 + 0.5;
-			if (cyl->gasmix.he.permille + o2 <= 1000) {
-				cyl->gasmix.o2.permille = o2;
-				changed = true;
-			}
+		if (CHANGED()) {
+			cyl->gasmix.o2 = string_to_fraction(vString.toUtf8().data());
+			changed = true;
 		}
 		break;
 	case HE:
-		if (CHANGED(toDouble, "%", "%")) {
-			int he = value.toString().remove('%').toDouble() * 10 + 0.5;
-			if (cyl->gasmix.o2.permille + he <= 1000) {
-				cyl->gasmix.he.permille = he;
-				changed = true;
-			}
+		if (CHANGED()) {
+			cyl->gasmix.he = string_to_fraction(vString.toUtf8().data());
+			changed = true;
 		}
 		break;
 	case DEPTH:
-		if (CHANGED(toDouble, "ft", "m")) {
-			if (value.toInt() != 0) {
-				if (prefs.units.length == prefs.units.FEET)
-					cyl->depth.mm = feet_to_mm(value.toString().remove("ft").remove("m").toInt());
-				else
-					cyl->depth.mm = value.toString().remove("ft").remove("m").toInt() * 1000;
-			}
-		}
+		if (CHANGED())
+			cyl->depth = string_to_depth(vString.toUtf8().data());
 	}
 	dataChanged(index, index);
 	if (addDiveMode)
@@ -468,33 +423,143 @@ void WeightModel::passInData(const QModelIndex& index, const QVariant& value)
 	}
 }
 
+weight_t string_to_weight(const char *str)
+{
+	const char *end;
+	double value = strtod_flags(str, &end, 0);
+	QString rest = QString(end).trimmed();
+	QString local_kg = WeightModel::tr("kg");
+	QString local_lbs = WeightModel::tr("lbs");
+	weight_t weight;
+
+	if (rest.startsWith("kg") || rest.startsWith(local_kg))
+		goto kg;
+	// using just "lb" instead of "lbs" is intentional - some people might enter the singular
+	if (rest.startsWith("lb") || rest.startsWith(local_lbs))
+		goto lbs;
+	if (prefs.units.weight == prefs.units.LBS)
+		goto lbs;
+kg:
+	weight.grams = rint(value * 1000);
+	return weight;
+lbs:
+	weight.grams = lbs_to_grams(value);
+	return weight;
+}
+
+depth_t string_to_depth(const char *str)
+{
+	const char *end;
+	double value = strtod_flags(str, &end, 0);
+	QString rest = QString(end).trimmed();
+	QString local_ft = WeightModel::tr("ft");
+	QString local_m = WeightModel::tr("m");
+	depth_t depth;
+
+	if (rest.startsWith("m") || rest.startsWith(local_m))
+		goto m;
+	if (rest.startsWith("ft") || rest.startsWith(local_ft))
+		goto ft;
+	if (prefs.units.length == prefs.units.FEET)
+		goto ft;
+m:
+	depth.mm = rint(value * 1000);
+	return depth;
+ft:
+	depth.mm = feet_to_mm(value);
+	return depth;
+}
+
+pressure_t string_to_pressure(const char *str)
+{
+	const char *end;
+	double value = strtod_flags(str, &end, 0);
+	QString rest = QString(end).trimmed();
+	QString local_psi = CylindersModel::tr("psi");
+	QString local_bar = CylindersModel::tr("bar");
+	pressure_t pressure;
+
+	if (rest.startsWith("bar") || rest.startsWith(local_bar))
+		goto bar;
+	if (rest.startsWith("psi") || rest.startsWith(local_psi))
+		goto psi;
+	if (prefs.units.pressure == prefs.units.PSI)
+		goto psi;
+bar:
+	pressure.mbar = rint(value * 1000);
+	return pressure;
+psi:
+	pressure.mbar = psi_to_mbar(value);
+	return pressure;
+}
+
+/* Imperial cylinder volumes need working pressure to be meaningful */
+volume_t string_to_volume(const char *str, pressure_t workp)
+{
+	const char *end;
+	double value = strtod_flags(str, &end, 0);
+	QString rest = QString(end).trimmed();
+	QString local_l = CylindersModel::tr("l");
+	QString local_cuft = CylindersModel::tr("cuft");
+	volume_t volume;
+
+	if (rest.startsWith("l") || rest.startsWith(local_l))
+		goto l;
+	if (rest.startsWith("cuft") || rest.startsWith(local_cuft))
+		goto cuft;
+	/*
+	 * If we don't have explicit units, and there is no working
+	 * pressure, we're going to assume "liter" even in imperial
+	 * measurements.
+	 */
+	if (!workp.mbar)
+		goto l;
+	if (prefs.units.volume == prefs.units.LITER)
+		goto l;
+cuft:
+	if (workp.mbar)
+		value /= bar_to_atm(workp.mbar / 1000.0);
+	value = cuft_to_l(value);
+l:
+	volume.mliter = rint(value * 1000);
+	return volume;
+}
+
+fraction_t string_to_fraction(const char *str)
+{
+	const char *end;
+	double value = strtod_flags(str, &end, 0);
+	fraction_t fraction;
+
+	fraction.permille = rint(value * 10);
+	return fraction;
+}
+
 bool WeightModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
+	QString vString = value.toString();
 	weightsystem_t *ws = &current->weightsystem[index.row()];
 	switch(index.column()) {
 	case TYPE:
 		if (!value.isNull()) {
-			if (!ws->description || gettextFromC::instance()->tr(ws->description) != value.toString()) {
+			if (!ws->description || gettextFromC::instance()->tr(ws->description) != vString) {
 				// loop over translations to see if one matches
 				int i = -1;
 				while(ws_info[++i].name) {
-					if (gettextFromC::instance()->tr(ws_info[i].name) == value.toString()) {
+					if (gettextFromC::instance()->tr(ws_info[i].name) == vString) {
 						ws->description = ws_info[i].name;
 						break;
 					}
 				}
 				if (ws_info[i].name == NULL) // didn't find a match
-					ws->description = strdup(value.toString().toUtf8().constData());
+					ws->description = strdup(vString.toUtf8().constData());
 				changed = true;
 			}
 		}
 		break;
 	case WEIGHT:
-		if (CHANGED(toDouble, "kg", "lbs")) {
-			if (prefs.units.weight == prefs.units.LBS)
-				ws->weight.grams = lbs_to_grams(value.toDouble());
-			else
-				ws->weight.grams = value.toDouble() * 1000.0 + 0.5;
+		if (CHANGED()) {
+			ws->weight = string_to_weight(vString.toUtf8().data());
 			// now update the ws_info
 			changed = true;
 			WSInfoModel *wsim = WSInfoModel::instance();
@@ -945,6 +1010,7 @@ static int nitrox_sort_value(struct dive *dive)
 QVariant DiveItem::data(int column, int role) const
 {
 	QVariant retVal;
+	struct dive *dive = getDiveById(diveId);
 
 	switch (role) {
 	case Qt::TextAlignmentRole:
@@ -960,6 +1026,7 @@ QVariant DiveItem::data(int column, int role) const
 		}
 		break;
 		case DiveTripModel::SORT_ROLE:
+		Q_ASSERT(dive != NULL);
 		switch (column) {
 		case NR:		retVal = (qulonglong) dive->when; break;
 		case DATE:		retVal = (qulonglong) dive->when; break;
@@ -978,6 +1045,7 @@ QVariant DiveItem::data(int column, int role) const
 		}
 		break;
 	case Qt::DisplayRole:
+		Q_ASSERT(dive != NULL);
 		switch (column) {
 		case NR:		retVal = dive->number; break;
 		case DATE:		retVal = displayDate(); break;
@@ -996,13 +1064,15 @@ QVariant DiveItem::data(int column, int role) const
 		break;
 	}
 
-	if (role == DiveTripModel::STAR_ROLE)
+	if (role == DiveTripModel::STAR_ROLE) {
+		Q_ASSERT(dive != NULL);
 		retVal = dive->rating;
-
-	if (role == DiveTripModel::DIVE_ROLE)
+	}
+	if (role == DiveTripModel::DIVE_ROLE) {
 		retVal = QVariant::fromValue<void*>(dive);
-
+	}
 	if(role == DiveTripModel::DIVE_IDX){
+		Q_ASSERT(dive != NULL);
 		retVal = get_divenr(dive);
 	}
 	return retVal;
@@ -1033,21 +1103,26 @@ bool DiveItem::setData(const QModelIndex& index, const QVariant& value, int role
 		if (d->number == v)
 			return false;
 	}
-
-	dive->number = value.toInt();
+	d = getDiveById(diveId);
+	Q_ASSERT(d != NULL);
+	d->number = value.toInt();
 	mark_divelist_changed(TRUE);
 	return true;
 }
 
 QString DiveItem::displayDate() const
 {
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	return get_dive_date_string(dive->when);
 }
 
 QString DiveItem::displayDepth() const
 {
-	const int scale = 1000;
 	QString fract, str;
+	const int scale = 1000;
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	if (get_units()->length == units::METERS) {
 		fract = QString::number((unsigned)(dive->maxdepth.mm % scale) / 100);
 		str = QString("%1.%2").arg((unsigned)(dive->maxdepth.mm / scale)).arg(fract, 1, QChar('0'));
@@ -1061,6 +1136,8 @@ QString DiveItem::displayDepth() const
 QString DiveItem::displayDuration() const
 {
 	int hrs, mins, secs;
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	secs = dive->duration.seconds % 60;
 	mins = dive->duration.seconds / 60;
 	hrs = mins / 60;
@@ -1078,6 +1155,8 @@ QString DiveItem::displayDuration() const
 QString DiveItem::displayTemperature() const
 {
 	QString str;
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	if (!dive->watertemp.mkelvin)
 		return str;
 	if (get_units()->temperature == units::CELSIUS)
@@ -1090,6 +1169,8 @@ QString DiveItem::displayTemperature() const
 QString DiveItem::displaySac() const
 {
 	QString str;
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != NULL);
 	if (get_units()->volume == units::LITER)
 		str = QString::number(dive->sac / 1000.0, 'f', 1).append(tr(" l/min"));
 	else
@@ -1105,6 +1186,8 @@ QString DiveItem::displayWeight() const
 
 int DiveItem::weight() const
 {
+	struct dive *dive = getDiveById(diveId);
+	Q_ASSERT(dive != 0);
 	weight_t tw = { total_weight(dive) };
 	return tw.grams;
 }
@@ -1172,7 +1255,7 @@ void DiveTripModel::setupModelData()
 		dive_trip_t* trip = dive->divetrip;
 
 		DiveItem* diveItem = new DiveItem();
-		diveItem->dive = dive;
+		diveItem->diveId = dive->id;
 
 		if (!trip || currentLayout == LIST) {
 			diveItem->parent = rootItem;
@@ -1579,7 +1662,7 @@ ProfilePrintModel::ProfilePrintModel(QObject *parent)
 
 void ProfilePrintModel::setDive(struct dive *divePtr)
 {
-	dive = divePtr;
+	diveId = divePtr->id;
 	// reset();
 }
 
@@ -1600,8 +1683,10 @@ QVariant ProfilePrintModel::data(const QModelIndex &index, int role) const
 
 	switch (role) {
 	case Qt::DisplayRole: {
+		struct dive *dive = getDiveById(diveId);
+		Q_ASSERT(dive != NULL);
 		struct DiveItem di;
-		di.dive = dive;
+		di.diveId = diveId;
 
 		const QString unknown = tr("unknown");
 

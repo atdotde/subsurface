@@ -187,8 +187,6 @@ void GroupedLineEdit::paintEvent(QPaintEvent *e)
 	QPainter painter(viewport());
 
 	painter.setRenderHint(QPainter::Antialiasing, true);
-	painter.setRenderHint(QPainter::HighQualityAntialiasing, true);
-
 	painter.fillRect(0, 0, viewport()->width(), viewport()->height(), palette().base());
 
 	QVectorIterator<QColor> i(d->colors);
@@ -207,7 +205,12 @@ void GroupedLineEdit::paintEvent(QPaintEvent *e)
 			i.toFront();
 		path.addRoundedRect(rectangle, 5.0, 5.0);
 		painter.setPen(i.peekNext());
-		painter.setBrush(i.next().lighter(180));
+		if (palette().color(QPalette::Text).lightnessF() <= 0.3 )
+			painter.setBrush(i.next().lighter());
+		else if (palette().color(QPalette::Text).lightnessF() <= 0.6 )
+			painter.setBrush(i.next());
+		else
+			painter.setBrush(i.next().darker());
 		painter.drawPath(path);
 	}
 #endif

@@ -1,6 +1,9 @@
 #include "qthelper.h"
 #include "qt-ui/mainwindow.h"
+#include "qt-gui.h"
 #include <QRegExp>
+#include <QDir>
+#include <QFileDialog>
 #include <QDebug>
 
 #define tr(_arg) mainWindow()->information()->tr(_arg)
@@ -101,23 +104,75 @@ QString weight_string(int weight_in_grams)
 
 bool parseGpsText(const QString& gps_text, double *latitude, double *longitude)
 {
+	enum { ISO6709D, SECONDS, MINUTES, DECIMAL } gpsStyle = ISO6709D;
+	int eastWest = 4;
+	int northSouth = 1;
+	QString regExp;
 	/* an empty string is interpreted as 0.0,0.0 and therefore "no gps location" */
 	if (gps_text.trimmed() == "") {
 		*latitude = 0.0;
 		*longitude = 0.0;
 		return true;
 	}
-	QString regExp = QString("\\s*([NS%1%2])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)\\.(\\d+)[^EW%3%4]*([EW%6%7])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)\\.(\\d+)")
-			.arg(tr("N")).arg(tr("S")).arg(tr("E")).arg(tr("W")).arg(tr("E")).arg(tr("W"));
+	// trying to parse all formats in one regexp might be possible, but it seems insane
+	// so handle the four formats we understand separately
+
+	// ISO 6709 Annex D representation
+	// http://en.wikipedia.org/wiki/ISO_6709#Representation_at_the_human_interface_.28Annex_D.29
+	if (gps_text.at(0).isDigit()) {
+		gpsStyle = ISO6709D;
+		regExp = QString("(\\d+)[" UTF8_DEGREE "\\s](\\d+)[\'\\s](\\d+)([,\\.](\\d+))?[\"\\s]([NS%1%2])"
+					 "\\s*(\\d+)[" UTF8_DEGREE "\\s](\\d+)[\'\\s](\\d+)([,\\.](\\d+))?[\"\\s]([EW%3%4])")
+				.arg(tr("N")).arg(tr("S")).arg(tr("E")).arg(tr("W"));
+	} else if (gps_text.count(QChar('"')) == 2) {
+		gpsStyle = SECONDS;
+		regExp = QString("\\s*([NS%1%2])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)[\'\\s]+(\\d+)([,\\.](\\d+))?[^EW%3%4]*"
+					 "([EW%6%7])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)[\'\\s]+(\\d+)([,\\.](\\d+))?")
+				.arg(tr("N")).arg(tr("S")).arg(tr("E")).arg(tr("W")).arg(tr("E")).arg(tr("W"));
+	} else if (gps_text.count(QChar('\'')) == 2) {
+		gpsStyle = MINUTES;
+		regExp = QString("\\s*([NS%1%2])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)([,\\.](\\d+))?[^EW%3%4]*"
+					 "([EW%6%7])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)([,\\.](\\d+))?")
+				.arg(tr("N")).arg(tr("S")).arg(tr("E")).arg(tr("W")).arg(tr("E")).arg(tr("W"));
+	} else {
+		gpsStyle = DECIMAL;
+		regExp = QString("\\s*([-NS%1%2]?)\\s*(\\d+)[,\\.](\\d+)[^-EW%3%4\\d]*([-EW%5%6]?)\\s*(\\d+)[,\\.](\\d+)")
+				.arg(tr("N")).arg(tr("S")).arg(tr("E")).arg(tr("W")).arg(tr("E")).arg(tr("W"));
+	}
 	QRegExp r(regExp);
-	if (r.indexIn(gps_text) != 8) {
+	if (r.indexIn(gps_text) != -1) {
 		// qDebug() << "Hemisphere" << r.cap(1) << "deg" << r.cap(2) << "min" << r.cap(3) << "decimal" << r.cap(4);
 		// qDebug() << "Hemisphere" << r.cap(5) << "deg" << r.cap(6) << "min" << r.cap(7) << "decimal" << r.cap(8);
-		*latitude = r.cap(2).toInt() + (r.cap(3) + QString(".") + r.cap(4)).toDouble() / 60.0;
-		*longitude = r.cap(6).toInt() + (r.cap(7) + QString(".") + r.cap(8)).toDouble() / 60.0;
-		if (r.cap(1) == "S" || r.cap(1) == tr("S"))
+		switch(gpsStyle) {
+		case ISO6709D:
+			*latitude = r.cap(1).toInt() + r.cap(2).toInt() / 60.0 +
+					(r.cap(3) + QString(".") + r.cap(5)).toDouble() / 3600.0;
+			*longitude = r.cap(7).toInt() + r.cap(8).toInt() / 60.0 +
+					(r.cap(9) + QString(".") + r.cap(11)).toDouble() / 3600.0;
+			northSouth = 6;
+			eastWest = 12;
+			break;
+		case SECONDS:
+			*latitude = r.cap(2).toInt() + r.cap(3).toInt() / 60.0 +
+					(r.cap(4) + QString(".") + r.cap(6)).toDouble() / 3600.0;
+			*longitude = r.cap(8).toInt() + r.cap(9).toInt() / 60.0 +
+					(r.cap(10) + QString(".") + r.cap(12)).toDouble() / 3600.0;
+			eastWest = 7;
+			break;
+		case MINUTES:
+			*latitude = r.cap(2).toInt() + (r.cap(3) + QString(".") + r.cap(5)).toDouble() / 60.0;
+			*longitude = r.cap(7).toInt() + (r.cap(8) + QString(".") + r.cap(10)).toDouble() / 60.0;
+			eastWest = 6;
+			break;
+		case DECIMAL:
+			default:
+			*latitude = (r.cap(2) + QString(".") + r.cap(3)).toDouble();
+			*longitude = (r.cap(5) + QString(".") + r.cap(6)).toDouble();
+			break;
+		}
+		if (r.cap(northSouth) == "S" || r.cap(northSouth) == tr("S") || r.cap(northSouth) == "-")
 			*latitude *= -1.0;
-		if (r.cap(5) == "W" || r.cap(5) == tr("W"))
+		if (r.cap(eastWest) == "W" || r.cap(eastWest) == tr("W") || r.cap(eastWest) == "-")
 			*longitude *= -1.0;
 		// qDebug("%s -> %8.5f / %8.5f", gps_text.toLocal8Bit().data(), *latitude, *longitude);
 		return true;
@@ -125,7 +180,7 @@ bool parseGpsText(const QString& gps_text, double *latitude, double *longitude)
 	return false;
 }
 
-bool gpsHasChanged(struct dive *dive, struct dive *master, const QString& gps_text)
+bool gpsHasChanged(struct dive *dive, struct dive *master, const QString& gps_text, bool *parsed)
 {
 	double latitude, longitude;
 	int latudeg, longudeg;
@@ -136,7 +191,7 @@ bool gpsHasChanged(struct dive *dive, struct dive *master, const QString& gps_te
 		       master->longitude.udeg != dive->longitude.udeg))
 		return false;
 
-	if (!parseGpsText(gps_text, &latitude, &longitude))
+	if (!(*parsed = parseGpsText(gps_text, &latitude, &longitude)))
 		return false;
 
 	latudeg = rint(1000000 * latitude);
@@ -163,3 +218,26 @@ QList< int > getDivesInTrip ( dive_trip_t* trip )
 	return ret;
 }
 
+// we need this to be uniq, but also make sure
+// it doesn't change during the life time of a Subsurface session
+// oh, and it has no meaning whatsoever - that's why we have the
+// silly initial number and increment by 3 :-)
+int getUniqID(struct dive *d)
+{
+	static QSet<int> ids;
+	static int maxId = 83529;
+
+	int id = d->id;
+	if (id) {
+		if (!ids.contains(id)) {
+			qDebug() << "WTF - only I am allowed to create IDs";
+			ids.insert(id);
+		}
+		return id;
+	}
+	maxId += 3;
+	id = maxId;
+	Q_ASSERT(!ids.contains(id));
+	ids.insert(id);
+	return id;
+}
