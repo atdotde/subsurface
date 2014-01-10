@@ -21,6 +21,7 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QFileDialog>
+#include <exiv2/exiv2.hpp>
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
 	sortColumn(0), currentOrder(Qt::DescendingOrder), searchBox(new QLineEdit(this))
@@ -789,7 +790,7 @@ void DiveListView::shiftTimes()
 
 void DiveListView::loadImages()
 {
-
+  Exiv2::Image::AutoPtr exif;
   QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
 
 	if (fileNames.isEmpty())
@@ -799,6 +800,18 @@ void DiveListView::loadImages()
 
 	for (int i = 0; i < fileNames.size(); ++i) {
 	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
+	  exif = Exiv2::ImageFactory::open(fileNames.at(i).toUtf8().data());
+	  if (exif.get() == 0)
+	    continue;
+	  exif->readMetadata();
+	  Exiv2::ExifData &exifData = exif->exifData();
+	  if (exifData.empty()) 
+	    continue;
+	  Exiv2::ExifData::const_iterator end = exifData.end();
+	  for (Exiv2::ExifData::const_iterator i = exifData.begin(); i != end; ++i) {
+	    const char* tn = i->typeName();
+	    printf("Tag: %s\n", tn);
+	  }
 	}
 }
 

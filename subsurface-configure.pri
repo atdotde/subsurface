@@ -118,7 +118,8 @@ LIBS *= $$XML2_LIBS $$XSLT_LIBS
 # We're searching for:
 #  libzip
 #  sqlite3
-link_pkgconfig: PKGCONFIG += libzip sqlite3
+#  exiv2
+link_pkgconfig: PKGCONFIG += libzip sqlite3 exiv2
 
 # Add libiconv if needed
 link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
@@ -131,6 +132,11 @@ link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
 # ### FIXME: implement that
 win32: CONFIG(debug, debug|release): LIBS += -lmarblewidgetd
 else: LIBS += -lmarblewidget
+
+#
+# Find libexiv2
+#
+LIBS += $$system($$PKG_CONFIG --libs exiv2)
 
 #
 # Platform-specific changes
