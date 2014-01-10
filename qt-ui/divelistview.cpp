@@ -727,6 +727,7 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 		popup.addAction(tr("save As"), this, SLOT(saveSelectedDivesAs()));
 		popup.addAction(tr("export As UDDF"), this, SLOT(exportSelectedDivesAsUDDF()));
 		popup.addAction(tr("shift times"), this, SLOT(shiftTimes()));
+		popup.addAction(tr("load images"), this, SLOT(loadImages()));
 	}
 	if (d)
 		popup.addAction(tr("upload dive(s) to divelogs.de"), this, SLOT(uploadToDivelogsDE()));
@@ -786,7 +787,41 @@ void DiveListView::shiftTimes()
 	ShiftTimesDialog::instance()->show();
 }
 
+void DiveListView::loadImages()
+{
+
+  QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
+
+	if (fileNames.isEmpty())
+		return;
+
+	updateLastUsedImageDir(QFileInfo(fileNames[0]).dir().path());
+
+	for (int i = 0; i < fileNames.size(); ++i) {
+	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
+	}
+}
+
 void DiveListView::uploadToDivelogsDE()
 {
 	DivelogsDeWebServices::instance()->prepareDivesForUpload();
+}
+
+QString DiveListView::lastUsedImageDir()
+{
+	QSettings settings;
+	QString lastImageDir = QDir::homePath();
+
+	settings.beginGroup("FileDialog");
+	if (settings.contains("LastImageDir"))
+		if (QDir::setCurrent(settings.value("LastImageDir").toString()))
+			lastImageDir = settings.value("LastIamgeDir").toString();
+	return lastImageDir;
+}
+
+void DiveListView::updateLastUsedImageDir(const QString& dir)
+{
+	QSettings s;
+	s.beginGroup("FileDialog");
+	s.setValue("LastImageDir", dir);
 }
