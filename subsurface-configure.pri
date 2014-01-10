@@ -113,13 +113,18 @@ QMAKE_CFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
 QMAKE_CXXFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
 LIBS *= $$XML2_LIBS $$XSLT_LIBS
 
-#
+EXIV2_CFLAGS = $$system($$PKG_CONFIG --cflags exiv2 2> $$NUL)
+EXIV2_LIBS = $$system($$PKG_CONFIG --libs exiv2 2> $$NUL)
+
+QMAKE_CFLAGS *= $$EXIV2_CFLAGS
+QMAKE_CXXFLAGS *= $$EXIV2_CFLAGS
+LIBS *= $$EXIV2_LIBS -lexiv2
+
 # Find other pkg-config-based projects
 # We're searching for:
 #  libzip
 #  sqlite3
-#  exiv2
-link_pkgconfig: PKGCONFIG += libzip sqlite3 exiv2
+link_pkgconfig: PKGCONFIG += libzip sqlite3
 
 # Add libiconv if needed
 link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
@@ -132,11 +137,6 @@ link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
 # ### FIXME: implement that
 win32: CONFIG(debug, debug|release): LIBS += -lmarblewidgetd
 else: LIBS += -lmarblewidget
-
-#
-# Find libexiv2
-#
-LIBS += $$system($$PKG_CONFIG --libs exiv2)
 
 #
 # Platform-specific changes

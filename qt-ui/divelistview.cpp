@@ -21,6 +21,8 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QFileDialog>
+#include <string>
+#include <iostream>
 #include <exiv2/exiv2.hpp>
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
@@ -800,7 +802,8 @@ void DiveListView::loadImages()
 
 	for (int i = 0; i < fileNames.size(); ++i) {
 	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
-	  exif = Exiv2::ImageFactory::open(fileNames.at(i).toUtf8().data());
+	  //      	  exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
+      	  exif = Exiv2::ImageFactory::open (std::string("fish.jpg"));
 	  if (exif.get() == 0)
 	    continue;
 	  exif->readMetadata();
