@@ -1681,6 +1681,10 @@ extern int dm4_events(void *handle, int columns, char **data, char **column)
 				/* 13 Air time */
 				cur_event.name = strdup("airtime");
 				break;
+			case 17:
+				/* 17 Ascent warning */
+				cur_event.name = strdup("ascent");
+				break;
 			case 18:
 				/* 18 Ceiling error */
 				cur_event.name = strdup("ceiling");
@@ -1688,6 +1692,14 @@ extern int dm4_events(void *handle, int columns, char **data, char **column)
 			case 19:
 				/* 19 Surfaced */
 				cur_event.name = strdup("surface");
+				break;
+			case 20:
+				/* 20 Deco */
+				cur_event.name = strdup("deco");
+				break;
+			case 22:
+				/* 22 Mandatory safety stop violation */
+				cur_event.name = strdup("violation");
 				break;
 			case 257:
 				/* 257 Dive active */
@@ -1714,6 +1726,14 @@ extern int dm4_events(void *handle, int columns, char **data, char **column)
 	return 0;
 }
 
+extern int dm4_tags(void *handle, int columns, char **data, char **column)
+{
+	if(data[0])
+		taglist_add_tag(cur_dive->tag_list, data[0]);
+
+	return 0;
+}
+
 extern int dm4_dive(void *param, int columns, char **data, char **column)
 {
 	int i, interval, retval = 0;
@@ -1723,6 +1743,7 @@ extern int dm4_dive(void *param, int columns, char **data, char **column)
 	int *pressureBlob;
 	char *err = NULL;
 	char get_events_template[] = "select * from Mark where DiveId = %d";
+	char get_tags_template[] = "select Text from DiveTag where DiveId = %d";
 	char get_events[64];
 
 	dive_start();
@@ -1802,7 +1823,7 @@ extern int dm4_dive(void *param, int columns, char **data, char **column)
 		else
 			cur_sample->depth.mm = cur_dive->dc.maxdepth.mm;
 
-		if (tempBlob)
+		if (data[18] && data[18][0])
 			cur_sample->temperature.mkelvin = C_to_mkelvin(tempBlob[i]);
 		if (data[19] && data[19][0])
 			cur_sample->cylinderpressure.mbar = pressureBlob[i] ;
@@ -1813,6 +1834,13 @@ extern int dm4_dive(void *param, int columns, char **data, char **column)
 	retval = sqlite3_exec(handle, get_events, &dm4_events, 0, &err);
 	if (retval != SQLITE_OK) {
 		fprintf(stderr, "%s", translate("gettextFromC","Database query get_events failed.\n"));
+		return 1;
+	}
+
+	snprintf(get_events, sizeof(get_events) - 1, get_tags_template, cur_dive->number);
+	retval = sqlite3_exec(handle, get_events, &dm4_tags, 0, &err);
+	if (retval != SQLITE_OK) {
+		fprintf(stderr, "%s", translate("gettextFromC","Database query get_tags failed.\n"));
 		return 1;
 	}
 
