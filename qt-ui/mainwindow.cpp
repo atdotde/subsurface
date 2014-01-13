@@ -57,6 +57,7 @@ MainWindow::MainWindow() : helpView(0)
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.InfoWidget, SLOT(updateDiveInfo()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlanner, SLOT(settingsChanged()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlannerWidget, SLOT(settingsChanged()));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), TankInfoModel::instance(), SLOT(update()));
 
 	ui.mainErrorMessage->hide();
 	initialUiSetup();
@@ -338,6 +339,8 @@ void MainWindow::on_actionYearlyStatistics_triggered()
 	view->setWindowModality(Qt::NonModal);
 	view->setMinimumWidth(600);
 	view->setAttribute(Qt::WA_QuitOnClose, false);
+	view->setWindowTitle(tr("Yearly Statistics"));
+	view->setWindowIcon(QIcon(":subsurface-icon"));
 	view->show();
 }
 
@@ -484,25 +487,9 @@ void MainWindow::on_actionAboutSubsurface_triggered()
 void MainWindow::on_actionUserManual_triggered()
 {
 	if(!helpView){
-		helpView = new QWebView();
-		helpView->page()->setLinkDelegationPolicy(QWebPage::DelegateExternalLinks);
-		connect(helpView, SIGNAL(linkClicked(QUrl)), this, SLOT(linkClickedSlot(QUrl)));
-	}
-	QString searchPath = getSubsurfaceDataPath("Documentation");
-	if (searchPath != "") {
-		QUrl url(searchPath.append("/user-manual.html"));
-		helpView->setWindowTitle(tr("User Manual"));
-		helpView->setWindowIcon(QIcon(":/subsurface-icon"));
-		helpView->setUrl(url);
-	} else {
-		helpView->setHtml(tr("Cannot find the Subsurface manual"));
+		helpView = new UserManual();
 	}
 	helpView->show();
-}
-
-void MainWindow::linkClickedSlot(QUrl url)
-{
-	QDesktopServices::openUrl(url);
 }
 
 QString MainWindow::filter()
@@ -661,6 +648,7 @@ void MainWindow::readSettings()
 	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
 	set_gf(prefs.gflow, prefs.gfhigh, prefs.gf_low_at_maxdepth);
 	GET_BOOL("show_sac", show_sac);
+	GET_BOOL("display_unused_tanks", display_unused_tanks);
 	s.endGroup();
 
 	s.beginGroup("GeneralSettings");

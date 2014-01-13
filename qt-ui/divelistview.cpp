@@ -31,6 +31,7 @@ DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelec
 	QSortFilterProxyModel *model = new QSortFilterProxyModel(this);
 	model->setSortRole(DiveTripModel::SORT_ROLE);
 	model->setFilterKeyColumn(-1); // filter all columns
+	model->setFilterCaseSensitivity(Qt::CaseInsensitive);
 	setModel(model);
 	connect(model, SIGNAL(layoutChanged()), this, SLOT(fixMessyQtModelBehaviour()));
 
@@ -42,7 +43,7 @@ DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelec
 	header()->setStretchLastSection(true);
 	QAction *showSearchBox = new QAction(tr("Show Search Box"), this);
 	showSearchBox->setShortcut( Qt::CTRL + Qt::Key_F);
-	showSearchBox->setShortcutContext(Qt::ApplicationShortcut);
+	showSearchBox->setShortcutContext(Qt::WindowShortcut);
 	addAction(showSearchBox);
 
 	searchBox->installEventFilter(this);
