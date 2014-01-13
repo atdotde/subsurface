@@ -802,8 +802,8 @@ void DiveListView::loadImages()
 
 	for (int i = 0; i < fileNames.size(); ++i) {
 	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
-	  //      	  exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
-      	  exif = Exiv2::ImageFactory::open (std::string("fish.jpg"));
+	  exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
+      	  // exif = Exiv2::ImageFactory::open (std::string("fish.jpg"));
 	  if (exif.get() == 0)
 	    continue;
 	  exif->readMetadata();
@@ -811,9 +811,11 @@ void DiveListView::loadImages()
 	  if (exifData.empty()) 
 	    continue;
 	  Exiv2::ExifData::const_iterator end = exifData.end();
+	printf("Let's look at the images!\n");
 	  for (Exiv2::ExifData::const_iterator i = exifData.begin(); i != end; ++i) {
-	    const char* tn = i->typeName();
-	    printf("Tag: %s\n", tn);
+	    const char* key = i->key().c_str();
+		const char* value = i->value().toString().c_str();
+	    printf("Tag: %s Value: %s\n", key, value);
 	  }
 	}
 }
