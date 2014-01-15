@@ -226,6 +226,8 @@ void DownloadFromDCWidget::fill_computer_list()
 		productList["Uemis"].push_back("Zurich");
 
 	descriptorLookup[QString("UemisZurich")] = (dc_descriptor_t *)mydescriptor;
+
+	qSort(vendorList);
 }
 
 void DownloadFromDCWidget::on_cancel_clicked()
@@ -348,7 +350,7 @@ void DownloadFromDCWidget::onDownloadThreadFinished()
 			for (int i = dive_table.nr - 1; i >= previousLast; i--)
 				delete_single_dive(i);
 		} else {
-			process_dives(TRUE, preferDownloaded());
+			process_dives(true, preferDownloaded());
 		}
 	} else {
 		updateState(CANCELLED);
