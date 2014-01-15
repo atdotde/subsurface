@@ -99,6 +99,10 @@ link_pkgconfig {
 		XML2_CFLAGS = $$system($$PKG_CONFIG --cflags libxml2 2> $$NUL)
 		XML2_LIBS = $$system($$PKG_CONFIG --libs libxml2 2> $$NUL)
 	}
+	isEmpty(XML2_CFLAGS)|isEmpty(XML2_LIBS) {
+		XML2_CFLAGS = $$system($$PKG_CONFIG --cflags libxml-2.0 2> $$NUL)
+		XML2_LIBS = $$system($$PKG_CONFIG --libs libxml-2.0 2> $$NUL)
+	}
 	isEmpty(XSLT_CFLAGS)|isEmpty(XSLT_LIBS) {
 		XSLT_CFLAGS = $$system($$PKG_CONFIG --cflags libxslt 2> $$NUL)
 		XSLT_LIBS = $$system($$PKG_CONFIG --libs libxslt 2> $$NUL)
@@ -111,7 +115,7 @@ link_pkgconfig {
 
 QMAKE_CFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
 QMAKE_CXXFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
-LIBS *= $$XML2_LIBS $$XSLT_LIBS
+LIBS *= $$XSLT_LIBS $$XML2_LIBS
 
 #
 # Find other pkg-config-based projects
