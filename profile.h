@@ -43,12 +43,15 @@ struct plot_data {
 	int stopdepth_calc;
 	int pressure_time;
 };
-
+//TODO: remove the calculatE_max_limits as soon as the new profile is done.
 void calculate_max_limits(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc);
+struct plot_info calculate_max_limits_new(struct dive *dive, struct divecomputer *dc);
 struct plot_info *create_plot_info(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc, bool print_mode);
 int setup_temperature_limits(struct graphics_context *gc);
 int get_cylinder_pressure_range(struct graphics_context *gc);
 void compare_samples(struct plot_data *e1, struct plot_data *e2, char *buf, int bufsize, int sum);
+struct plot_data *populate_plot_entries(struct dive *dive, struct divecomputer *dc, struct plot_info *pi);
+struct plot_info *analyze_plot_info(struct plot_info *pi);
 
 struct ev_select {
 	char *ev_name;

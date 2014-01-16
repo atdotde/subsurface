@@ -23,23 +23,36 @@ void Class::updateModel() \
 	QStringList list; \
 	struct dive* dive; \
 	int i = 0; \
-	for_each_dive(i, dive){ \
+	for_each_dive(i, dive) { \
 		QString buddy(dive->diveStructMember); \
-		if (!list.contains(buddy)){ \
+		if (!list.contains(buddy)) { \
 			list.append(buddy); \
 		} \
 	} \
 	setStringList(list); \
 }
 
-CREATE_UPDATE_METHOD(BuddyCompletionModel, buddy);
+void BuddyCompletionModel::updateModel()
+{
+	QSet<QString> set;
+	struct dive* dive;
+	int i = 0;
+	for_each_dive(i, dive) {
+		QString buddy(dive->buddy);
+		foreach (const QString &value, buddy.split(",", QString::SkipEmptyParts)) {
+			set.insert(value.trimmed());
+		}
+	}
+	setStringList(set.toList());
+}
+
 CREATE_UPDATE_METHOD(DiveMasterCompletionModel, divemaster);
 CREATE_UPDATE_METHOD(LocationCompletionModel, location);
 CREATE_UPDATE_METHOD(SuitCompletionModel, suit);
 
 void TagCompletionModel::updateModel()
 {
-	if(g_tag_list == NULL)
+	if (g_tag_list == NULL)
 		return;
 	QStringList list;
 	struct tag_entry *current_tag_entry = g_tag_list->next;
