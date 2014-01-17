@@ -32,8 +32,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	timeAxis(new TimeAxis()),
 	depthController(new DiveRectItem()),
 	timeController(new DiveRectItem()),
-	diveProfileItem(new DiveProfileItem()),
-	temperatureItem(new DiveTemperatureItem()),
+	diveProfileItem(NULL),
+	cylinderPressureAxis(new DiveCartesianAxis()),
+	temperatureItem(NULL),
 	cartesianPlane(new DiveCartesianPlane())
 {
 	setScene(new QGraphicsScene());
@@ -69,6 +70,12 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	temperatureAxis->setTickSize(2);
 	temperatureAxis->setTickInterval(300);
 
+	cylinderPressureAxis->setOrientation(DiveCartesianAxis::BottomToTop);
+	cylinderPressureAxis->setLine(0,20,0,60);
+	cylinderPressureAxis->setX(3);
+	cylinderPressureAxis->setTickSize(2);
+	cylinderPressureAxis->setTickInterval(30000);
+
 	timeAxis->setLine(0,0,96,0);
 	timeAxis->setX(3);
 	timeAxis->setTickSize(1);
@@ -82,7 +89,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 
 	// insert in the same way it's declared on the Enum. This is needed so we don't use an map.
 	QList<QGraphicsItem*> stateItems; stateItems << background << profileYAxis << gasYAxis <<
-							timeAxis << depthController << timeController << temperatureAxis;
+							timeAxis << depthController << timeController << temperatureAxis << cylinderPressureAxis;
 	Q_FOREACH(QGraphicsItem *item, stateItems) {
 		scene()->addItem(item);
 	}
@@ -270,6 +277,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	 * shown.
 	 */
 	struct plot_info pInfo = calculate_max_limits_new(d, currentdc);
+	create_plot_info_new(d, currentdc, &pInfo);
 	int maxtime = get_maxtime(&pInfo);
 	int maxdepth = get_maxdepth(&pInfo);
 
@@ -282,6 +290,10 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	//temperatureAxis->updateTicks();
 	timeAxis->setMaximum(maxtime);
 	timeAxis->updateTicks();
+	cylinderPressureAxis->setMinimum(pInfo.minpressure);
+	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
+	cylinderPressureAxis->updateTicks();
+
 	dataModel->setDive(current_dive, pInfo);
 
 	if (diveProfileItem) {
@@ -324,6 +336,17 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	temperatureItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
 	scene()->addItem(temperatureItem);
 
+	if(gasPressureItem){
+		scene()->removeItem(gasPressureItem);
+		delete gasPressureItem;
+	}
+	gasPressureItem = new DiveGasPressureItem();
+	gasPressureItem->setHorizontalAxis(timeAxis);
+	gasPressureItem->setVerticalAxis(cylinderPressureAxis);
+	gasPressureItem->setModel(dataModel);
+	gasPressureItem->setVerticalDataColumn(DivePlotDataModel::TEMPERATURE);
+	gasPressureItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	scene()->addItem(gasPressureItem);
 
 	emit startProfileState();
 }
@@ -360,7 +383,11 @@ void ProfileWidget2::resizeEvent(QResizeEvent* event)
 
 void ProfileWidget2::fixBackgroundPos()
 {
-	QPixmap p = QPixmap(":background").scaledToHeight(viewport()->height());
+	QPixmap toBeScaled(":background");
+	if (toBeScaled.isNull())
+		return;
+	QPixmap p = toBeScaled.scaledToHeight(viewport()->height());
+
 	int x = viewport()->width() / 2 - p.width() / 2;
 	DivePixmapItem *bg = background;
 	bg->setPixmap(p);

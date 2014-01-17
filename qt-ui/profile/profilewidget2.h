@@ -29,6 +29,7 @@ struct QStateMachine;
 struct DiveCartesianPlane;
 struct DiveTemperatureItem;
 struct plot_info;
+struct DiveGasPressureItem;
 
 class ProfileWidget2 : public QGraphicsView {
 	Q_OBJECT
@@ -75,6 +76,8 @@ private:
 	DiveProfileItem *diveProfileItem;
 	DiveCartesianPlane *cartesianPlane;
 	DiveTemperatureItem *temperatureItem;
+	DiveCartesianAxis *cylinderPressureAxis;
+	DiveGasPressureItem *gasPressureItem;
 	QList<DiveEventItem*> eventItems;
 };
 

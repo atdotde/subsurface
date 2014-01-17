@@ -31,6 +31,10 @@ QVariant DivePlotDataModel::data(const QModelIndex& index, int role) const
 			case TEMPERATURE:	return item.temperature;
 			case COLOR:		return item.velocity;
 			case USERENTERED:	return false;
+			case CYLINDERINDEX: return item.cylinderindex;
+			case SENSOR_PRESSURE: return item.pressure[0];
+			case INTERPOLATED_PRESSURE: return item.pressure[1];
+			case SAC: return item.sac;
 		}
 	}
 	if (role == Qt::BackgroundRole) {
@@ -61,6 +65,10 @@ QVariant DivePlotDataModel::headerData(int section, Qt::Orientation orientation,
 		case TEMPERATURE:	return tr("Temperature");
 		case COLOR:		return tr("Color");
 		case USERENTERED:	return tr("User Entered");
+		case CYLINDERINDEX: return tr("Cylinder Index");
+		case SENSOR_PRESSURE: return tr("Pressure  S");
+		case INTERPOLATED_PRESSURE: return tr("Pressure I");
+		case SAC: return tr("SAC");
 	}
 	return QVariant();
 }
@@ -82,16 +90,8 @@ void DivePlotDataModel::setDive(dive* d,const plot_info& pInfo)
 
 	if (d)
 		dc = select_dc(&d->dc);
-
-	/* Create the new plot data */
-	if (plotData)
-		free((void *)plotData);
-
-	plot_info info = pInfo;
-	plotData = populate_plot_entries(d, dc, &info); // Create the plot data.
-	analyze_plot_info(&info); // Get the Velocity Color information.
-
-	sampleCount = info.nr;
+	plotData = pInfo.entry;
+	sampleCount = pInfo.nr;
 	beginInsertRows(QModelIndex(), 0, sampleCount-1);
 	endInsertRows();
 }
