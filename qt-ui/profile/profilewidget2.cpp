@@ -296,7 +296,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 
 	dataModel->setDive(current_dive, pInfo);
 
-	if (diveProfileItem) {
+	if (diveProfileItem && diveProfileItem->scene()) {
 		//diveProfileItem->animateDelete();
 		scene()->removeItem(diveProfileItem);
 		delete diveProfileItem;
@@ -324,7 +324,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 		event = event->next;
 	}
 
-	if(temperatureItem){
+	if(temperatureItem && temperatureItem->scene()){
 		scene()->removeItem(temperatureItem);
 		delete temperatureItem;
 	}
@@ -336,7 +336,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	temperatureItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
 	scene()->addItem(temperatureItem);
 
-	if(gasPressureItem){
+	if(gasPressureItem && gasPressureItem->scene()){
 		scene()->removeItem(gasPressureItem);
 		delete gasPressureItem;
 	}
