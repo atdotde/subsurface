@@ -31,7 +31,6 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 				    editMode(NONE)
 {
 	ui.setupUi(this);
-	ui.tagWidget->setFocusPolicy(Qt::StrongFocus); // Don't get focus by 'Wheel'
 	ui.cylinders->setModel(cylindersModel);
 	ui.weights->setModel(weightModel);
 	closeMessage();
@@ -305,8 +304,7 @@ bool MainTab::eventFilter(QObject* object, QEvent* event)
 	// FocusIn for the starWidgets or RequestSoftwareInputPanel for tagWidget start the editing
 	if ((event->type() == QEvent::MouseButtonPress) ||
 	    (event->type() == QEvent::KeyPress && object == ui.dateTimeEdit) ||
-	    (event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility || object == ui.buddy)) ||
-	    (event->type() == QEvent::RequestSoftwareInputPanel && object == ui.tagWidget)) {
+	    (event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility || object == ui.buddy || object == ui.tagWidget || object || ui.divemaster))) {
 		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
 		enableEdition();
 	}
@@ -840,8 +838,9 @@ void MainTab::on_buddy_textChanged()
 	markChangedWidget(ui.buddy);
 }
 
-void MainTab::on_divemaster_textChanged(const QString& text)
+void MainTab::on_divemaster_textChanged()
 {
+	QString text = ui.divemaster->toPlainText().split(",", QString::SkipEmptyParts).join(", ");
 	EDIT_SELECTED_DIVES( EDIT_TEXT(mydive->divemaster, text) );
 	markChangedWidget(ui.divemaster);
 }

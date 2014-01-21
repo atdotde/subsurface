@@ -35,7 +35,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	diveProfileItem(NULL),
 	cylinderPressureAxis(new DiveCartesianAxis()),
 	temperatureItem(NULL),
-	cartesianPlane(new DiveCartesianPlane())
+	gasPressureItem(NULL),
+	cartesianPlane(new DiveCartesianPlane()),
+	meanDepth(new DiveLineItem())
 {
 	setScene(new QGraphicsScene());
 	scene()->setSceneRect(0, 0, 100, 100);
@@ -82,6 +84,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	depthController->setRect(0, 0, 10, 5);
 	timeController->setRect(0, 0, 10, 5);
 	timeController->setX(sceneRect().width() - timeController->boundingRect().width()); // Position it on the right spot.
+	meanDepth->setLine(0,0,96,0);
+	meanDepth->setX(3);
+	meanDepth->setPen(QPen(QBrush(Qt::red), 0, Qt::SolidLine));
 
 	cartesianPlane->setBottomAxis(timeAxis);
 	cartesianPlane->setLeftAxis(profileYAxis);
@@ -89,7 +94,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 
 	// insert in the same way it's declared on the Enum. This is needed so we don't use an map.
 	QList<QGraphicsItem*> stateItems; stateItems << background << profileYAxis << gasYAxis <<
-							timeAxis << depthController << timeController << temperatureAxis << cylinderPressureAxis;
+							timeAxis << depthController << timeController <<
+							temperatureAxis << cylinderPressureAxis <<
+							meanDepth;
 	Q_FOREACH(QGraphicsItem *item, stateItems) {
 		scene()->addItem(item);
 	}
@@ -283,17 +290,15 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 
 	// It seems that I'll have a lot of boilerplate setting the model / axis for
 	// each item, I'll mostly like to fix this in the future, but I'll keep at this for now.
-	profileYAxis->setMaximum(qMax<long>(pInfo.maxdepth + M_OR_FT(10,30), maxdepth * 2 / 3));
+	profileYAxis->setMaximum(maxdepth);
 	profileYAxis->updateTicks();
 	temperatureAxis->setMinimum(pInfo.mintemp);
 	temperatureAxis->setMaximum(pInfo.maxtemp);
-	//temperatureAxis->updateTicks();
 	timeAxis->setMaximum(maxtime);
 	timeAxis->updateTicks();
 	cylinderPressureAxis->setMinimum(pInfo.minpressure);
 	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
-	cylinderPressureAxis->updateTicks();
-
+	meanDepth->animateMoveTo(3, profileYAxis->posAtValue(pInfo.meandepth));
 	dataModel->setDive(current_dive, pInfo);
 
 	if (diveProfileItem && diveProfileItem->scene()) {
@@ -319,6 +324,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 		item->setVerticalAxis(profileYAxis);
 		item->setModel(dataModel);
 		item->setEvent(event);
+		item->setZValue(2);
 		scene()->addItem(item);
 		eventItems.push_back(item);
 		event = event->next;

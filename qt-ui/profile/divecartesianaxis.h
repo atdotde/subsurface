@@ -29,30 +29,35 @@ public:
 	qreal posAtValue(qreal value);
 	void setColor(const QColor& color);
 	void setTextColor(const QColor& color);
+	void setShowTicks(bool show);
+	void setShowText(bool show);
 	int unitSystem;
 signals:
 	void sizeChanged();
 protected:
 	virtual QString textForValue(double value);
-
+	virtual QColor colorForValue(double value);
 	Orientation orientation;
-	QList<DiveLineItem*> ticks;
 	QList<DiveTextItem*> labels;
 	double min;
 	double max;
 	double interval;
 	double tickSize;
 	QColor textColor;
+	bool showTicks;
+	bool showText;
 };
 
 class DepthAxis : public DiveCartesianAxis {
 protected:
 	QString textForValue(double value);
+	QColor colorForValue(double value);
 };
 
 class TimeAxis : public DiveCartesianAxis {
 protected:
 	QString textForValue(double value);
+	QColor colorForValue(double value);
 };
 
 class TemperatureAxis : public DiveCartesianAxis{
