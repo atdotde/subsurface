@@ -34,15 +34,26 @@ QVariant DivePlotDataModel::data(const QModelIndex& index, int role) const
 			case CYLINDERINDEX: return item.cylinderindex;
 			case SENSOR_PRESSURE: return item.pressure[0];
 			case INTERPOLATED_PRESSURE: return item.pressure[1];
+			case CEILING: return item.ceiling;
 			case SAC: return item.sac;
 		}
 	}
+
+	if (role == Qt::DisplayRole && index.column() >= TISSUE_1 && index.column() <= TISSUE_16){
+		return item.ceilings[ index.column() - TISSUE_1];
+	}
+
 	if (role == Qt::BackgroundRole) {
 		switch (index.column()) {
 			case COLOR:	return getColor((color_indice_t)(VELOCITY_COLORS_START_IDX + item.velocity));
 		}
 	}
 	return QVariant();
+}
+
+plot_data* DivePlotDataModel::data()
+{
+	return plotData;
 }
 
 int DivePlotDataModel::rowCount(const QModelIndex& parent) const
@@ -68,7 +79,11 @@ QVariant DivePlotDataModel::headerData(int section, Qt::Orientation orientation,
 		case CYLINDERINDEX: return tr("Cylinder Index");
 		case SENSOR_PRESSURE: return tr("Pressure  S");
 		case INTERPOLATED_PRESSURE: return tr("Pressure I");
+		case CEILING: return tr("Ceiling");
 		case SAC: return tr("SAC");
+	}
+	if (role == Qt::DisplayRole && section >= TISSUE_1 && section <= TISSUE_16){
+		return QString("Ceiling: %1").arg(section - TISSUE_1);
 	}
 	return QVariant();
 }
@@ -90,8 +105,14 @@ void DivePlotDataModel::setDive(dive* d,const plot_info& pInfo)
 
 	if (d)
 		dc = select_dc(&d->dc);
+	diveId = d->id;
 	plotData = pInfo.entry;
 	sampleCount = pInfo.nr;
 	beginInsertRows(QModelIndex(), 0, sampleCount-1);
 	endInsertRows();
+}
+
+int DivePlotDataModel::id() const
+{
+	return diveId;
 }

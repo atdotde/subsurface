@@ -18,9 +18,11 @@
  This is a generically item and should be used as a base for others, I think...
 */
 
+class DivePlotDataModel;
 class DiveTextItem;
 class DiveCartesianAxis;
 class QAbstractTableModel;
+struct plot_data;
 
 class AbstractProfilePolygonItem : public QObject, public QGraphicsPolygonItem{
 	Q_OBJECT
@@ -31,25 +33,33 @@ public:
 	AbstractProfilePolygonItem();
 	void setVerticalAxis(DiveCartesianAxis *vertical);
 	void setHorizontalAxis(DiveCartesianAxis *horizontal);
-	void setModel(QAbstractTableModel *model);
+	void setModel(DivePlotDataModel *model);
 	void setHorizontalDataColumn(int column);
 	void setVerticalDataColumn(int column);
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0) = 0;
 public slots:
+	virtual void preferencesChanged();
 	virtual void modelDataChanged();
 protected:
 	DiveCartesianAxis *hAxis;
 	DiveCartesianAxis *vAxis;
-	QAbstractTableModel *dataModel;
+	DivePlotDataModel *dataModel;
 	int hDataColumn;
 	int vDataColumn;
+	QList<DiveTextItem*> texts;
 };
 
 class DiveProfileItem : public AbstractProfilePolygonItem{
 	Q_OBJECT
+
 public:
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 	virtual void modelDataChanged();
+	virtual void preferencesChanged();
+	void plot_depth_sample(struct plot_data *entry,QFlags<Qt::AlignmentFlag> flags,const QColor& color);
+private:
+	unsigned int show_reported_ceiling;
+	unsigned int reported_ceiling_in_red;
 };
 
 class DiveTemperatureItem : public AbstractProfilePolygonItem{
@@ -60,18 +70,34 @@ public:
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 private:
 	void createTextItem(int seconds, int mkelvin);
-	QList<DiveTextItem*> texts;
 };
 
 class DiveGasPressureItem : public AbstractProfilePolygonItem{
 	Q_OBJECT
+
 public:
 	virtual void modelDataChanged();
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 private:
+	void plot_pressure_value(int mbar, int sec, QFlags<Qt::AlignmentFlag> align);
+	void plot_gas_value(int mbar, int sec, QFlags<Qt::AlignmentFlag> align, int o2, int he);
 	QVector<QPolygonF> polygons;
 };
 
-QGraphicsItemGroup *plotText(text_render_options_t *tro,const QPointF& pos, const QString& text, QGraphicsItem *parent);
+class DiveCalculatedCeiling : public AbstractProfilePolygonItem{
+	Q_OBJECT
 
+public:
+	virtual void modelDataChanged();
+	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
+};
+
+class DiveReportedCeiling : public AbstractProfilePolygonItem{
+	Q_OBJECT
+
+public:
+	virtual void modelDataChanged();
+	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
+	virtual void preferencesChanged();
+};
 #endif

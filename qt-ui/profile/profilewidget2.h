@@ -16,6 +16,8 @@
 #include "graphicsview-common.h"
 #include "divelineitem.h"
 
+class DiveReportedCeiling;
+class DiveTextItem;
 class TemperatureAxis;
 class DiveEventItem;
 struct DivePlotDataModel;
@@ -31,6 +33,8 @@ struct DiveCartesianPlane;
 struct DiveTemperatureItem;
 struct plot_info;
 struct DiveGasPressureItem;
+struct DiveCalculatedCeiling;
+struct DiveReportedCeiling;
 
 class ProfileWidget2 : public QGraphicsView {
 	Q_OBJECT
@@ -81,6 +85,10 @@ private:
 	DiveGasPressureItem *gasPressureItem;
 	DiveLineItem *meanDepth;
 	QList<DiveEventItem*> eventItems;
+	DiveTextItem *diveComputerText;
+	DiveCalculatedCeiling *diveCeiling;
+	QList<DiveCalculatedCeiling*> allTissues;
+	DiveReportedCeiling *reportedCeiling;
 };
 
 #endif
