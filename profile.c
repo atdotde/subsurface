@@ -138,7 +138,7 @@ void remember_event(const char *eventname)
 			return;
 	}
 	ev_namelist[evn_used].ev_name = strdup(eventname);
-	ev_namelist[evn_used].plot_ev = TRUE;
+	ev_namelist[evn_used].plot_ev = true;
 	evn_used++;
 }
 
@@ -195,12 +195,12 @@ int get_cylinder_pressure_range(struct graphics_context *gc)
 		gc->bottomy = 0;
 	gc->topy = gc->pi.maxpressure * 1.5;
 	if (!gc->pi.maxpressure)
-		return FALSE;
+		return false;
 
 	while (gc->pi.endtempcoord <= SCALEY(gc, gc->pi.minpressure - (gc->topy) * 0.1))
 		gc->bottomy -=  gc->topy * 0.1 * gc->maxy/abs(gc->maxy);
 
-	return TRUE;
+	return true;
 }
 
 
@@ -305,7 +305,7 @@ static velocity_t velocity(int speed)
 	return v;
 }
 
-static struct plot_info *analyze_plot_info(struct plot_info *pi)
+struct plot_info *analyze_plot_info(struct plot_info *pi)
 {
 	int i;
 	int nr = pi->nr;
@@ -717,6 +717,67 @@ static void check_gas_change_events(struct dive *dive, struct divecomputer *dc, 
 	set_cylinder_index(pi, i, cylinderindex, ~0u);
 }
 
+
+struct plot_info calculate_max_limits_new(struct dive *dive, struct divecomputer *dc)
+{
+	struct plot_info pi;
+	int maxdepth = dive->maxdepth.mm;
+	int maxtime = 0;
+	int maxpressure = 0, minpressure = INT_MAX;
+	int mintemp = dive->mintemp.mkelvin;
+	int maxtemp = dive->maxtemp.mkelvin;
+	int cyl;
+
+	/* Get the per-cylinder maximum pressure if they are manual */
+	for (cyl = 0; cyl < MAX_CYLINDERS; cyl++) {
+		unsigned int mbar = dive->cylinder[cyl].start.mbar;
+		if (mbar > maxpressure)
+			maxpressure = mbar;
+	}
+
+	/* Then do all the samples from all the dive computers */
+	do {
+		int i = dc->samples;
+		int lastdepth = 0;
+		struct sample *s = dc->sample;
+
+		while (--i >= 0) {
+			int depth = s->depth.mm;
+			int pressure = s->cylinderpressure.mbar;
+			int temperature = s->temperature.mkelvin;
+
+			if (!mintemp && temperature < mintemp)
+				mintemp = temperature;
+			if (temperature > maxtemp)
+				maxtemp = temperature;
+
+			if (pressure && pressure < minpressure)
+				minpressure = pressure;
+			if (pressure > maxpressure)
+				maxpressure = pressure;
+
+			if (depth > maxdepth)
+				maxdepth = s->depth.mm;
+			if ((depth > SURFACE_THRESHOLD || lastdepth > SURFACE_THRESHOLD) &&
+			    s->time.seconds > maxtime)
+				maxtime = s->time.seconds;
+			lastdepth = depth;
+			s++;
+		}
+	} while ((dc = dc->next) != NULL);
+
+	if (minpressure > maxpressure)
+		minpressure = 0;
+
+	pi.maxdepth = maxdepth;
+	pi.maxtime = maxtime;
+	pi.maxpressure = maxpressure;
+	pi.minpressure = minpressure;
+	pi.mintemp = mintemp;
+	pi.maxtemp = maxtemp;
+	return pi;
+}
+
 void calculate_max_limits(struct dive *dive, struct divecomputer *dc, struct graphics_context *gc)
 {
 	struct plot_info *pi;
@@ -783,7 +844,7 @@ void calculate_max_limits(struct dive *dive, struct divecomputer *dc, struct gra
 	pi->maxtemp = maxtemp;
 }
 
-static struct plot_data *populate_plot_entries(struct dive *dive, struct divecomputer *dc, struct plot_info *pi)
+struct plot_data *populate_plot_entries(struct dive *dive, struct divecomputer *dc, struct plot_info *pi)
 {
 	int idx, maxtime, nr, i;
 	int lastdepth, lasttime, lasttemp = 0;
@@ -968,7 +1029,7 @@ static void populate_pressure_information(struct dive *dive, struct divecomputer
 	int i, cylinderindex;
 	pr_track_t *track_pr[MAX_CYLINDERS] = {NULL, };
 	pr_track_t *current;
-	bool missing_pr = FALSE;
+	bool missing_pr = false;
 
 	cylinderindex = -1;
 	current = NULL;
@@ -1036,7 +1097,7 @@ static void calculate_ndl_tts(double tissue_tolerance, struct plot_data *entry, 
 	/* If we don't have a ceiling yet, calculate ndl. Don't try to calculate
 	 * a ndl for lower values than 3m it would take forever */
 	if (next_stop == 0) {
-		if(entry->depth < 3000) {
+		if (entry->depth < 3000) {
 			entry->ndl = max_ndl;
 			return;
 		}
@@ -1051,7 +1112,7 @@ static void calculate_ndl_tts(double tissue_tolerance, struct plot_data *entry, 
 	}
 
 	/* We are in deco */
-	entry->in_deco_calc = TRUE;
+	entry->in_deco_calc = true;
 
 	/* Add segments for movement to stopdepth */
 	for (; ascent_depth > next_stop; ascent_depth -= ascent_mm_per_step, entry->tts_calc += ascent_s_per_step) {
@@ -1093,7 +1154,7 @@ static void calculate_ndl_tts(double tissue_tolerance, struct plot_data *entry, 
 static void calculate_deco_information(struct dive *dive, struct divecomputer *dc, struct plot_info *pi, bool print_mode)
 {
 	int i;
-	double surface_pressure = (dc->surface_pressure.mbar ? dc->surface_pressure.mbar : get_surface_pressure_in_mbar(dive, TRUE)) / 1000.0;
+	double surface_pressure = (dc->surface_pressure.mbar ? dc->surface_pressure.mbar : get_surface_pressure_in_mbar(dive, true)) / 1000.0;
 	double tissue_tolerance = 0;
 	for (i = 1; i < pi->nr; i++) {
 		struct plot_data *entry = pi->entry + i;
@@ -1239,6 +1300,24 @@ struct plot_info *create_plot_info(struct dive *dive, struct divecomputer *dc, s
 	return analyze_plot_info(pi);
 }
 
+void create_plot_info_new(struct dive *dive, struct divecomputer *dc, struct plot_info *pi)
+{
+	if (prefs.profile_calc_ceiling)             /* reset deco information to start the calculation */
+		init_decompression(dive);
+	if (last_pi_entry)                          /* Create the new plot data */
+		free((void *)last_pi_entry);
+	last_pi_entry = populate_plot_entries(dive, dc, pi);
+	check_gas_change_events(dive, dc, pi);      /* Populate the gas index from the gas change events */
+	setup_gas_sensor_pressure(dive, dc, pi);    /* Try to populate our gas pressure knowledge */
+	populate_pressure_information(dive, dc, pi);/* .. calculate missing pressure entries */
+	calculate_sac(dive, pi);                    /* Calculate sac */
+	if (prefs.profile_calc_ceiling)             /* Then, calculate deco information */
+		calculate_deco_information(dive, dc, pi, false);
+	calculate_gas_information(dive, pi);       /* And finaly calculate gas partial pressures */
+	pi->meandepth = dive->dc.meandepth.mm;
+	analyze_plot_info(pi);
+}
+
 /* make sure you pass this the FIRST dc - it just walks the list */
 static int nr_dcs(struct divecomputer *main)
 {
@@ -1379,10 +1458,10 @@ static void plot_string(struct plot_data *entry, char *buf, int bufsize,
 		depthvalue = get_depth_units(entry->ceiling, NULL, &depth_unit);
 		memcpy(buf2, buf, bufsize);
 		snprintf(buf, bufsize, translate("gettextFromC","%s\nCalculated ceiling %.0f %s"), buf2, depthvalue, depth_unit);
-		if (prefs.calc_all_tissues){
+		if (prefs.calc_all_tissues) {
 			int k;
-			for (k=0; k<16; k++){
-				if (entry->ceilings[k]){
+			for (k=0; k<16; k++) {
+				if (entry->ceilings[k]) {
 					depthvalue = get_depth_units(entry->ceilings[k], NULL, &depth_unit);
 					memcpy(buf2, buf, bufsize);
 					snprintf(buf, bufsize, translate("gettextFromC","%s\nTissue %.0fmin: %.0f %s"), buf2, buehlmann_N2_t_halflife[k], depthvalue, depth_unit);

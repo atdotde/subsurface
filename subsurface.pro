@@ -1,12 +1,17 @@
 include(subsurface-configure.pri)
 
-QT = core gui network webkit svg
+QT = core gui network svg
+lessThan(QT_MAJOR_VERSION, 5) {
+	QT += webkit
+} else {
+	QT += webkitwidgets
+}
 INCLUDEPATH += qt-ui $$PWD
 
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 4.0.1
+VERSION = 4.0.2
 
 HEADERS = \
 	color.h \
@@ -56,7 +61,18 @@ HEADERS = \
 	webservice.h \
 	qt-ui/divelogimportdialog.h \
 	qt-ui/tagwidget.h \
-	qt-ui/groupedlineedit.h
+	qt-ui/groupedlineedit.h \
+	qt-ui/usermanual.h \
+	qt-ui/profile/profilewidget2.h \
+	qt-ui/profile/diverectitem.h \
+	qt-ui/profile/divepixmapitem.h \
+	qt-ui/profile/divelineitem.h \
+	qt-ui/profile/divetextitem.h \
+	qt-ui/profile/animationfunctions.h \
+	qt-ui/profile/divecartesianaxis.h \
+	qt-ui/profile/diveplotdatamodel.h \
+	qt-ui/profile/diveprofileitem.h \
+	qt-ui/profile/diveeventitem.h
 
 SOURCES =  \
 	deco.c \
@@ -68,6 +84,7 @@ SOURCES =  \
 	gettextfromc.cpp \
 	libdivecomputer.c \
 	main.cpp \
+	membuffer.c \
 	parse-xml.c \
 	planner.c \
 	profile.c \
@@ -105,7 +122,18 @@ SOURCES =  \
 	uemis-downloader.c \
 	qt-ui/divelogimportdialog.cpp \
 	qt-ui/tagwidget.cpp \
-	qt-ui/groupedlineedit.cpp
+	qt-ui/groupedlineedit.cpp \
+	qt-ui/usermanual.cpp \
+	qt-ui/profile/profilewidget2.cpp \
+	qt-ui/profile/diverectitem.cpp \
+	qt-ui/profile/divepixmapitem.cpp \
+	qt-ui/profile/divelineitem.cpp \
+	qt-ui/profile/divetextitem.cpp \
+	qt-ui/profile/animationfunctions.cpp \
+	qt-ui/profile/divecartesianaxis.cpp \
+	qt-ui/profile/diveplotdatamodel.cpp \
+	qt-ui/profile/diveprofileitem.cpp \
+	qt-ui/profile/diveeventitem.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
@@ -124,7 +152,8 @@ FORMS = \
 	qt-ui/shifttimes.ui \
 	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
-	qt-ui/divelogimportdialog.ui
+	qt-ui/divelogimportdialog.ui \
+	qt-ui/usermanual.ui
 
 RESOURCES = subsurface.qrc
 

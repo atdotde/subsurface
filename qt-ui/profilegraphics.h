@@ -10,10 +10,8 @@
 #include <QPushButton>
 #include <QGraphicsProxyWidget>
 
-struct text_render_options;
 struct graphics_context;
 struct plot_info;
-typedef struct text_render_options text_render_options_t;
 
 /* To use a tooltip, simply ->setToolTip on the QGraphicsItem that you want
  * or, if it's a "global" tooltip, set it on the mouseMoveEvent of the ProfileGraphicsView.
@@ -100,7 +98,7 @@ private:
 class EventItem : public QGraphicsPixmapItem
 {
 public:
-	explicit EventItem(struct event *ev, QGraphicsItem* parent = 0, bool grayscale = FALSE);
+	explicit EventItem(struct event *ev, QGraphicsItem* parent = 0, bool grayscale = false);
 	struct event* ev;
 
 private:
@@ -131,10 +129,10 @@ public:
 	enum Mode{DIVE, PLAN};
 
 	ProfileGraphicsView(QWidget* parent = 0);
-	void plot(struct dive *d, bool forceRedraw = FALSE);
+	void plot(struct dive *d, bool forceRedraw = false);
 	bool eventFilter(QObject* obj, QEvent* event);
 	void clear();
-	void setPrintMode(bool mode, bool grayscale = FALSE);
+	void setPrintMode(bool mode, bool grayscale = false);
 
 protected:
 	void resizeEvent(QResizeEvent *event);
@@ -164,7 +162,7 @@ private:
 	void plot_single_temp_text(int sec, int mkelvin);
 	void plot_depth_text();
 	void plot_text_samples();
-	void plot_depth_sample(struct plot_data *entry, text_render_options_t *tro);
+	void plot_depth_sample(plot_data* entry, text_render_options_t* tro);
 	void plot_cylinder_pressure_text();
 	void plot_pressure_value(int mbar, int sec, double xalign, double yalign);
 	void plot_gas_value(int mbar, int sec, double xalign, double yalign, int o2, int he);

@@ -12,6 +12,7 @@
 #include <QUrl>
 
 #include "ui_mainwindow.h"
+#include "usermanual.h"
 
 struct DiveList;
 class QSortFilterProxyModel;
@@ -54,7 +55,7 @@ public:
 	void loadFiles(const QStringList files);
 	void importFiles(const QStringList importFiles);
 	void cleanUpEmpty();
-
+	QTabWidget *tabWidget();
 private slots:
 	/* file menu action */
 	void on_actionNew_triggered();
@@ -86,6 +87,7 @@ private slots:
 	void on_actionViewAll_triggered();
 	void on_actionPreviousDC_triggered();
 	void on_actionNextDC_triggered();
+	void on_actionFullScreen_triggered(bool checked);
 
 	/* other menu actions */
 	void on_actionSelectEvents_triggered();
@@ -102,7 +104,6 @@ private slots:
 	void initialUiSetup();
 
 	void on_actionImportDiveLog_triggered();
-	void linkClickedSlot(QUrl url);
 
 protected:
 	void closeEvent(QCloseEvent *);
@@ -117,7 +118,7 @@ private:
 	Ui::MainWindow ui;
 	QAction *actionNextDive;
 	QAction *actionPreviousDive;
-	QWebView *helpView;
+	UserManual *helpView;
 	CurrentState state;
 	QString filter();
 	bool askSaveChanges();

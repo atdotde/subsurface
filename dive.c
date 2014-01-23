@@ -570,12 +570,12 @@ static void sanitize_cylinder_info(struct dive *dive)
 static bool is_potentially_redundant(struct event *event)
 {
 	if (!strcmp(event->name, "gaschange"))
-		return FALSE;
+		return false;
 	if (!strcmp(event->name, "bookmark"))
-		return FALSE;
+		return false;
 	if (!strcmp(event->name, "heading"))
-		return FALSE;
-	return TRUE;
+		return false;
+	return true;
 }
 
 /* match just by name - we compare the details in the code that uses this helper */
@@ -592,6 +592,31 @@ static struct event *find_previous_event(struct divecomputer *dc, struct event *
 		ev = ev->next;
 	}
 	return previous;
+}
+
+/* mark all tanks that we switch to in this dive computer's data as used */
+static void mark_used_tanks(struct dive *dive, struct divecomputer *dc)
+{
+	struct event *ev = get_next_event(dc->events, "gaschange");
+	// unless there is a gas change in the first 30 seconds we can
+	// always mark the first cylinder as used
+	if (!ev || ev->time.seconds > 30)
+		dive->cylinder[0].used = true;
+	while (ev) {
+		int idx = get_cylinder_index(dive, ev);
+		dive->cylinder[idx].used = true;
+		ev = get_next_event(ev->next, "gaschange");
+	}
+}
+
+/* walk all divecomputers to find the unused tanks in this dive */
+static void check_for_unused_tanks(struct dive *dive)
+{
+	struct divecomputer *dc;
+
+	for_each_dc(dive, dc) {
+		mark_used_tanks(dive, dc);
+	}
 }
 
 static void fixup_surface_pressure(struct dive *dive)
@@ -735,7 +760,7 @@ static void fixup_dc_events(struct divecomputer *dc)
 			if (prev && prev->value == event->value &&
 			    prev->flags == event->flags &&
 			    event->time.seconds - prev->time.seconds < 61)
-				event->deleted = TRUE;
+				event->deleted = true;
 		}
 		event = event->next;
 	}
@@ -879,7 +904,7 @@ struct dive *fixup_dive(struct dive *dive)
 	fixup_duration(dive);
 	fixup_watertemp(dive);
 	fixup_airtemp(dive);
-
+	check_for_unused_tanks(dive);
 	for (i = 0; i < MAX_CYLINDERS; i++) {
 		cylinder_t *cyl = dive->cylinder + i;
 		add_cylinder_description(&cyl->type);
@@ -1028,7 +1053,7 @@ add_sample_b:
 		if (as->stopdepth.mm)
 			sample.stopdepth = as->stopdepth;
 		if (as->in_deco)
-			sample.in_deco = TRUE;
+			sample.in_deco = true;
 
 		merge_one_sample(&sample, at, res);
 
@@ -2063,6 +2088,14 @@ struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer
 	}
 	if (prefer_downloaded && b->downloaded)
 		dl = b;
+
+	/*
+	 * Did the user ask us to merge dives in the dive list?
+	 * We may want to just join the dive computers, not try to
+	 * interleave them at some offset.
+	 */
+	if (offset && likely_same_dive(a, b))
+		offset = 0;
 
 	res->when = dl ? dl->when : a->when;
 	res->selected = a->selected || b->selected;

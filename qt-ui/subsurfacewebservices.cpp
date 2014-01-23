@@ -22,6 +22,10 @@
 #  include <unistd.h> // for dup(2)
 #endif
 
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#   include <QUrlQuery>
+#endif
+
 struct dive_table gps_location_table;
 static bool merge_locations_into_dives(void);
 
@@ -30,8 +34,8 @@ static bool is_automatic_fix(struct dive *gpsfix)
 	if (gpsfix && gpsfix->location &&
 			(!strcmp(gpsfix->location, "automatic fix") ||
 			 !strcmp(gpsfix->location, "Auto-created dive")))
-		return TRUE;
-	return FALSE;
+		return true;
+	return false;
 }
 
 #define SAME_GROUP 6 * 3600   // six hours
@@ -319,20 +323,26 @@ SubsurfaceWebServices::SubsurfaceWebServices(QWidget* parent, Qt::WindowFlags f)
 	ui.userID->setText(s.value("subsurface_webservice_uid").toString().toUpper());
 	hidePassword();
 	hideUpload();
+	ui.progressBar->setFormat("Enter User ID and click Download");
+	ui.progressBar->setRange(0,1);
+	ui.progressBar->setValue(-1);
 }
 
 void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 {
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
-	switch(ui.buttonBox->buttonRole(button)){
-	case QDialogButtonBox::ApplyRole:{
+	switch (ui.buttonBox->buttonRole(button)) {
+	case QDialogButtonBox::ApplyRole: {
 		clear_table(&gps_location_table);
 		QByteArray url = tr("Webservice").toLocal8Bit();
 		parse_xml_buffer(url.data(), downloadedData.data(), downloadedData.length(), &gps_location_table, NULL, NULL);
 
 		/* now merge the data in the gps_location table into the dive_table */
 		if (merge_locations_into_dives()) {
-			mark_divelist_changed(TRUE);
+			mark_divelist_changed(true);
+			mainWindow()->globe()->repopulateLabels();
+			mainWindow()->globe()->centerOn(current_dive);
+			mainWindow()->information()->updateDiveInfo(selected_dive);
 		}
 
 		/* store last entered uid in config */
@@ -363,13 +373,20 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 void SubsurfaceWebServices::startDownload()
 {
 	QUrl url("http://api.hohndel.org/api/dive/get/");
+#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
 	url.addQueryItem("login", ui.userID->text().toUpper());
+#else
+	QUrlQuery query;
+	query.addQueryItem("login", ui.userID->text().toUpper());
+	url.setQuery(query);
+#endif
 
 	QNetworkRequest request;
 	request.setUrl(url);
 	request.setRawHeader("Accept", "text/xml");
 	reply = manager()->get(request);
 	ui.status->setText(tr("Connecting..."));
+	ui.progressBar->setEnabled(true);
 	ui.progressBar->setRange(0,0); // this makes the progressbar do an 'infinite spin'
 	ui.download->setEnabled(false);
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
@@ -382,6 +399,8 @@ void SubsurfaceWebServices::downloadFinished()
 		return;
 
 	ui.progressBar->setRange(0,1);
+	ui.progressBar->setValue(1);
+	ui.progressBar->setFormat("%p%");
 	downloadedData = reply->readAll();
 
 	ui.download->setEnabled(true);
@@ -389,7 +408,7 @@ void SubsurfaceWebServices::downloadFinished()
 
 	uint resultCode = download_dialog_parse_response(downloadedData);
 	setStatusText(resultCode);
-	if (resultCode == DD_STATUS_OK){
+	if (resultCode == DD_STATUS_OK) {
 		ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(true);
 	}
 	reply->deleteLater();
@@ -407,7 +426,7 @@ void SubsurfaceWebServices::downloadError(QNetworkReply::NetworkError)
 void SubsurfaceWebServices::setStatusText(int status)
 {
 	QString text;
-	switch (status)	{
+	switch (status) {
 	case DD_STATUS_ERROR_CONNECT:	text = tr("Connection Error: ");	break;
 	case DD_STATUS_ERROR_ID:	text = tr("Invalid user identifier!");	break;
 	case DD_STATUS_ERROR_PARSE:	text = tr("Cannot parse response!");	break;
@@ -674,7 +693,7 @@ void DivelogsDeWebServices::startDownload()
 	body.addQueryItem("user", ui.userID->text());
 	body.addQueryItem("pass", ui.password->text());
 
-	reply = manager()->post(request, body.query(QUrl::FullyEncoded).toLatin1())
+	reply = manager()->post(request, body.query(QUrl::FullyEncoded).toLatin1());
 #endif
 	connect(reply, SIGNAL(finished()), this, SLOT(listDownloadFinished()));
 	connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
@@ -720,7 +739,7 @@ void DivelogsDeWebServices::listDownloadFinished()
 	body.addQueryItem("pass", ui.password->text());
 	body.addQueryItem("ids", diveList.idList);
 
-	reply = manager()->post(request, body.query(QUrl::FullyEncoded).toLatin1())
+	reply = manager()->post(request, body.query(QUrl::FullyEncoded).toLatin1());
 #endif
 
 	connect(reply, SIGNAL(readyRead()), this, SLOT(saveToZipFile()));
@@ -831,8 +850,8 @@ void DivelogsDeWebServices::uploadError(QNetworkReply::NetworkError error)
 void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 {
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
-	switch(ui.buttonBox->buttonRole(button)){
-	case QDialogButtonBox::ApplyRole:{
+	switch (ui.buttonBox->buttonRole(button)) {
+	case QDialogButtonBox::ApplyRole: {
 		/* in 'uploadMode' button is called 'Done' and closes the dialog */
 		if (uploadMode) {
 			hide();
@@ -847,7 +866,7 @@ void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 			mainWindow()->showError(error);
 			free(error);
 		}
-		process_dives(TRUE, FALSE);
+		process_dives(true, false);
 		mainWindow()->refreshDisplay();
 
 		/* store last entered user/pass in config */

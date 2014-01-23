@@ -27,9 +27,9 @@ struct buehlmann_config {
   double  gf_high;		//! gradient factor high (at surface).
   double  gf_low;		//! gradient factor low (at bottom/start of deco calculation).
   double  gf_low_position_min;	//! gf_low_position below surface_min_shallow.
-  bool    gf_low_at_maxdepth;	//! if TRUE, gf_low applies at max depth instead of at deepest ceiling.
+  bool    gf_low_at_maxdepth;	//! if true, gf_low applies at max depth instead of at deepest ceiling.
 };
-struct buehlmann_config buehlmann_config = { 1.0, 1.01, 0, 0.75, 0.35, 2.0, FALSE };
+struct buehlmann_config buehlmann_config = { 1.0, 1.01, 0, 0.75, 0.35, 2.0, false };
 
 const double buehlmann_N2_a[] = {1.1696, 1.0, 0.8618, 0.7562,
 				 0.62, 0.5043, 0.441, 0.4,
@@ -92,7 +92,7 @@ static double tissue_tolerance_calc(const struct dive *dive)
 	double ret_tolerance_limit_ambient_pressure = 0.0;
 	double gf_high = buehlmann_config.gf_high;
 	double gf_low = buehlmann_config.gf_low;
-	double surface = get_surface_pressure_in_mbar(dive, TRUE) / 1000.0;
+	double surface = get_surface_pressure_in_mbar(dive, true) / 1000.0;
 
 	for (ci = 0; ci < 16; ci++)
 	{
@@ -129,6 +129,49 @@ static double tissue_tolerance_calc(const struct dive *dive)
 	return ret_tolerance_limit_ambient_pressure;
 }
 
+/*
+ * Return buelman factor for a particular period and tissue index.
+ *
+ * We cache the last factor, since we commonly call this with the
+ * same values... We have a special "fixed cache" for the one second
+ * case, although I wonder if that's even worth it considering the
+ * more general-purpose cache.
+ */
+struct factor_cache {
+	int last_period;
+	double last_factor;
+};
+
+double n2_factor(int period_in_seconds, int ci)
+{
+	static struct factor_cache cache[16];
+
+	if (period_in_seconds == 1)
+		return buehlmann_N2_factor_expositon_one_second[ci];
+
+	if (period_in_seconds != cache[ci].last_period) {
+		cache[ci].last_period = period_in_seconds;
+		cache[ci].last_factor = 1 - pow(2.0, - period_in_seconds / (buehlmann_N2_t_halflife[ci] * 60));
+	}
+
+	return cache[ci].last_factor;
+}
+
+double he_factor(int period_in_seconds, int ci)
+{
+	static struct factor_cache cache[16];
+
+	if (period_in_seconds == 1)
+		return buehlmann_He_factor_expositon_one_second[ci];
+
+	if (period_in_seconds != cache[ci].last_period) {
+		cache[ci].last_period = period_in_seconds;
+		cache[ci].last_factor = 1 - pow(2.0, - period_in_seconds / (buehlmann_He_t_halflife[ci] * 60));
+	}
+
+	return cache[ci].last_factor;
+}
+
 /* add period_in_seconds at the given pressure and gas to the deco calculation */
 double add_segment(double pressure, const struct gasmix *gasmix, int period_in_seconds, int ccpo2, const struct dive *dive)
 {
@@ -152,37 +195,17 @@ double add_segment(double pressure, const struct gasmix *gasmix, int period_in_s
 			pphe *= f_dilutent;
 		}
 	}
-	if (period_in_seconds == 1) { /* one second interval during dive */
-		for (ci = 0; ci < 16; ci++) {
-			if (ppn2 - tissue_n2_sat[ci] > 0)
-				tissue_n2_sat[ci] += buehlmann_config.satmult * (ppn2 - tissue_n2_sat[ci]) *
-								buehlmann_N2_factor_expositon_one_second[ci];
-			else
-				tissue_n2_sat[ci] += buehlmann_config.desatmult * (ppn2 - tissue_n2_sat[ci]) *
-								buehlmann_N2_factor_expositon_one_second[ci];
-			if (pphe - tissue_he_sat[ci] > 0)
-				tissue_he_sat[ci] += buehlmann_config.satmult * (pphe - tissue_he_sat[ci]) *
-								buehlmann_He_factor_expositon_one_second[ci];
-			else
-				tissue_he_sat[ci] += buehlmann_config.desatmult * (pphe - tissue_he_sat[ci]) *
-								buehlmann_He_factor_expositon_one_second[ci];
-		}
-	} else { /* all other durations */
-		for (ci = 0; ci < 16; ci++)
-		{
-			if (ppn2 - tissue_n2_sat[ci] > 0)
-				tissue_n2_sat[ci] += buehlmann_config.satmult * (ppn2 - tissue_n2_sat[ci]) *
-					(1 - pow(2.0,(- period_in_seconds / (buehlmann_N2_t_halflife[ci] * 60))));
-			else
-				tissue_n2_sat[ci] += buehlmann_config.desatmult * (ppn2 - tissue_n2_sat[ci]) *
-					(1 - pow(2.0,(- period_in_seconds / (buehlmann_N2_t_halflife[ci] * 60))));
-			if (pphe - tissue_he_sat[ci] > 0)
-				tissue_he_sat[ci] += buehlmann_config.satmult * (pphe - tissue_he_sat[ci]) *
-					(1 - pow(2.0,(- period_in_seconds / (buehlmann_He_t_halflife[ci] * 60))));
-			else
-				tissue_he_sat[ci] += buehlmann_config.desatmult * (pphe - tissue_he_sat[ci]) *
-					(1 - pow(2.0,(- period_in_seconds / (buehlmann_He_t_halflife[ci] * 60))));
-		}
+
+	for (ci = 0; ci < 16; ci++) {
+		double ppn2_oversat = ppn2 - tissue_n2_sat[ci];
+		double pphe_oversat = pphe - tissue_he_sat[ci];
+		double n2_f = n2_factor(period_in_seconds, ci);
+		double he_f = he_factor(period_in_seconds, ci);
+		double n2_satmult = ppn2_oversat > 0 ? buehlmann_config.satmult : buehlmann_config.desatmult;
+		double he_satmult = pphe_oversat > 0 ? buehlmann_config.satmult : buehlmann_config.desatmult;
+
+		tissue_n2_sat[ci] += n2_satmult * ppn2_oversat * n2_f;
+		tissue_he_sat[ci] += he_satmult * pphe_oversat * he_f;
 	}
 	return tissue_tolerance_calc(dive);
 }

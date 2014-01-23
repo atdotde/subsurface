@@ -22,7 +22,7 @@ QFont defaultModelFont();
 class CleanerTableModel : public QAbstractTableModel{
 	Q_OBJECT
 public:
-	CleanerTableModel();
+	explicit CleanerTableModel(QObject *parent = 0);
 	virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
 	virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 protected:
@@ -47,6 +47,7 @@ public:
 	/*reimp*/ bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
 	const QString& biggerString() const;
 	void clear();
+public slots:
 	void update();
 private:
 	int rows;
