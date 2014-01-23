@@ -7,6 +7,7 @@
 #include "dive.h"
 #include "profilegraphics.h"
 #include "preferences.h"
+#include "helpers.h"
 
 #include <QPen>
 #include <QPainter>
@@ -14,6 +15,7 @@
 #include <QDebug>
 #include <QApplication>
 #include <QGraphicsItem>
+#include <QSettings>
 
 AbstractProfilePolygonItem::AbstractProfilePolygonItem(): QObject(), QGraphicsPolygonItem(),
 	hAxis(NULL), vAxis(NULL), dataModel(NULL), hDataColumn(-1), vDataColumn(-1)
@@ -41,6 +43,7 @@ void AbstractProfilePolygonItem::setModel(DivePlotDataModel* model)
 {
 	dataModel = model;
 	connect(dataModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(modelDataChanged()));
+	connect(dataModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(modelDataChanged()));
 	modelDataChanged();
 }
 
@@ -134,7 +137,6 @@ void DiveProfileItem::modelDataChanged()
 	pat.setColorAt(1, getColor(DEPTH_BOTTOM));
 	pat.setColorAt(0, getColor(DEPTH_TOP));
 	setBrush(QBrush(pat));
-	AbstractProfilePolygonItem::preferencesChanged();
 
 	int last = -1;
 	for (int i = 0, count  = dataModel->rowCount(); i < count; i++) {
@@ -365,6 +367,8 @@ void DiveCalculatedCeiling::modelDataChanged()
 	AbstractProfilePolygonItem::modelDataChanged();
 	// Add 2 points to close the polygon.
 	QPolygonF poly = polygon();
+	if (poly.isEmpty())
+		return;
 	QPointF p1 = poly.first();
 	QPointF p2 = poly.last();
 
@@ -384,6 +388,17 @@ void DiveCalculatedCeiling::paint(QPainter* painter, const QStyleOptionGraphicsI
 	QGraphicsPolygonItem::paint(painter, option, widget);
 }
 
+DiveCalculatedTissue::DiveCalculatedTissue()
+{
+	preferencesChanged();
+}
+
+void DiveCalculatedTissue::preferencesChanged()
+{
+	QSettings s;
+	s.beginGroup("TecDetails");
+	setVisible(s.value("calcalltissues").toBool());
+}
 
 void DiveReportedCeiling::modelDataChanged()
 {
@@ -414,14 +429,37 @@ void DiveReportedCeiling::modelDataChanged()
 
 void DiveReportedCeiling::preferencesChanged()
 {
-	if (prefs.profile_dc_ceiling) {
-		setVisible(prefs.profile_red_ceiling);
-	} else {
-		setVisible(false);
-	}
+	QSettings s;
+	s.beginGroup("TecDetails");
+	setVisible(s.value("redceiling").toBool());
 }
 
 void DiveReportedCeiling::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
 	QGraphicsPolygonItem::paint(painter, option, widget);
+}
+
+MeanDepthLine::MeanDepthLine()
+{
+	leftText = new DiveTextItem(this);
+	leftText->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+	leftText->setBrush(getColor(MEAN_DEPTH));
+	rightText = new DiveTextItem(this);
+	rightText->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+	rightText->setBrush(getColor(MEAN_DEPTH));
+	leftText->setPos(0, 0);
+	rightText->setPos(line().length(), 0);
+}
+
+void MeanDepthLine::setLine(qreal x1, qreal y1, qreal x2, qreal y2)
+{
+	QGraphicsLineItem::setLine(x1, y1, x2, y2);
+	leftText->setPos(x1, 0);
+	rightText->setPos(x2, 0);
+}
+
+void MeanDepthLine::setMeanDepth(int value)
+{
+	leftText->setText(get_depth_string(value, false, false));
+	rightText->setText(get_depth_string(value, false, false));
 }

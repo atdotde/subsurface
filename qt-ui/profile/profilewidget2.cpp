@@ -37,7 +37,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	temperatureItem(NULL),
 	gasPressureItem(NULL),
 	cartesianPlane(new DiveCartesianPlane()),
-	meanDepth(new DiveLineItem()),
+	meanDepth(new MeanDepthLine()),
 	diveComputerText(new DiveTextItem()),
 	diveCeiling(NULL),
 	reportedCeiling(NULL)
@@ -64,7 +64,6 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	timeAxis->setTickInterval(600); // 10 to 10 minutes?
 
 	// Default Sizes of the Items.
-	profileYAxis->setLine(0, 0, 0, 90);
 	profileYAxis->setX(2);
 	profileYAxis->setTickSize(1);
 	gasYAxis->setLine(0, 0, 0, 20);
@@ -90,6 +89,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	meanDepth->setLine(0,0,96,0);
 	meanDepth->setX(3);
 	meanDepth->setPen(QPen(QBrush(Qt::red), 0, Qt::SolidLine));
+	meanDepth->setZValue(1);
 
 	cartesianPlane->setBottomAxis(timeAxis);
 	cartesianPlane->setLeftAxis(profileYAxis);
@@ -106,6 +106,24 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	Q_FOREACH(QGraphicsItem *item, stateItems) {
 		scene()->addItem(item);
 	}
+
+	reportedCeiling = new DiveReportedCeiling();
+	reportedCeiling->setHorizontalAxis(timeAxis);
+	reportedCeiling->setVerticalAxis(profileYAxis);
+	reportedCeiling->setModel(dataModel);
+	reportedCeiling->setVerticalDataColumn(DivePlotDataModel::CEILING);
+	reportedCeiling->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	reportedCeiling->setZValue(1);
+	scene()->addItem(reportedCeiling);
+
+	diveCeiling = new DiveCalculatedCeiling();
+	diveCeiling->setHorizontalAxis(timeAxis);
+	diveCeiling->setVerticalAxis(profileYAxis);
+	diveCeiling->setModel(dataModel);
+	diveCeiling->setVerticalDataColumn(DivePlotDataModel::CEILING);
+	diveCeiling->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	diveCeiling->setZValue(1);
+	scene()->addItem(diveCeiling);
 
 	background->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 
@@ -187,7 +205,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	profileState->assignProperty(this, "backgroundBrush", getColor(::BACKGROUND));
 	profileState->assignProperty(background, "y",  backgroundOffCanvas);
 	profileState->assignProperty(profileYAxis, "x", profileYAxisOnCanvas);
-	profileState->assignProperty(profileYAxis, "line", profileYAxisExpanded);
+	//profileState->assignProperty(profileYAxis, "line", profileYAxisExpanded);
 	profileState->assignProperty(gasYAxis, "x", 0);
 	profileState->assignProperty(timeAxis, "y", timeAxisOnCanvas);
 	profileState->assignProperty(depthController, "y", depthControllerOffCanvas);
@@ -304,6 +322,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	timeAxis->updateTicks();
 	cylinderPressureAxis->setMinimum(pInfo.minpressure);
 	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
+	meanDepth->setMeanDepth(pInfo.meandepth);
 	meanDepth->animateMoveTo(3, profileYAxis->posAtValue(pInfo.meandepth));
 	dataModel->setDive(current_dive, pInfo);
 
@@ -318,6 +337,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	diveProfileItem->setModel(dataModel);
 	diveProfileItem->setVerticalDataColumn(DivePlotDataModel::DEPTH);
 	diveProfileItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	diveProfileItem->setZValue(0);
 	scene()->addItem(diveProfileItem);
 
 	qDeleteAll(eventItems);
@@ -346,6 +366,7 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	temperatureItem->setModel(dataModel);
 	temperatureItem->setVerticalDataColumn(DivePlotDataModel::TEMPERATURE);
 	temperatureItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	temperatureItem->setZValue(1);
 	scene()->addItem(temperatureItem);
 
 	if(gasPressureItem && gasPressureItem->scene()){
@@ -358,19 +379,8 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	gasPressureItem->setModel(dataModel);
 	gasPressureItem->setVerticalDataColumn(DivePlotDataModel::TEMPERATURE);
 	gasPressureItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
+	gasPressureItem->setZValue(1);
 	scene()->addItem(gasPressureItem);
-
-	if(diveCeiling){
-		scene()->removeItem(diveCeiling);
-		delete diveCeiling;
-	}
-	diveCeiling = new DiveCalculatedCeiling();
-	diveCeiling->setHorizontalAxis(timeAxis);
-	diveCeiling->setVerticalAxis(profileYAxis);
-	diveCeiling->setModel(dataModel);
-	diveCeiling->setVerticalDataColumn(DivePlotDataModel::CEILING);
-	diveCeiling->setHorizontalDataColumn(DivePlotDataModel::TIME);
-	scene()->addItem(diveCeiling);
 
 	diveComputerText->setText(currentdc->model);
 	diveComputerText->animateMoveTo(1 , sceneRect().height());
@@ -378,27 +388,17 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	qDeleteAll(allTissues);
 	allTissues.clear();
 	for(int i = 0; i < 16; i++){
-		DiveCalculatedCeiling *tissueItem = new DiveCalculatedCeiling();
+		DiveCalculatedTissue *tissueItem = new DiveCalculatedTissue();
 		tissueItem->setHorizontalAxis(timeAxis);
 		tissueItem->setVerticalAxis(profileYAxis);
 		tissueItem->setModel(dataModel);
 		tissueItem->setVerticalDataColumn(DivePlotDataModel::TISSUE_1 + i);
 		tissueItem->setHorizontalDataColumn(DivePlotDataModel::TIME);
+		tissueItem->setZValue(1);
 		allTissues.append(tissueItem);
 		scene()->addItem(tissueItem);
 	}
 
-	if(reportedCeiling){
-		scene()->removeItem(reportedCeiling);
-		delete reportedCeiling;
-	}
-	reportedCeiling = new DiveReportedCeiling();
-	reportedCeiling->setHorizontalAxis(timeAxis);
-	reportedCeiling->setVerticalAxis(profileYAxis);
-	reportedCeiling->setModel(dataModel);
-	reportedCeiling->setVerticalDataColumn(DivePlotDataModel::CEILING);
-	reportedCeiling->setHorizontalDataColumn(DivePlotDataModel::TIME);
-	scene()->addItem(reportedCeiling);
 	emit startProfileState();
 }
 
