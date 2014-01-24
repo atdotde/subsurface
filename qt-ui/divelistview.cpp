@@ -10,6 +10,8 @@
 #include "mainwindow.h"
 #include "subsurfacewebservices.h"
 #include "../display.h"
+#include "exif.h"
+#include "../file.h"
 #include <QApplication>
 #include <QHeaderView>
 #include <QDebug>
@@ -23,7 +25,7 @@
 #include <QFileDialog>
 #include <string>
 #include <iostream>
-#include <exiv2/exiv2.hpp>
+
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
 	sortColumn(0), currentOrder(Qt::DescendingOrder), searchBox(new QLineEdit(this))
@@ -797,7 +799,9 @@ void DiveListView::shiftTimes()
 
 void DiveListView::loadImages()
 {
-  Exiv2::Image::AutoPtr exif;
+  struct memblock mem;
+  EXIFInfo exif;
+  int code;
   QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
 
 	if (fileNames.isEmpty())
@@ -806,23 +810,20 @@ void DiveListView::loadImages()
 	updateLastUsedImageDir(QFileInfo(fileNames[0]).dir().path());
 
 	for (int i = 0; i < fileNames.size(); ++i) {
+	  struct tm tm;
+	  int year, month, day, hour, min, sec;
 	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
-	  //exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
-
-      	  exif = Exiv2::ImageFactory::open ("wreck.jpg");
-	  if (exif.get() == 0)
-	    continue;
-	  exif->readMetadata();
-	  Exiv2::ExifData &exifData = exif->exifData();
-	  if (exifData.empty()) 
-	    continue;
-	  Exiv2::ExifData::const_iterator end = exifData.end();
-	printf("Let's look at the images!\n");
-	  for (Exiv2::ExifData::const_iterator i = exifData.begin(); i != end; ++i) {
-	    const char* key = i->key().c_str();
-		const char* value = i->value().toString().c_str();
-	    printf("Tag: %s Value: %s\n", key, value);
-	  }
+	  readfile(fileNames.at(i).toUtf8().data(), &mem);
+	  code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
+	  printf("Image date/time: %s\n",exif.DateTime.c_str());
+	  sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+	  tm.tm_year = year;
+	  tm.tm_mon = month - 1;
+	  tm.tm_mday = day;
+	  tm.tm_hour = hour;
+	  tm.tm_min = min;
+	  tm.tm_sec = sec;
+	  printf("This could be epoch %lld\n", utc_mktime(&tm));
 	}
 }
 
