@@ -830,9 +830,19 @@ void DiveListView::loadImages()
 		for_each_dive(j, dive){
 			if (!dive->selected)
 				continue;
-			if(dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime)
+			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
 				printf("Dive nr. %d matches at %dmin!\n", dive->number,(int) (imagetime - dive->when)/60);
-
+				if (dive->when > imagetime) {
+					;  // Before dive
+ 				}
+				else if (dive->when + dive->duration.seconds < imagetime){
+					;  // After dive
+				}
+				else {
+					add_event(&(dive->dc), imagetime - dive->when, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					mainWindow()->refreshDisplay();
+				}
+			}
 		}
 	}
 }
