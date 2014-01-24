@@ -117,13 +117,6 @@ QMAKE_CFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
 QMAKE_CXXFLAGS *= $$XML2_CFLAGS $$XSLT_CFLAGS
 LIBS *= $$XSLT_LIBS $$XML2_LIBS
 
-EXIV2_CFLAGS = $$system($$PKG_CONFIG --cflags exiv2 2> $$NUL)
-EXIV2_LIBS = $$system($$PKG_CONFIG --libs exiv2 2> $$NUL)
-
-QMAKE_CFLAGS *= $$EXIV2_CFLAGS
-QMAKE_CXXFLAGS *= $$EXIV2_CFLAGS
-LIBS *= $$EXIV2_LIBS -lexiv2
-
 # Find other pkg-config-based projects
 # We're searching for:
 #  libzip

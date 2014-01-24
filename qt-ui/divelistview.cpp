@@ -807,8 +807,9 @@ void DiveListView::loadImages()
 
 	for (int i = 0; i < fileNames.size(); ++i) {
 	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
-	  exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
-      	  // exif = Exiv2::ImageFactory::open (std::string("fish.jpg"));
+	  //exif = Exiv2::ImageFactory::open(std::string(fileNames.at(i).toUtf8().data()));
+
+      	  exif = Exiv2::ImageFactory::open ("wreck.jpg");
 	  if (exif.get() == 0)
 	    continue;
 	  exif->readMetadata();
