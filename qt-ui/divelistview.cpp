@@ -799,31 +799,41 @@ void DiveListView::shiftTimes()
 
 void DiveListView::loadImages()
 {
-  struct memblock mem;
-  EXIFInfo exif;
-  int code;
-  QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
-
+	struct memblock mem;
+	EXIFInfo exif;
+	int code;
+	time_t imagetime;
+	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
+	
 	if (fileNames.isEmpty())
 		return;
 
 	updateLastUsedImageDir(QFileInfo(fileNames[0]).dir().path());
-
+	
 	for (int i = 0; i < fileNames.size(); ++i) {
-	  struct tm tm;
-	  int year, month, day, hour, min, sec;
-	  printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
-	  readfile(fileNames.at(i).toUtf8().data(), &mem);
-	  code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
-	  printf("Image date/time: %s\n",exif.DateTime.c_str());
-	  sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
-	  tm.tm_year = year;
-	  tm.tm_mon = month - 1;
-	  tm.tm_mday = day;
-	  tm.tm_hour = hour;
-	  tm.tm_min = min;
-	  tm.tm_sec = sec;
-	  printf("This could be epoch %lld\n", utc_mktime(&tm));
+		struct tm tm;
+		int year, month, day, hour, min, sec;
+		printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
+		readfile(fileNames.at(i).toUtf8().data(), &mem);
+		code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
+		printf("Image date/time: %s\n",exif.DateTime.c_str());
+		sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+		tm.tm_year = year;
+		tm.tm_mon = month - 1;
+		tm.tm_mday = day;
+		tm.tm_hour = hour;
+		tm.tm_min = min;
+		tm.tm_sec = sec;
+		imagetime = utc_mktime(&tm);
+		int j = 0;
+		struct dive *dive;
+		for_each_dive(j, dive){
+			if (!dive->selected)
+				continue;
+			if(dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime)
+				printf("Dive nr. %d matches at %dmin!\n", dive->number,(int) (imagetime - dive->when)/60);
+
+		}
 	}
 }
 
