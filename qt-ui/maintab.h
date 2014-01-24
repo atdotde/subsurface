@@ -68,8 +68,8 @@ public slots:
 	void rejectChanges();
 	void on_location_textChanged(const QString& text);
 	void on_coordinates_textChanged(const QString& text);
-	void on_divemaster_textChanged(const QString& text);
-	void on_buddy_textChanged(const QString& text);
+	void on_divemaster_textChanged();
+	void on_buddy_textChanged();
 	void on_suit_textChanged(const QString& text);
 	void on_notes_textChanged();
 	void on_airtemp_textChanged(const QString& text);
