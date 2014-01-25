@@ -134,7 +134,7 @@ struct {
 	const char *nickname, *serial_nr, *firmware;
 } dc;
 } cur_settings;
-static bool in_settings = FALSE;
+static bool in_settings = false;
 static struct tm cur_tm;
 static int cur_cylinder_index, cur_ws_index;
 static int lastndl, laststoptime, laststopdepth, lastcns, lastpo2, lastindeco;
@@ -266,20 +266,20 @@ enum number_type {
 static enum number_type parse_float(const char *buffer, double *res, const char **endp)
 {
 	double val;
-	static bool first_time = TRUE;
+	static bool first_time = true;
 
 	errno = 0;
 	val = ascii_strtod(buffer, endp);
 	if (errno || *endp == buffer)
 		return NEITHER;
 	if (**endp == ',') {
-		if (val == rint(val)) {
+		if (IS_FP_SAME(val, rint(val))) {
 			/* we really want to send an error if this is a Subsurface native file
 			 * as this is likely indication of a bug - but right now we don't have
 			 * that information available */
 			if (first_time) {
 				fprintf(stderr, "Floating point value with decimal comma (%s)?\n", buffer);
-				first_time = FALSE;
+				first_time = false;
 			}
 			/* Try again in permissive mode*/
 			val = strtod_flags(buffer, endp, 0);
@@ -594,8 +594,7 @@ static void fahrenheit(char *buffer, void *_temperature)
 
 	switch (integer_or_float(buffer, &val)) {
 	case FLOAT:
-		/* Floating point equality is evil, but works for small integers */
-		if (val.fp == 32.0)
+		if (IS_FP_SAME(val.fp, 32.0))
 			break;
 		if (val.fp < 32.0)
 			temperature->mkelvin = C_to_mkelvin(val.fp);
@@ -1222,12 +1221,12 @@ static void reset_dc_settings(void)
 
 static void settings_start(void)
 {
-	in_settings = TRUE;
+	in_settings = true;
 }
 
 static void settings_end(void)
 {
-	in_settings = FALSE;
+	in_settings = false;
 }
 
 static void dc_settings_start(void)
@@ -1628,10 +1627,10 @@ void parse_xml_buffer(const char *url, const char *buffer, int size,
 extern int dm4_events(void *handle, int columns, char **data, char **column)
 {
 	event_start();
-	if(data[1])
+	if (data[1])
 		cur_event.time.seconds = atoi(data[1]);
 
-	if(data[2]) {
+	if (data[2]) {
 		switch (atoi(data[2])) {
 			case 1:
 				/* 1 Mandatory Safety Stop */
@@ -1728,7 +1727,7 @@ extern int dm4_events(void *handle, int columns, char **data, char **column)
 
 extern int dm4_tags(void *handle, int columns, char **data, char **column)
 {
-	if(data[0])
+	if (data[0])
 		taglist_add_tag(cur_dive->tag_list, data[0]);
 
 	return 0;
@@ -1874,7 +1873,7 @@ int parse_dm4_buffer(const char *url, const char *buffer, int size,
 
 	retval = sqlite3_open(url, &handle);
 
-	if(retval) {
+	if (retval) {
 		fprintf(stderr, translate("gettextFromC","Database connection failed '%s'.\n"), url);
 		return 1;
 	}
@@ -1914,6 +1913,7 @@ static struct xslt_files {
 	{ "profile", "udcf.xslt" },
 	{ "Divinglog", "DivingLog.xslt" },
 	{ "csv", "csv2xml.xslt" },
+	{ "sensuscsv", "sensuscsv.xslt" },
 	{ NULL, }
 };
 

@@ -34,7 +34,7 @@
           <xsl:attribute name="time">
             <xsl:value-of select="concat(substring($time, 2, 2), ':', substring($time, 4, 2))"/>
           </xsl:attribute>
-          <divecomputerid deviceid="ffffffff" model="stone" />
+          <divecomputerid deviceid="ffffffff" model="csv" />
           <xsl:call-template name="printLine">
             <xsl:with-param name="line" select="substring-before(//csv, $lf)"/>
             <xsl:with-param name="remaining" select="substring-after(//csv, $lf)"/>
@@ -48,10 +48,27 @@
     <xsl:param name="line"/>
     <xsl:param name="remaining"/>
 
-    <xsl:if test="substring-before($line, $fs) != substring-before(substring-before($remaining, $lf), $fs)">
-      <xsl:call-template name="printFields">
-        <xsl:with-param name="line" select="$line"/>
-      </xsl:call-template>
+    <!-- We only want to process lines with different time stamps, and
+         timeField is not necessarily the first field -->
+    <xsl:if test="$line != substring-before($remaining, $lf)">
+      <xsl:variable name="curTime">
+        <xsl:call-template name="getFieldByIndex">
+          <xsl:with-param name="index" select="$timeField"/>
+          <xsl:with-param name="line" select="$line"/>
+        </xsl:call-template>
+      </xsl:variable>
+      <xsl:variable name="prevTime">
+        <xsl:call-template name="getFieldByIndex">
+          <xsl:with-param name="index" select="$timeField"/>
+          <xsl:with-param name="line" select="substring-before($remaining, $lf)"/>
+        </xsl:call-template>
+      </xsl:variable>
+
+      <xsl:if test="$curTime != $prevTime">
+        <xsl:call-template name="printFields">
+          <xsl:with-param name="line" select="$line"/>
+        </xsl:call-template>
+      </xsl:if>
     </xsl:if>
     <xsl:if test="$remaining != ''">
       <xsl:call-template name="printLine">
@@ -70,9 +87,6 @@
         <xsl:with-param name="line" select="$line"/>
       </xsl:call-template>
     </xsl:variable>
-
-    <!-- First field should be dive time. If the value is not numeric,
-         we'll skip it. (We do also allow time in h:m:s notation.) -->
 
     <xsl:if test="number($value) = $value or number(substring-before($value, ':')) = substring-before($value, ':')">
       <sample>
@@ -175,7 +189,16 @@
         </xsl:call-template>
       </xsl:when>
       <xsl:otherwise>
-        <xsl:value-of select="substring-before($line,$fs)"/>
+        <xsl:choose>
+          <xsl:when test="substring-before($line,$fs) != ''">
+            <xsl:value-of select="substring-before($line,$fs)"/>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:if test="substring-after($line, $fs) = ''">
+              <xsl:value-of select="$line"/>
+            </xsl:if>
+          </xsl:otherwise>
+        </xsl:choose>
       </xsl:otherwise>
     </xsl:choose>
   </xsl:template>

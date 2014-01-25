@@ -63,7 +63,17 @@ HEADERS = \
 	qt-ui/divelogimportdialog.h \
 	qt-ui/tagwidget.h \
 	qt-ui/groupedlineedit.h \
-	qt-ui/usermanual.h
+	qt-ui/usermanual.h \
+	qt-ui/profile/profilewidget2.h \
+	qt-ui/profile/diverectitem.h \
+	qt-ui/profile/divepixmapitem.h \
+	qt-ui/profile/divelineitem.h \
+	qt-ui/profile/divetextitem.h \
+	qt-ui/profile/animationfunctions.h \
+	qt-ui/profile/divecartesianaxis.h \
+	qt-ui/profile/diveplotdatamodel.h \
+	qt-ui/profile/diveprofileitem.h \
+	qt-ui/profile/diveeventitem.h
 
 SOURCES =  \
 	deco.c \
@@ -75,6 +85,7 @@ SOURCES =  \
 	gettextfromc.cpp \
 	libdivecomputer.c \
 	main.cpp \
+	membuffer.c \
 	parse-xml.c \
 	planner.c \
 	profile.c \
@@ -114,7 +125,17 @@ SOURCES =  \
 	qt-ui/divelogimportdialog.cpp \
 	qt-ui/tagwidget.cpp \
 	qt-ui/groupedlineedit.cpp \
-	qt-ui/usermanual.cpp
+	qt-ui/usermanual.cpp \
+	qt-ui/profile/profilewidget2.cpp \
+	qt-ui/profile/diverectitem.cpp \
+	qt-ui/profile/divepixmapitem.cpp \
+	qt-ui/profile/divelineitem.cpp \
+	qt-ui/profile/divetextitem.cpp \
+	qt-ui/profile/animationfunctions.cpp \
+	qt-ui/profile/divecartesianaxis.cpp \
+	qt-ui/profile/diveplotdatamodel.cpp \
+	qt-ui/profile/diveprofileitem.cpp \
+	qt-ui/profile/diveeventitem.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c

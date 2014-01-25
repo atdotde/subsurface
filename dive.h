@@ -20,6 +20,8 @@
     (void) (&_max1 == &_max2);      \
     _max1 > _max2 ? _max1 : _max2; })
 
+#define IS_FP_SAME(_a,_b) (abs((_a) - (_b)) < 0.000001 * MAX(abs(_a), abs(_b)))
+
 #include <libxml/tree.h>
 #include <libxslt/transform.h>
 
@@ -28,23 +30,7 @@
 #ifdef __cplusplus
 extern "C" {
 #else
-#if __STDC_VERSION__ >= 199901L
 #include <stdbool.h>
-#ifndef TRUE
-#define TRUE true
-#endif
-#ifndef FALSE
-#define FALSE false
-#endif
-#else
-typedef int bool;
-#ifndef TRUE
-#define TRUE 1
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
-#endif
 #endif
 
 #define O2_IN_AIR		209     // permille
@@ -648,7 +634,7 @@ extern void set_filename(const char *filename, bool force);
 extern int parse_dm4_buffer(const char *url, const char *buf, int size, struct dive_table *table, char **error);
 
 extern void parse_file(const char *filename, char **error);
-extern void parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, char **error);
+extern void parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, char **error);
 
 extern void save_dives(const char *filename);
 extern void save_dives_logic(const char *filename, bool select_only);

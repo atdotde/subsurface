@@ -11,7 +11,7 @@
 TableView::TableView(QWidget *parent) : QWidget(parent)
 {
 	ui.setupUi(this);
-	ui.tableView->setItemDelegate(new DiveListDelegate);
+	ui.tableView->setItemDelegate(new DiveListDelegate(this));
 	/* There`s mostly a need for a Mac fix here too. */
 	if (qApp->style()->objectName() == "gtk+")
 		ui.groupBox->layout()->setContentsMargins(0, 9, 0, 0);
@@ -45,7 +45,8 @@ void TableView::setTitle(const QString& title)
 	ui.groupBox->setTitle(title);
 }
 
-void TableView::setModel(QAbstractItemModel *model){
+void TableView::setModel(QAbstractItemModel *model)
+{
 	ui.tableView->setModel(model);
 	connect(ui.tableView, SIGNAL(clicked(QModelIndex)), model, SLOT(remove(QModelIndex)));
 
@@ -80,10 +81,12 @@ void TableView::showEvent(QShowEvent* event)
 	fixPlusPosition();
 }
 
-void TableView::edit(const QModelIndex& index){
+void TableView::edit(const QModelIndex& index)
+{
 	ui.tableView->edit(index);
 }
 
-QTableView *TableView::view(){
+QTableView *TableView::view()
+{
 	return ui.tableView;
 }

@@ -26,12 +26,11 @@
 #include <QScrollBar>
 
 MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
-				    weightModel(new WeightModel()),
+				    weightModel(new WeightModel(this)),
 				    cylindersModel(CylindersModel::instance()),
 				    editMode(NONE)
 {
 	ui.setupUi(this);
-	ui.tagWidget->setFocusPolicy(Qt::StrongFocus); // Don't get focus by 'Wheel'
 	ui.cylinders->setModel(cylindersModel);
 	ui.weights->setModel(weightModel);
 	closeMessage();
@@ -83,8 +82,8 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	connect(ui.cylinders->view(), SIGNAL(clicked(QModelIndex)), this, SLOT(editCylinderWidget(QModelIndex)));
 	connect(ui.weights->view(), SIGNAL(clicked(QModelIndex)), this, SLOT(editWeightWidget(QModelIndex)));
 
-	ui.cylinders->view()->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate());
-	ui.weights->view()->setItemDelegateForColumn(WeightModel::TYPE, new WSInfoDelegate());
+	ui.cylinders->view()->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate(this));
+	ui.weights->view()->setItemDelegateForColumn(WeightModel::TYPE, new WSInfoDelegate(this));
 	ui.cylinders->view()->setColumnHidden(CylindersModel::DEPTH, true);
 	completers.buddy = new QCompleter(BuddyCompletionModel::instance(), ui.buddy);
 	completers.divemaster = new QCompleter(DiveMasterCompletionModel::instance(), ui.divemaster);
@@ -95,7 +94,6 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 	completers.divemaster->setCaseSensitivity(Qt::CaseInsensitive);
 	completers.location->setCaseSensitivity(Qt::CaseInsensitive);
 	completers.suit->setCaseSensitivity(Qt::CaseInsensitive);
-	completers.buddy->setCaseSensitivity(Qt::CaseInsensitive);
 	completers.tags->setCaseSensitivity(Qt::CaseInsensitive);
 	ui.buddy->setCompleter(completers.buddy);
 	ui.divemaster->setCompleter(completers.divemaster);
@@ -132,7 +130,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 			"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
 			"    stop: 0 #E0E0E0, stop: 1 #FFFFFF);"
 			"}");
-		Q_FOREACH(QGroupBox *box, findChildren<QGroupBox*>()){
+		Q_FOREACH(QGroupBox *box, findChildren<QGroupBox*>()) {
 			box->setStyleSheet(gnomeCss);
 		}
 
@@ -141,7 +139,7 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 
 	QSettings s;
 	s.beginGroup("cylinders_dialog");
-	for(int i = 0; i < CylindersModel::COLUMNS; i++){
+	for(int i = 0; i < CylindersModel::COLUMNS; i++) {
 		if ((i == CylindersModel::REMOVE) || (i == CylindersModel::TYPE))
 			  continue;
 		bool checked = s.value(QString("column%1_hidden").arg(i)).toBool();
@@ -159,7 +157,7 @@ MainTab::~MainTab()
 {
 	QSettings s;
 	s.beginGroup("cylinders_dialog");
-	for(int i = 0; i < CylindersModel::COLUMNS; i++){
+	for(int i = 0; i < CylindersModel::COLUMNS; i++) {
 		if ((i == CylindersModel::REMOVE) || (i == CylindersModel::TYPE))
 			  continue;
 		s.setValue(QString("column%1_hidden").arg(i), ui.cylinders->view()->isColumnHidden(i));
@@ -172,9 +170,9 @@ void MainTab::toggleTriggeredColumn()
 	int col = action->data().toInt();
 	QTableView *view = ui.cylinders->view();
 
-	if(action->isChecked()){
+	if (action->isChecked()) {
 		view->showColumn(col);
-		if(view->columnWidth(col) <= 15)
+		if (view->columnWidth(col) <= 15)
 			view->setColumnWidth(col, 80);
 	}
 	else
@@ -306,8 +304,7 @@ bool MainTab::eventFilter(QObject* object, QEvent* event)
 	// FocusIn for the starWidgets or RequestSoftwareInputPanel for tagWidget start the editing
 	if ((event->type() == QEvent::MouseButtonPress) ||
 	    (event->type() == QEvent::KeyPress && object == ui.dateTimeEdit) ||
-	    (event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility)) ||
-	    (event->type() == QEvent::RequestSoftwareInputPanel && object == ui.tagWidget)) {
+	    (event->type() == QEvent::FocusIn && (object == ui.rating || object == ui.visibility || object == ui.buddy || object == ui.tagWidget || object || ui.divemaster))) {
 		tabBar()->setTabIcon(currentIndex(), QIcon(":warning"));
 		enableEdition();
 	}
@@ -548,14 +545,14 @@ void MainTab::updateDiveInfo(int dive)
 
 void MainTab::addCylinder_clicked()
 {
-	if(editMode == NONE)
+	if (editMode == NONE)
 		enableEdition();
 	cylindersModel->add();
 }
 
 void MainTab::addWeight_clicked()
 {
-	if(editMode == NONE)
+	if (editMode == NONE)
 		enableEdition();
 	weightModel->add();
 }
@@ -655,7 +652,7 @@ void MainTab::acceptChanges()
 	}
 	int scrolledBy = mainWindow()->dive_list()->verticalScrollBar()->sliderPosition();
 	resetPallete();
-	if(editMode == ADD || editMode == MANUALLY_ADDED_DIVE){
+	if (editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		mainWindow()->dive_list()->unselectDives();
 		struct dive *d = get_dive(dive_table.nr -1 );
 		// mark the dive as remembered (abusing the selected flag)
@@ -663,7 +660,7 @@ void MainTab::acceptChanges()
 		d->selected = true;
 		sort_table(&dive_table);
 		int i = 0;
-		for_each_dive(i,d){
+		for_each_dive(i,d) {
 			if (d->selected) {
 				d->selected = false;
 				break;
@@ -715,7 +712,7 @@ void MainTab::rejectChanges()
 	tabBar()->setTabIcon(1, QIcon()); // Equipment
 
 	mainWindow()->dive_list()->setEnabled(true);
-	if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1){
+	if (mainWindow() && mainWindow()->dive_list()->selectedTrips().count() == 1) {
 		ui.notes->setText(notesBackup[NULL].notes );
 		ui.location->setText(notesBackup[NULL].location);
 	} else {
@@ -823,7 +820,7 @@ void MainTab::rejectChanges()
 	} \
 } while(0)
 
-void markChangedWidget(QWidget *w){
+void markChangedWidget(QWidget *w) {
 	QPalette p;
 	qreal h, s, l, a;
 	qApp->palette().color(QPalette::Text).getHslF(&h, &s, &l, &a);
@@ -834,14 +831,16 @@ void markChangedWidget(QWidget *w){
 	w->setPalette(p);
 }
 
-void MainTab::on_buddy_textChanged(const QString& text)
+void MainTab::on_buddy_textChanged()
 {
+	QString text = ui.buddy->toPlainText().split(",", QString::SkipEmptyParts).join(", ");
 	EDIT_SELECTED_DIVES( EDIT_TEXT(mydive->buddy, text) );
 	markChangedWidget(ui.buddy);
 }
 
-void MainTab::on_divemaster_textChanged(const QString& text)
+void MainTab::on_divemaster_textChanged()
 {
+	QString text = ui.divemaster->toPlainText().split(",", QString::SkipEmptyParts).join(", ");
 	EDIT_SELECTED_DIVES( EDIT_TEXT(mydive->divemaster, text) );
 	markChangedWidget(ui.divemaster);
 }
@@ -889,12 +888,12 @@ void MainTab::on_location_textChanged(const QString& text)
 		// we are editing a trip
 		dive_trip_t *currentTrip = *mainWindow()->dive_list()->selectedTrips().begin();
 		EDIT_TEXT(currentTrip->location, text);
-	} else if (editMode == DIVE || editMode == ADD){
+	} else if (editMode == DIVE || editMode == ADD || editMode == MANUALLY_ADDED_DIVE) {
 		if (!ui.coordinates->isModified() ||
 		    ui.coordinates->text().trimmed().isEmpty()) {
 			struct dive* dive;
 			int i = 0;
-			for_each_dive(i, dive){
+			for_each_dive(i, dive) {
 				QString location(dive->location);
 				if (location == text &&
 				    (dive->latitude.udeg || dive->longitude.udeg)) {
