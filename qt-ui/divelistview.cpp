@@ -816,10 +816,9 @@ void DiveListView::loadImages()
 	for (int i = 0; i < fileNames.size(); ++i) {
 		struct tm tm;
 		int year, month, day, hour, min, sec;
-		printf("Analysing |%s|\n",fileNames.at(i).toUtf8().data());
 		readfile(fileNames.at(i).toUtf8().data(), &mem);
 		code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
-		printf("Image date/time: %s\n",exif.DateTime.c_str());
+		free(mem.buffer);
 		sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
 		tm.tm_year = year;
 		tm.tm_mon = month - 1;
@@ -834,7 +833,6 @@ void DiveListView::loadImages()
 			if (!dive->selected)
 				continue;
 			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
-				printf("Dive nr. %d matches at %dmin!\n", dive->number,(int) (imagetime - dive->when)/60);
 				if (dive->when > imagetime) {
 					;  // Before dive
  				}
@@ -844,8 +842,15 @@ void DiveListView::loadImages()
 				else {
 					add_event(&(dive->dc), imagetime - dive->when, 123, 0, 0, fileNames.at(i).toUtf8().data());
 					mainWindow()->refreshDisplay();
+					mark_divelist_changed(true);
 				}
-			}
+				if (!dive->latitude.udeg && !IS_FP_SAME(exif.GeoLocation.Latitude, 0.0)){
+					dive->latitude.udeg = lrint(1000000.0 * exif.GeoLocation.Latitude);
+					dive->longitude.udeg = lrint(1000000.0 * exif.GeoLocation.Longitude);
+					mark_divelist_changed(true);
+					mainWindow()->refreshDisplay();
+				}
+			}	
 		}
 	}
 }
