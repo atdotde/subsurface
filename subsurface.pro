@@ -229,6 +229,5 @@ QMAKE_INFO_PLIST = packaging/macosx/Info.plist.in
 OTHER_FILES += $$DESKTOPFILE $$ICON $$MANPAGE $$XSLT_FILES $$DOC_FILES $$MARBLEDIR \
         $$QMAKE_INFO_PLIST
 
-include(updateqm.pri)
 include(subsurface-gen-version.pri)
 include(subsurface-install.pri)
