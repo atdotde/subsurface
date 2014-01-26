@@ -835,9 +835,15 @@ void DiveListView::loadImages()
 			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
 				if (dive->when > imagetime) {
 					;  // Before dive
+					add_event(&(dive->dc), 0, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					mainWindow()->refreshDisplay();
+					mark_divelist_changed(true);
  				}
 				else if (dive->when + dive->duration.seconds < imagetime){
 					;  // After dive
+					add_event(&(dive->dc), dive->duration.seconds, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					mainWindow()->refreshDisplay();
+					mark_divelist_changed(true);
 				}
 				else {
 					add_event(&(dive->dc), imagetime - dive->when, 123, 0, 0, fileNames.at(i).toUtf8().data());
