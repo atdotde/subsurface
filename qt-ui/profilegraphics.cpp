@@ -1013,12 +1013,10 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	int y = SCALEYGC(entry->depth);
 	struct dive *dive = getDiveById(diveId);
 	Q_ASSERT(dive != NULL);
-	printf("Event name: |%s|\n",ev->name);
-	if (!strcmp(ev->name, "image")){
-	  printf("Image at %d,%d\n",x,y);
-	  QPixmap picture;
-	  picture.load("/Users/helling/subsurface/fish.jpg");
-	  scene()->addPixmap(picture.scaledToHeight(100))->setPos(x, y + 10);
+	if (ev->type == 123){
+		QPixmap picture;
+		picture.load(ev->name);
+		scene()->addPixmap(picture.scaledToHeight(100))->setPos(x, y + 10);
 	}
 	
 	EventItem *item = new EventItem(ev, 0, isGrayscale);

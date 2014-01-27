@@ -53,6 +53,7 @@ HEADERS = \
 	qt-ui/starwidget.h \
 	qt-ui/subsurfacewebservices.h \
 	qt-ui/tableview.h \
+	qt-ui/exif.h \
 	sha1.h \
 	statistics.h \
 	subsurface-icon.h \
@@ -112,6 +113,7 @@ SOURCES =  \
 	qt-ui/starwidget.cpp \
 	qt-ui/subsurfacewebservices.cpp \
 	qt-ui/tableview.cpp \
+	qt-ui/exif.cpp \
 	save-xml.c \
 	sha1.c \
 	statistics.c \
@@ -227,6 +229,5 @@ QMAKE_INFO_PLIST = packaging/macosx/Info.plist.in
 OTHER_FILES += $$DESKTOPFILE $$ICON $$MANPAGE $$XSLT_FILES $$DOC_FILES $$MARBLEDIR \
         $$QMAKE_INFO_PLIST
 
-include(updateqm.pri)
 include(subsurface-gen-version.pri)
 include(subsurface-install.pri)
