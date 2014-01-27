@@ -813,6 +813,9 @@ void DiveListView::loadImages()
 
 	updateLastUsedImageDir(QFileInfo(fileNames[0]).dir().path());
 	
+	ShiftImageTimesDialog* shiftDialog = ShiftImageTimesDialog::instance();
+	shiftDialog->exec();
+
 	for (int i = 0; i < fileNames.size(); ++i) {
 		struct tm tm;
 		int year, month, day, hour, min, sec;
@@ -826,7 +829,7 @@ void DiveListView::loadImages()
 		tm.tm_hour = hour;
 		tm.tm_min = min;
 		tm.tm_sec = sec;
-		imagetime = utc_mktime(&tm);
+		imagetime = utc_mktime(&tm) + shiftDialog->amount;
 		int j = 0;
 		struct dive *dive;
 		for_each_dive(j, dive){
@@ -835,9 +838,15 @@ void DiveListView::loadImages()
 			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
 				if (dive->when > imagetime) {
 					;  // Before dive
+					add_event(&(dive->dc), 0, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					mainWindow()->refreshDisplay();
+					mark_divelist_changed(true);
  				}
 				else if (dive->when + dive->duration.seconds < imagetime){
 					;  // After dive
+					add_event(&(dive->dc), dive->duration.seconds, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					mainWindow()->refreshDisplay();
+					mark_divelist_changed(true);
 				}
 				else {
 					add_event(&(dive->dc), imagetime - dive->when, 123, 0, 0, fileNames.at(i).toUtf8().data());

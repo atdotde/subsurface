@@ -152,6 +152,7 @@ FORMS = \
 	qt-ui/printoptions.ui \
 	qt-ui/renumber.ui \
 	qt-ui/shifttimes.ui \
+	qt-ui/shiftimagetimes.ui \
 	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
 	qt-ui/divelogimportdialog.ui \

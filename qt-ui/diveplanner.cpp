@@ -961,7 +961,8 @@ DivePlannerWidget::DivePlannerWidget(QWidget* parent, Qt::WindowFlags f): QWidge
 	QTableView *view = ui.cylinderTableWidget->view();
 	view->setColumnHidden(CylindersModel::START, true);
 	view->setColumnHidden(CylindersModel::END, true);
-	view->setColumnHidden(CylindersModel::DEPTH, false);
+	// disabled as pointless outside of the disabled planner
+	// view->setColumnHidden(CylindersModel::DEPTH, false);
 	view->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate(this));
 	connect(ui.cylinderTableWidget, SIGNAL(addButtonClicked()), DivePlannerPointsModel::instance(), SLOT(addCylinder_clicked()));
 	connect(ui.tableWidget, SIGNAL(addButtonClicked()), DivePlannerPointsModel::instance(), SLOT(addStop()));
@@ -1429,11 +1430,13 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		cylinder_t *cyl = &stagingDive->cylinder[i];
 		if (cyl->depth.mm) {
 			dp = create_dp(0, cyl->depth.mm, cyl->gasmix.o2.permille, cyl->gasmix.he.permille, 0);
-			if (diveplan.dp)
+			if (diveplan.dp) {
 				dp->next = diveplan.dp->next;
-			else
+				diveplan.dp->next = dp;
+			} else {
 				dp->next = NULL;
-			diveplan.dp->next = dp;
+				diveplan.dp = dp;
+			}
 		}
 	}
 #if DEBUG_PLAN
