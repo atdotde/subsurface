@@ -819,6 +819,7 @@ void DiveListView::loadImages()
 		readfile(fileNames.at(i).toUtf8().data(), &mem);
 		code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
 		free(mem.buffer);
+		qDebug() << "Exif says " << exif.DateTime.c_str();
 		sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
 		tm.tm_year = year;
 		tm.tm_mon = month - 1;
@@ -830,6 +831,7 @@ void DiveListView::loadImages()
 		int j = 0;
 		struct dive *dive;
 		for_each_dive(j, dive){
+			qDebug() << "Dive :" << dive->when << "Image: " << imagetime;
 			if (!dive->selected)
 				continue;
 			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
