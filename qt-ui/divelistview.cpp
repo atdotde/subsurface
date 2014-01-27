@@ -813,13 +813,15 @@ void DiveListView::loadImages()
 
 	updateLastUsedImageDir(QFileInfo(fileNames[0]).dir().path());
 	
+	ShiftImageTimesDialog* shiftDialog = ShiftImageTimesDialog::instance();
+	shiftDialog->exec();
+
 	for (int i = 0; i < fileNames.size(); ++i) {
 		struct tm tm;
 		int year, month, day, hour, min, sec;
 		readfile(fileNames.at(i).toUtf8().data(), &mem);
 		code = exif.parseFrom((const unsigned char *) mem.buffer, (unsigned) mem.size);
 		free(mem.buffer);
-		qDebug() << "Exif says " << exif.DateTime.c_str();
 		sscanf(exif.DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
 		tm.tm_year = year;
 		tm.tm_mon = month - 1;
@@ -827,11 +829,10 @@ void DiveListView::loadImages()
 		tm.tm_hour = hour;
 		tm.tm_min = min;
 		tm.tm_sec = sec;
-		imagetime = utc_mktime(&tm);
+		imagetime = utc_mktime(&tm) + shiftDialog->amount;
 		int j = 0;
 		struct dive *dive;
 		for_each_dive(j, dive){
-			qDebug() << "Dive :" << dive->when << "Image: " << imagetime;
 			if (!dive->selected)
 				continue;
 			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime){
