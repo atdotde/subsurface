@@ -17,6 +17,8 @@
 #include <QTableView>
 #include <QDesktopWidget>
 #include <QDesktopServices>
+#include <QStringList>
+#include <QSettings>
 #include "divelistview.h"
 #include "starwidget.h"
 
@@ -36,16 +38,15 @@
 #include "printdialog.h"
 #include "divelogimportdialog.h"
 
-static MainWindow* instance = 0;
+MainWindow *MainWindow::m_Instance = NULL;
 
-MainWindow* mainWindow()
+MainWindow::MainWindow() : QMainWindow(),
+	actionNextDive(0),
+	actionPreviousDive(0),
+	helpView(0),
+	state(VIEWALL)
 {
-	return instance;
-}
-
-MainWindow::MainWindow() : helpView(0)
-{
-	instance = this;
+	m_Instance = this;
 	ui.setupUi(this);
 	setWindowIcon(QIcon(":subsurface-icon"));
 	connect(ui.ListWidget, SIGNAL(currentDiveChanged(int)), this, SLOT(current_dive_changed(int)));
@@ -57,6 +58,10 @@ MainWindow::MainWindow() : helpView(0)
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlanner, SLOT(settingsChanged()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlannerWidget, SLOT(settingsChanged()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), TankInfoModel::instance(), SLOT(update()));
+	connect(ui.actionRecent1, SIGNAL(triggered(bool)), this, SLOT(recentFileTriggered(bool)));
+	connect(ui.actionRecent2, SIGNAL(triggered(bool)), this, SLOT(recentFileTriggered(bool)));
+	connect(ui.actionRecent3, SIGNAL(triggered(bool)), this, SLOT(recentFileTriggered(bool)));
+	connect(ui.actionRecent4, SIGNAL(triggered(bool)), this, SLOT(recentFileTriggered(bool)));
 
 	ui.mainErrorMessage->hide();
 	initialUiSetup();
@@ -65,10 +70,24 @@ MainWindow::MainWindow() : helpView(0)
 	ui.ListWidget->reloadHeaderActions();
 	ui.ListWidget->setFocus();
 	ui.globe->reload();
-	ui.ListWidget->expand(ui.ListWidget->model()->index(0,0));
-	ui.ListWidget->scrollTo(ui.ListWidget->model()->index(0,0), QAbstractItemView::PositionAtCenter);
+	ui.ListWidget->expand(ui.ListWidget->model()->index(0, 0));
+	ui.ListWidget->scrollTo(ui.ListWidget->model()->index(0, 0), QAbstractItemView::PositionAtCenter);
 	ui.divePlanner->settingsChanged();
 	ui.divePlannerWidget->settingsChanged();
+
+#ifndef ENABLE_PLANNER
+	ui.menuLog->removeAction(ui.actionDivePlanner);
+#endif
+}
+
+MainWindow::~MainWindow()
+{
+	m_Instance = NULL;
+}
+
+MainWindow *MainWindow::instance()
+{
+	return m_Instance;
 }
 
 // this gets called after we download dives from a divecomputer
@@ -97,7 +116,7 @@ void MainWindow::current_dive_changed(int divenr)
 	 * a single profile plot on the canvas. I know that we are using only one right now,
 	 * but let's keep like this so it's easy to change when we need? :)
 	 */
-	ui.graphicsView->plotDives( QList<dive*>() << (current_dive) );
+	ui.newProfile->plotDives(QList<dive *>() << (current_dive));
 	ui.InfoWidget->updateDiveInfo(divenr);
 }
 
@@ -123,7 +142,7 @@ void MainWindow::on_actionOpen_triggered()
 		return;
 	updateLastUsedDir(QFileInfo(filename).dir().path());
 	on_actionClose_triggered();
-	loadFiles( QStringList() << filename );
+	loadFiles(QStringList() << filename);
 }
 
 QTabWidget *MainWindow::tabWidget()
@@ -163,6 +182,7 @@ void MainWindow::on_actionClose_triggered()
 	if (unsaved_changes() && (askSaveChanges() == false))
 		return;
 
+	ui.newProfile->setEmptyState();
 	/* free the dives and trips */
 	while (dive_table.nr)
 		delete_single_dive(0);
@@ -193,7 +213,7 @@ QString MainWindow::lastUsedDir()
 	return lastDir;
 }
 
-void MainWindow::updateLastUsedDir(const QString& dir)
+void MainWindow::updateLastUsedDir(const QString &dir)
 {
 	QSettings s;
 	s.beginGroup("FileDialog");
@@ -211,7 +231,9 @@ void MainWindow::on_actionExportUDDF_triggered()
 
 void MainWindow::on_actionPrint_triggered()
 {
-	PrintDialog::instance()->runDialog();
+	PrintDialog dlg(this);
+
+	dlg.exec();
 }
 
 void MainWindow::disableDcShortcuts()
@@ -268,13 +290,16 @@ void MainWindow::on_actionQuit_triggered()
 
 void MainWindow::on_actionDownloadDC_triggered()
 {
-	DownloadFromDCWidget* downloadWidget = DownloadFromDCWidget::instance();
-	downloadWidget->runDialog();
+	DownloadFromDCWidget dlg(this);
+
+	dlg.exec();
 }
 
 void MainWindow::on_actionDownloadWeb_triggered()
 {
-	SubsurfaceWebServices::instance()->exec();
+	SubsurfaceWebServices dlg(this);
+
+	dlg.exec();
 }
 
 void MainWindow::on_actionDivelogs_de_triggered()
@@ -453,14 +478,16 @@ void MainWindow::on_actionViewAll_triggered()
 	redrawProfile();
 }
 
-void MainWindow::beginChangeState(CurrentState s) {
+void MainWindow::beginChangeState(CurrentState s)
+{
 	if (state == VIEWALL && state != s) {
 		saveSplitterSizes();
 	}
 	state = s;
 }
 
-void MainWindow::saveSplitterSizes() {
+void MainWindow::saveSplitterSizes()
+{
 	QSettings settings;
 	settings.beginGroup("MainWindow");
 	settings.setValue("mainSplitter", ui.mainSplitter->saveState());
@@ -472,6 +499,7 @@ void MainWindow::on_actionPreviousDC_triggered()
 {
 	dc_number--;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
+	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 	redrawProfile();
 }
 
@@ -479,6 +507,7 @@ void MainWindow::on_actionNextDC_triggered()
 {
 	dc_number++;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
+	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 	redrawProfile();
 }
 
@@ -503,7 +532,9 @@ void MainWindow::on_actionInputPlan_triggered()
 
 void MainWindow::on_actionAboutSubsurface_triggered()
 {
-	SubsurfaceAbout::instance()->show();
+	SubsurfaceAbout dlg(this);
+
+	dlg.exec();
 }
 
 void MainWindow::on_actionUserManual_triggered()
@@ -563,49 +594,6 @@ bool MainWindow::askSaveChanges()
 	return false;
 }
 
-#define GET_UNIT(name, field, f, t)				\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.units.field = (v.toInt() == (t)) ? (t) : (f); \
-	else							\
-		prefs.units.field = default_prefs.units.field
-
-#define GET_BOOL(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toInt() ? true : false;		\
-	else							\
-		prefs.field = default_prefs.field
-
-#define GET_DOUBLE(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toDouble();			\
-	else							\
-		prefs.field = default_prefs.field
-
-#define GET_INT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toInt();			\
-	else							\
-		prefs.field = default_prefs.field
-
-#define GET_TXT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = strdup(v.toString().toUtf8().constData());			\
-	else							\
-		prefs.field = default_prefs.field
-
-#define GET_TXT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = strdup(v.toString().toUtf8().constData());			\
-	else							\
-		prefs.field = default_prefs.field
-
-
 void MainWindow::initialUiSetup()
 {
 	QSettings settings;
@@ -616,76 +604,49 @@ void MainWindow::initialUiSetup()
 	else
 		resize(sz);
 
-	state = (CurrentState) settings.value("lastState", 0).toInt();
+	state = (CurrentState)settings.value("lastState", 0).toInt();
 	switch (state) {
-		case VIEWALL: on_actionViewAll_triggered(); break;
-		case GLOBE_MAXIMIZED : on_actionViewGlobe_triggered(); break;
-		case INFO_MAXIMIZED : on_actionViewInfo_triggered(); break;
-		case LIST_MAXIMIZED : on_actionViewList_triggered(); break;
-		case PROFILE_MAXIMIZED : on_actionViewProfile_triggered(); break;
+	case VIEWALL:
+		on_actionViewAll_triggered();
+		break;
+	case GLOBE_MAXIMIZED:
+		on_actionViewGlobe_triggered();
+		break;
+	case INFO_MAXIMIZED:
+		on_actionViewInfo_triggered();
+		break;
+	case LIST_MAXIMIZED:
+		on_actionViewList_triggered();
+		break;
+	case PROFILE_MAXIMIZED:
+		on_actionViewProfile_triggered();
+		break;
 	}
 	settings.endGroup();
 }
 
 void MainWindow::readSettings()
 {
-	QVariant v;
 	QSettings s;
-
-	s.beginGroup("Units");
-	if (s.value("unit_system").toString() == "metric") {
-		prefs.unit_system = METRIC;
-		prefs.units = SI_units;
-	} else if (s.value("unit_system").toString() == "imperial") {
-		prefs.unit_system = IMPERIAL;
-		prefs.units = IMPERIAL_units;
-	} else {
-		prefs.unit_system = PERSONALIZE;
-		GET_UNIT("length", length, units::FEET, units::METERS);
-		GET_UNIT("pressure", pressure, units::PSI, units::BAR);
-		GET_UNIT("volume", volume, units::CUFT, units::LITER);
-		GET_UNIT("temperature", temperature, units::FAHRENHEIT, units::CELSIUS);
-		GET_UNIT("weight", weight, units::LBS, units::KG);
-	}
-	GET_UNIT("vertical_speed_time", vertical_speed_time, units::MINUTES, units::SECONDS);
-	s.endGroup();
-	s.beginGroup("TecDetails");
-	GET_BOOL("po2graph", pp_graphs.po2);
-	GET_BOOL("pn2graph", pp_graphs.pn2);
-	GET_BOOL("phegraph", pp_graphs.phe);
-	GET_DOUBLE("po2threshold", pp_graphs.po2_threshold);
-	GET_DOUBLE("pn2threshold", pp_graphs.pn2_threshold);
-	GET_DOUBLE("phethreshold", pp_graphs.phe_threshold);
-	GET_BOOL("mod", mod);
-	GET_DOUBLE("modppO2", mod_ppO2);
-	GET_BOOL("ead", ead);
-	GET_BOOL("redceiling", profile_red_ceiling);
-	GET_BOOL("dcceiling", profile_dc_ceiling);
-	GET_BOOL("calcceiling", profile_calc_ceiling);
-	GET_BOOL("calcceiling3m", calc_ceiling_3m_incr);
-	GET_BOOL("calcndltts", calc_ndl_tts);
-	GET_BOOL("calcalltissues", calc_all_tissues);
-	GET_INT("gflow", gflow);
-	GET_INT("gfhigh", gfhigh);
-	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
-	set_gf(prefs.gflow, prefs.gfhigh, prefs.gf_low_at_maxdepth);
-	GET_BOOL("show_sac", show_sac);
-	GET_BOOL("display_unused_tanks", display_unused_tanks);
-	s.endGroup();
-
-	s.beginGroup("GeneralSettings");
-	GET_TXT("default_filename", default_filename);
-	GET_TXT("default_cylinder", default_cylinder);
-	s.endGroup();
-
 	s.beginGroup("Display");
 	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
 	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
 	qApp->setFont(defaultFont);
-	GET_TXT("divelist_font", divelist_font);
-	GET_INT("font_size", font_size);
-	GET_INT("displayinvalid", display_invalid_dives);
 	s.endGroup();
+
+	s.beginGroup("TecDetails");
+	ui.profCalcAllTissues->setChecked(s.value("calcalltissues").toBool());
+	ui.profCalcCeiling->setChecked(s.value("calcceiling").toBool());
+	ui.profDcCeiling->setChecked(s.value("dcceiling").toBool());
+	ui.profEad->setChecked(s.value("ead").toBool());
+	ui.profIncrement3m->setChecked(s.value("calcceiling3m").toBool());
+	ui.profMod->setChecked(s.value("mod").toBool());
+	ui.profNtl_tts->setChecked(s.value("calcndltts").toBool());
+	ui.profPhe->setChecked(s.value("phegraph").toBool());
+	ui.profPn2->setChecked(s.value("pn2graph").toBool());
+	ui.profPO2->setChecked(s.value("po2graph").toBool());
+	ui.profRuler->setChecked(s.value("rulergraph").toBool());
+	ui.profSAC->setChecked(s.value("show_sac").toBool());
 }
 
 void MainWindow::writeSettings()
@@ -693,7 +654,7 @@ void MainWindow::writeSettings()
 	QSettings settings;
 
 	settings.beginGroup("MainWindow");
-	settings.setValue("lastState", (int) state);
+	settings.setValue("lastState", (int)state);
 	settings.setValue("maximized", isMaximized());
 	if (!isMaximized())
 		settings.setValue("size", size());
@@ -724,24 +685,146 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	writeSettings();
 }
 
-DiveListView* MainWindow::dive_list()
+DiveListView *MainWindow::dive_list()
 {
 	return ui.ListWidget;
 }
 
-GlobeGPS* MainWindow::globe()
+GlobeGPS *MainWindow::globe()
 {
 	return ui.globe;
 }
 
-ProfileGraphicsView* MainWindow::graphics()
+ProfileGraphicsView *MainWindow::graphics()
 {
 	return ui.ProfileWidget;
 }
 
-MainTab* MainWindow::information()
+MainTab *MainWindow::information()
 {
 	return ui.InfoWidget;
+}
+
+void MainWindow::loadRecentFiles(QSettings *s)
+{
+	QStringList files;
+	bool modified = false;
+
+	s->beginGroup("Recent_Files");
+	for (int c = 1; c <= 4; c++) {
+		QString key = QString("File_%1").arg(c);
+		if (s->contains(key)) {
+			QString file = s->value(key).toString();
+
+			if (QFile::exists(file)) {
+				files.append(file);
+			} else {
+				modified = true;
+			}
+		} else {
+			break;
+		}
+	}
+
+	if (modified) {
+		for (int c = 0; c < 4; c++) {
+			QString key = QString("File_%1").arg(c + 1);
+
+			if (files.count() > c) {
+				s->setValue(key, files.at(c));
+			} else {
+				if (s->contains(key)) {
+					s->remove(key);
+				}
+			}
+		}
+
+		s->sync();
+	}
+	s->endGroup();
+
+	for (int c = 0; c < 4; c++) {
+		QAction *action = this->findChild<QAction *>(QString("actionRecent%1").arg(c + 1));
+
+		if (files.count() > c) {
+			QFileInfo fi(files.at(c));
+			action->setText(fi.fileName());
+			action->setToolTip(fi.absoluteFilePath());
+			action->setVisible(true);
+		} else {
+			action->setVisible(false);
+		}
+	}
+}
+
+void MainWindow::addRecentFile(const QStringList &newFiles)
+{
+	QStringList files;
+	QSettings s;
+
+	if (newFiles.isEmpty()) {
+		return;
+	}
+
+	s.beginGroup("Recent_Files");
+
+	for (int c = 1; c <= 4; c++) {
+		QString key = QString("File_%1").arg(c);
+		if (s.contains(key)) {
+			QString file = s.value(key).toString();
+
+			files.append(file);
+		} else {
+			break;
+		}
+	}
+
+	foreach(const QString & file, newFiles) {
+		int index = files.indexOf(file);
+
+		if (index >= 0) {
+			files.removeAt(index);
+		}
+	}
+
+	foreach(const QString & file, newFiles) {
+		if (QFile::exists(file)) {
+			files.prepend(file);
+		}
+	}
+
+	while (files.count() > 4) {
+		files.removeLast();
+	}
+
+	for (int c = 0; c < 4; c++) {
+		QString key = QString("File_%1").arg(c + 1);
+
+		if (files.count() > c) {
+			s.setValue(key, files.at(c));
+		} else {
+			if (s.contains(key)) {
+				s.remove(key);
+			}
+		}
+	}
+	s.endGroup();
+	s.sync();
+
+	loadRecentFiles(&s);
+}
+
+void MainWindow::recentFileTriggered(bool checked)
+{
+	Q_UNUSED(checked);
+
+	QAction *actionRecent = (QAction *)sender();
+
+	const QString &filename = actionRecent->toolTip();
+
+	updateLastUsedDir(QFileInfo(filename).dir().path());
+	on_actionClose_triggered();
+	loadFiles(QStringList() << filename);
 }
 
 void MainWindow::file_save_as(void)
@@ -764,6 +847,7 @@ void MainWindow::file_save_as(void)
 		set_filename(filename.toUtf8().data(), true);
 		setTitle(MWTF_FILENAME);
 		mark_divelist_changed(false);
+		addRecentFile(QStringList() << filename);
 	}
 }
 
@@ -778,7 +862,7 @@ void MainWindow::file_save(void)
 		ui.InfoWidget->acceptChanges();
 
 	current_default = prefs.default_filename;
-	if (strcmp(existing_filename, current_default) ==  0) {
+	if (strcmp(existing_filename, current_default) == 0) {
 		/* if we are using the default filename the directory
 		 * that we are creating the file in may not exist */
 		QDir current_def_dir = QFileInfo(current_default).absoluteDir();
@@ -787,6 +871,7 @@ void MainWindow::file_save(void)
 	}
 	save_dives(existing_filename);
 	mark_divelist_changed(false);
+	addRecentFile(QStringList() << QString(existing_filename));
 }
 
 void MainWindow::showError(QString message)
@@ -859,6 +944,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	}
 
 	process_dives(false, false);
+	addRecentFile(fileNames);
 
 	refreshDisplay();
 	ui.actionAutoGroup->setChecked(autogroup);
@@ -872,7 +958,7 @@ void MainWindow::on_actionImportDiveLog_triggered()
 		return;
 	updateLastUsedDir(QFileInfo(fileNames[0]).dir().path());
 
-	QStringList logFiles = fileNames.filter( QRegExp("^.*\\.(?!csv)", Qt::CaseInsensitive) ) ;
+	QStringList logFiles = fileNames.filter(QRegExp("^.*\\.(?!csv)", Qt::CaseInsensitive));
 	QStringList csvFiles = fileNames.filter(".csv", Qt::CaseInsensitive);
 	if (logFiles.size()) {
 		importFiles(logFiles);
@@ -912,3 +998,71 @@ void MainWindow::editCurrentDive()
 		ui.InfoWidget->enableEdition(MainTab::MANUALLY_ADDED_DIVE);
 	}
 }
+
+#define TOOLBOX_PREF_PROFILE(PREFS)    \
+	QSettings s;                   \
+	s.beginGroup("TecDetails");    \
+	s.setValue(#PREFS, triggered); \
+	PreferencesDialog::instance()->emitSettingsChanged();
+
+void MainWindow::on_profCalcAllTissues_clicked(bool triggered)
+{
+	prefs.calc_all_tissues = triggered;
+	TOOLBOX_PREF_PROFILE(calcalltissues);
+}
+void MainWindow::on_profCalcCeiling_clicked(bool triggered)
+{
+	prefs.profile_calc_ceiling = triggered;
+	TOOLBOX_PREF_PROFILE(calcceiling);
+}
+void MainWindow::on_profDcCeiling_clicked(bool triggered)
+{
+	prefs.profile_dc_ceiling = triggered;
+	TOOLBOX_PREF_PROFILE(dcceiling);
+}
+void MainWindow::on_profEad_clicked(bool triggered)
+{
+	prefs.ead = triggered;
+	TOOLBOX_PREF_PROFILE(ead);
+}
+void MainWindow::on_profIncrement3m_clicked(bool triggered)
+{
+	prefs.calc_ceiling_3m_incr = triggered;
+	TOOLBOX_PREF_PROFILE(calcceiling3m);
+}
+void MainWindow::on_profMod_clicked(bool triggered)
+{
+	prefs.mod = triggered;
+	TOOLBOX_PREF_PROFILE(mod);
+}
+void MainWindow::on_profNtl_tts_clicked(bool triggered)
+{
+	prefs.calc_ndl_tts = triggered;
+	TOOLBOX_PREF_PROFILE(calcndltts);
+}
+void MainWindow::on_profPhe_clicked(bool triggered)
+{
+	prefs.pp_graphs.phe = triggered;
+	TOOLBOX_PREF_PROFILE(phegraph);
+}
+void MainWindow::on_profPn2_clicked(bool triggered)
+{
+	prefs.pp_graphs.pn2 = triggered;
+	TOOLBOX_PREF_PROFILE(pn2graph);
+}
+void MainWindow::on_profPO2_clicked(bool triggered)
+{
+	prefs.pp_graphs.po2 = triggered;
+	TOOLBOX_PREF_PROFILE(po2graph);
+}
+void MainWindow::on_profRuler_clicked(bool triggered)
+{
+	TOOLBOX_PREF_PROFILE(rulergraph);
+}
+void MainWindow::on_profSAC_clicked(bool triggered)
+{
+	prefs.show_sac = triggered;
+	TOOLBOX_PREF_PROFILE(show_sac);
+}
+
+#undef TOOLBOX_PREF_PROFILE

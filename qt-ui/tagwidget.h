@@ -1,5 +1,5 @@
-#ifndef __TAGWIDGET_H
-#define __TAGWIDGET_H
+#ifndef TAGWIDGET_H
+#define TAGWIDGET_H
 
 #include "groupedlineedit.h"
 #include <QCompleter>
@@ -18,12 +18,12 @@ public:
 	void setCursorPosition(int position);
 	void wheelEvent(QWheelEvent *event);
 public slots:
-        void reparse();
+	void reparse();
 	void completionSelected(QString);
 protected:
 	void keyPressEvent(QKeyEvent *e);
 private:
-        QCompleter *m_completer;
+	QCompleter *m_completer;
 };
 
-#endif /* __TAGWIDGET_H */
+#endif // TAGWIDGET_H

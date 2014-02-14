@@ -36,16 +36,15 @@ namespace DownloadFromDcGlobal {
 	const char *err_string;
 };
 
-DownloadFromDCWidget *DownloadFromDCWidget::instance()
-{
-	static DownloadFromDCWidget *dialog = new DownloadFromDCWidget(mainWindow());
-	dialog->setAttribute(Qt::WA_QuitOnClose, false);
-	return dialog;
-}
-
-DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
-	QDialog(parent, f), thread(0), timer(new QTimer(this)),
-	dumpWarningShown(false), currentState(INITIAL)
+DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) : QDialog(parent, f),
+	thread(0),
+	downloading(false),
+	previousLast(0),
+	vendorModel(0),
+	productModel(0),
+	timer(new QTimer(this)),
+	dumpWarningShown(false),
+	currentState(INITIAL)
 {
 	ui.setupUi(this);
 	ui.progressBar->hide();
@@ -79,15 +78,14 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 	updateState(INITIAL);
 }
 
-void DownloadFromDCWidget::runDialog()
-{
-	updateState(INITIAL);
-	exec();
-}
-
 void DownloadFromDCWidget::updateProgressBar()
 {
-	ui.progressBar->setValue(progress_bar_fraction *100);
+	if (*progress_bar_text != '\0') {
+		ui.progressBar->setFormat(progress_bar_text);
+	} else {
+		ui.progressBar->setFormat("%p%");
+		ui.progressBar->setValue(progress_bar_fraction *100);
+	}
 }
 
 void DownloadFromDCWidget::updateState(states state)
@@ -126,19 +124,30 @@ void DownloadFromDCWidget::updateState(states state)
 		markChildrenAsEnabled();
 	}
 
-	// DOWNLOAD is finally done, close the dialog and go back to the main window
+	// DOWNLOAD is finally done, but we don't know if there was an error as libdivecomputer doesn't pass
+	// that information on to us
+	// so check the progressBar text and if no error was reported, close the dialog and go back to the main window
+	// otherwise treat this as if the download was cancelled
 	else if (currentState == DOWNLOADING && state == DONE) {
 		timer->stop();
-		ui.progressBar->setValue(100);
-		markChildrenAsEnabled();
-		ui.ok->setText(tr("OK"));
-		accept();
+		if (QString(progress_bar_text).contains("error", Qt::CaseInsensitive)) {
+			updateProgressBar();
+			markChildrenAsEnabled();
+			progress_bar_text = "";
+			ui.ok->setText(tr("Retry"));
+		} else {
+			ui.progressBar->setValue(100);
+			markChildrenAsEnabled();
+			ui.ok->setText(tr("OK"));
+			accept();
+		}
 	}
 
 	// DOWNLOAD is started.
 	else if (state == DOWNLOADING) {
 		timer->start();
 		ui.progressBar->setValue(0);
+		updateProgressBar();
 		ui.progressBar->show();
 		markChildrenAsDisabled();
 	}
@@ -260,7 +269,7 @@ void DownloadFromDCWidget::on_ok_clicked()
 	connect(thread, SIGNAL(finished()),
 			this, SLOT(onDownloadThreadFinished()), Qt::QueuedConnection);
 
-	MainWindow *w = mainWindow();
+	MainWindow *w = MainWindow::instance();
 	connect(thread, SIGNAL(finished()), w, SLOT(refreshDisplay()));
 
 	// before we start, remember where the dive_table ended
@@ -412,12 +421,12 @@ static QString str_error(const char *fmt, ...)
 
 void DownloadThread::run()
 {
-	const char *error;
+	const char *errorText;
 	import_thread_cancelled = false;
 	if (!strcmp(data->vendor, "Uemis"))
-		error = do_uemis_import(data->devname, data->force_download);
+		errorText = do_uemis_import(data->devname, data->force_download);
 	else
-		error = do_libdivecomputer_import(data);
-	if (error)
-		this->error =  str_error(error, data->devname, data->vendor, data->product);
+		errorText = do_libdivecomputer_import(data);
+	if (errorText)
+		error =  str_error(errorText, data->devname, data->vendor, data->product);
 }

@@ -107,7 +107,7 @@ void MinMaxAvgWidget::setMinimum(const QString& minimum)
 
 RenumberDialog* RenumberDialog::instance()
 {
-	static RenumberDialog* self = new RenumberDialog(mainWindow());
+	static RenumberDialog* self = new RenumberDialog(MainWindow::instance());
 	return self;
 }
 
@@ -127,7 +127,7 @@ RenumberDialog::RenumberDialog(QWidget *parent): QDialog(parent)
 
 ShiftTimesDialog* ShiftTimesDialog::instance()
 {
-	static ShiftTimesDialog* self = new ShiftTimesDialog(mainWindow());
+	static ShiftTimesDialog* self = new ShiftTimesDialog(MainWindow::instance());
 	return self;
 }
 
@@ -144,9 +144,9 @@ void ShiftTimesDialog::buttonClicked(QAbstractButton* button)
 			shift_times(amount);
 			sort_table(&dive_table);
 			mark_divelist_changed(true);
-			mainWindow()->dive_list()->rememberSelection();
-			mainWindow()->refreshDisplay();
-			mainWindow()->dive_list()->restoreSelection();
+			MainWindow::instance()->dive_list()->rememberSelection();
+			MainWindow::instance()->refreshDisplay();
+			MainWindow::instance()->dive_list()->restoreSelection();
 		}
 	}
 }
@@ -155,6 +155,26 @@ ShiftTimesDialog::ShiftTimesDialog(QWidget *parent): QDialog(parent)
 {
 	ui.setupUi(this);
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+}
+
+void ShiftImageTimesDialog::buttonClicked(QAbstractButton* button)
+{
+	if (ui.buttonBox->buttonRole(button) == QDialogButtonBox::AcceptRole) {
+		m_amount = ui.timeEdit->time().hour() * 3600 + ui.timeEdit->time().minute() * 60;
+		if (ui.backwards->isChecked())
+			m_amount *= -1;
+	}
+}
+
+ShiftImageTimesDialog::ShiftImageTimesDialog(QWidget *parent): QDialog(parent), m_amount(0)
+{
+	ui.setupUi(this);
+	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+}
+
+int ShiftImageTimesDialog::amount() const
+{
+	return m_amount;
 }
 
 bool isGnome3Session()

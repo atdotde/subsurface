@@ -330,6 +330,8 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 		put_milli(b, " po2='", sample->po2, " bar'");
 		old->po2 = sample->po2;
 	}
+	show_index(b, sample->heartbeat, "heartbeat='", "'");
+	show_index(b, sample->bearing, "bearing='", "'");
 	put_format(b, " />\n");
 }
 
@@ -608,7 +610,7 @@ void export_dives_uddf(const char *filename, const bool selected)
 	 * transform it to UDDF format, finally dumping
 	 * the XML into a character buffer.
 	 */
-	doc = xmlReadMemory(buf.buffer, buf.used, "divelog", NULL, 0);
+	doc = xmlReadMemory(buf.buffer, buf.len, "divelog", NULL, 0);
 	free_buffer(&buf);
 	if (!doc) {
 		fprintf(stderr, "Failed to read XML memory\n");

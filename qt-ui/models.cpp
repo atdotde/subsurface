@@ -23,6 +23,7 @@
 #include <QFont>
 #include <QIcon>
 #include <QMessageBox>
+#include <QStringListModel>
 
 QFont defaultModelFont()
 {
@@ -333,7 +334,7 @@ void CylindersModel::remove(const QModelIndex& index)
 	}
 	cylinder_t *cyl = &current->cylinder[index.row()];
 	if (DivePlannerPointsModel::instance()->tankInUse(cyl->gasmix.o2.permille, cyl->gasmix.he.permille)) {
-		QMessageBox::warning(mainWindow(), TITLE_OR_TEXT(
+		QMessageBox::warning(MainWindow::instance(), TITLE_OR_TEXT(
 				tr("Cylinder cannot be removed"),
 				tr("This gas in use. Only cylinders that are not used in the dive can be removed.")),
 				QMessageBox::Ok);
@@ -1861,14 +1862,12 @@ QVariant LanguageModel::data(const QModelIndex& index, int role) const
 	if (!index.isValid())
 		return QVariant();
 	switch (role) {
-		case Qt::DisplayRole: {
-			QLocale l( currentString.remove("subsurface_"));
-			return currentString == "English" ? currentString : QString("%1 (%2)").arg(l.languageToString(l.language())).arg(l.countryToString(l.country()));
-		}break;
-	case Qt::UserRole: {
-			QString currentString = languages.at(index.row());
-			return currentString == "English" ? "en_US" : currentString.remove("subsurface_");
-		}break;
+	case Qt::DisplayRole: {
+		QLocale l( currentString.remove("subsurface_"));
+		return currentString == "English" ? currentString : QString("%1 (%2)").arg(l.languageToString(l.language())).arg(l.countryToString(l.country()));
+	}
+	case Qt::UserRole:
+		return currentString == "English" ? "en_US" : currentString.remove("subsurface_");
 	}
 	return QVariant();
 }

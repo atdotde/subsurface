@@ -10,9 +10,10 @@
 #include <QDebug>
 
 DiveTextItem::DiveTextItem(QGraphicsItem* parent): QGraphicsItemGroup(parent),
+	internalAlignFlags(Qt::AlignHCenter | Qt::AlignVCenter),
 	textBackgroundItem(NULL),
 	textItem(NULL),
-	internalAlignFlags(Qt::AlignHCenter | Qt::AlignVCenter)
+	colorIndex(SAC_DEFAULT)
 {
 	setFlag(ItemIgnoresTransformations);
 }
@@ -42,11 +43,13 @@ const QString& DiveTextItem::text()
 
 void DiveTextItem::updateText()
 {
-	if(internalText.isEmpty())
-		return;
-
 	delete textItem;
+	textItem = NULL;
 	delete textBackgroundItem;
+	textBackgroundItem = NULL;
+	if(internalText.isEmpty()){
+		return;
+	}
 
 	QFont fnt(qApp->font());
 	QFontMetrics fm(fnt);
@@ -55,7 +58,7 @@ void DiveTextItem::updateText()
 	qreal xPos = 0, yPos = 0;
 
 	QRectF rect = fm.boundingRect(internalText);
-	yPos = (internalAlignFlags & Qt::AlignTop) ? -rect.height() :
+	yPos = (internalAlignFlags & Qt::AlignTop) ? 0 :
 			(internalAlignFlags & Qt::AlignBottom) ? +rect.height() :
 	/*(internalAlignFlags & Qt::AlignVCenter  ? */ +rect.height() / 4;
 

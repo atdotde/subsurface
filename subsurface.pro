@@ -7,6 +7,7 @@ lessThan(QT_MAJOR_VERSION, 5) {
 	QT += webkitwidgets
 }
 INCLUDEPATH += qt-ui $$PWD
+DEPENDPATH += qt-ui
 
 mac: TARGET = Subsurface
 else: TARGET = subsurface
@@ -53,6 +54,7 @@ HEADERS = \
 	qt-ui/starwidget.h \
 	qt-ui/subsurfacewebservices.h \
 	qt-ui/tableview.h \
+	qt-ui/exif.h \
 	sha1.h \
 	statistics.h \
 	subsurface-icon.h \
@@ -72,7 +74,8 @@ HEADERS = \
 	qt-ui/profile/divecartesianaxis.h \
 	qt-ui/profile/diveplotdatamodel.h \
 	qt-ui/profile/diveprofileitem.h \
-	qt-ui/profile/diveeventitem.h
+	qt-ui/profile/diveeventitem.h \
+	qt-ui/profile/divetooltipitem.h
 
 SOURCES =  \
 	deco.c \
@@ -112,6 +115,7 @@ SOURCES =  \
 	qt-ui/starwidget.cpp \
 	qt-ui/subsurfacewebservices.cpp \
 	qt-ui/tableview.cpp \
+	qt-ui/exif.cpp \
 	save-xml.c \
 	sha1.c \
 	statistics.c \
@@ -133,7 +137,8 @@ SOURCES =  \
 	qt-ui/profile/divecartesianaxis.cpp \
 	qt-ui/profile/diveplotdatamodel.cpp \
 	qt-ui/profile/diveprofileitem.cpp \
-	qt-ui/profile/diveeventitem.cpp
+	qt-ui/profile/diveeventitem.cpp \
+	qt-ui/profile/divetooltipitem.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
@@ -150,6 +155,7 @@ FORMS = \
 	qt-ui/printoptions.ui \
 	qt-ui/renumber.ui \
 	qt-ui/shifttimes.ui \
+	qt-ui/shiftimagetimes.ui \
 	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
 	qt-ui/divelogimportdialog.ui \
@@ -226,6 +232,11 @@ QMAKE_INFO_PLIST = packaging/macosx/Info.plist.in
 
 OTHER_FILES += $$DESKTOPFILE $$ICON $$MANPAGE $$XSLT_FILES $$DOC_FILES $$MARBLEDIR \
         $$QMAKE_INFO_PLIST
+
+# enable or disable the dive planner
+planner {
+	DEFINES += ENABLE_PLANNER
+}
 
 include(subsurface-gen-version.pri)
 include(subsurface-install.pri)

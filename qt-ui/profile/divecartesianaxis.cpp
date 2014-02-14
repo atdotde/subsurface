@@ -3,6 +3,8 @@
 #include "divetextitem.h"
 #include "helpers.h"
 #include "preferences.h"
+#include "diveplotdatamodel.h"
+#include "animationfunctions.h"
 #include <QPen>
 #include <QGraphicsScene>
 #include <QDebug>
@@ -17,16 +19,40 @@ static QPen gridPen(){
 	pen.setCosmetic(true);
 	return pen;
 }
+
+void DiveCartesianAxis::setup(double minimum, double maximum, double interval, DiveCartesianAxis::Orientation o, qreal tick_size, const QPointF& pos)
+{
+	setMinimum(minimum);
+	setMaximum(maximum);
+	setTickInterval(interval);
+	setOrientation(o);
+	setTickSize(tick_size);
+	setPos(pos);
+}
+
+double DiveCartesianAxis::tickInterval() const
+{
+	return interval;
+}
+
+double DiveCartesianAxis::tickSize() const
+{
+	return tick_size;
+}
+
 void DiveCartesianAxis::setMaximum(double maximum)
 {
+	if (IS_FP_SAME(max, maximum))
+		return;
 	max = maximum;
-	emit sizeChanged();
+	emit maxChanged();
 }
 
 void DiveCartesianAxis::setMinimum(double minimum)
 {
+	if (IS_FP_SAME(min, minimum))
+		return;
 	min = minimum;
-	emit sizeChanged();
 }
 
 void DiveCartesianAxis::setTextColor(const QColor& color)
@@ -34,7 +60,15 @@ void DiveCartesianAxis::setTextColor(const QColor& color)
 	textColor = color;
 }
 
-DiveCartesianAxis::DiveCartesianAxis() : orientation(LeftToRight), showTicks(true), showText(true)
+DiveCartesianAxis::DiveCartesianAxis() : QObject(),
+	QGraphicsLineItem(),
+	unitSystem(0),
+	orientation(LeftToRight),
+	min(0),
+	max(0),
+	interval(1),
+	tick_size(0),
+	textVisibility(true)
 {
 	setPen(gridPen());
 }
@@ -54,6 +88,17 @@ QColor DiveCartesianAxis::colorForValue(double value)
 	return QColor(Qt::black);
 }
 
+void DiveCartesianAxis::setTextVisible(bool arg1)
+{
+	if(textVisibility == arg1){
+		return;
+	}
+	textVisibility = arg1;
+	Q_FOREACH(DiveTextItem *item, labels){
+		item->setVisible(textVisibility);
+	}
+}
+
 void DiveCartesianAxis::updateTicks()
 {
 	if (!scene())
@@ -64,15 +109,13 @@ void DiveCartesianAxis::updateTicks()
 	double steps = (max - min) / interval;
 	double currValue = min;
 
-	if(!showText && !labels.empty()){
-			qDeleteAll(labels);
-			labels.clear();
-	}
+	if (steps < 1)
+		return;
 
 	if (!labels.isEmpty() && labels.size() > steps) {
 		while (labels.size() > steps) {
 				DiveTextItem *removedText = labels.takeLast();
-				removedText->animatedHide();
+				Animations::animDelete(removedText);
 		}
 	}
 	// Move the remaining Ticks / Text to it's corerct position
@@ -100,11 +143,12 @@ void DiveCartesianAxis::updateTicks()
 		} else {
 			childPos = begin - i * stepSize;
 		}
+
 		labels[i]->setText(textForValue(currValue));
 		if ( orientation == LeftToRight || orientation == RightToLeft) {
-			labels[i]->animateMoveTo(childPos, m.y1() + tickSize);
+			labels[i]->animateMoveTo(childPos, m.y1() + tick_size);
 		} else {
-			labels[i]->animateMoveTo(m.x1() - tickSize, childPos);
+			labels[i]->animateMoveTo(m.x1() - tick_size, childPos);
 		}
 	}
 
@@ -116,28 +160,24 @@ void DiveCartesianAxis::updateTicks()
 		} else {
 			childPos = begin - i * stepSize;
 		}
-		DiveTextItem *label = NULL;
-
-		if (showText){
-			label = new DiveTextItem(this);
-			label->setText(textForValue(currValue));
-			label->setBrush(QBrush(textColor));
-			label->setBrush(colorForValue(currValue));
-		}
+		DiveTextItem *label = new DiveTextItem(this);
+		label->setText(textForValue(currValue));
+		label->setBrush(QBrush(textColor));
+		label->setBrush(colorForValue(currValue));
 		labels.push_back(label);
 		if (orientation == RightToLeft || orientation == LeftToRight) {
-			if(showText){
-				label->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
-				label->setPos(scene()->sceneRect().width() + 10, m.y1() + tickSize); // position it outside of the scene);
-				label->animateMoveTo(childPos, m.y1() + tickSize);
-			}
+			label->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
+			label->setPos(scene()->sceneRect().width() + 10, m.y1() + tick_size); // position it outside of the scene);
+			label->animateMoveTo(childPos, m.y1() + tick_size);
 		} else {
-			if(showText){
-				label->setAlignment(Qt::AlignVCenter| Qt::AlignRight);
-				label->setPos(m.x1() - tickSize, scene()->sceneRect().height() + 10);
-				label->animateMoveTo(m.x1() - tickSize, childPos);
-			}
+			label->setAlignment(Qt::AlignVCenter| Qt::AlignLeft);
+			label->setPos(m.x1() - tick_size, scene()->sceneRect().height() + 10);
+			label->animateMoveTo(m.x1() - tick_size, childPos);
 		}
+	}
+
+	Q_FOREACH(DiveTextItem *item, labels){
+		item->setVisible(textVisibility);
 	}
 }
 
@@ -148,18 +188,6 @@ void DiveCartesianAxis::animateChangeLine(const QLineF& newLine)
 	sizeChanged();
 }
 
-void DiveCartesianAxis::setShowText(bool show)
-{
-	showText = show;
-	updateTicks();
-}
-
-void DiveCartesianAxis::setShowTicks(bool show)
-{
-	showTicks = show;
-	updateTicks();
-}
-
 QString DiveCartesianAxis::textForValue(double value)
 {
 	return QString::number(value);
@@ -167,7 +195,7 @@ QString DiveCartesianAxis::textForValue(double value)
 
 void DiveCartesianAxis::setTickSize(qreal size)
 {
-	tickSize = size;
+	tick_size = size;
 }
 
 void DiveCartesianAxis::setTickInterval(double i)
@@ -175,12 +203,15 @@ void DiveCartesianAxis::setTickInterval(double i)
 	interval = i;
 }
 
-qreal DiveCartesianAxis::valueAt(const QPointF& p)
+qreal DiveCartesianAxis::valueAt(const QPointF& p) const
 {
 	QLineF m = line();
-	double retValue =  orientation == LeftToRight || RightToLeft?
-				max * (p.x() - m.x1()) / (m.x2() - m.x1()) :
-				max * (p.y() - m.y1()) / (m.y2() - m.y1());
+	QPointF relativePosition = p;
+	relativePosition -= pos(); // normalize p based on the axis' offset on screen
+
+	double retValue =  (orientation == LeftToRight || orientation == RightToLeft) ?
+				max * (relativePosition.x() - m.x1()) / (m.x2() - m.x1()) :
+				max * (relativePosition.y() - m.y1()) / (m.y2() - m.y1());
 	return retValue;
 }
 
@@ -251,23 +282,36 @@ QColor DepthAxis::colorForValue(double value)
 	return QColor(Qt::red);
 }
 
-DepthAxis::DepthAxis()
-{
-	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(settingsChanged()));
-	settingsChanged(); // force the correct size of the line.
-}
-
-void DepthAxis::settingsChanged()
+static bool isPPGraphEnabled()
 {
 	QSettings s;
 
 	s.beginGroup("TecDetails");
-	bool ppGraph = s.value("phegraph").toBool() || s.value("po2graph").toBool() || s.value("pn2graph").toBool();
-	if (ppGraph) {
-		animateChangeLine(QLineF(0,2,0,60));
-	} else {
-		animateChangeLine(QLineF(0,2,0,98));
-	}
+	return s.value("phegraph").toBool() || s.value("po2graph").toBool() || s.value("pn2graph").toBool();
+}
+
+DepthAxis::DepthAxis() : showWithPPGraph(false)
+{
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(settingsChanged()));
+
+	 // force the correct size of the line.
+	showWithPPGraph = !isPPGraphEnabled();
+	settingsChanged();
+}
+
+void DepthAxis::settingsChanged()
+{
+// 	bool ppGraph = isPPGraphEnabled();
+// 	if ( ppGraph == showWithPPGraph){
+// 		return;
+// 	}
+//
+// 	if (ppGraph) {
+// 		animateChangeLine(shrinkedLine);
+// 	} else {
+// 		animateChangeLine(expandedLine);
+// 	}
+// 	showWithPPGraph = ppGraph;
 }
 
 QColor TimeAxis::colorForValue(double value)
@@ -278,7 +322,20 @@ QColor TimeAxis::colorForValue(double value)
 
 QString TimeAxis::textForValue(double value)
 {
-	return QString::number(value / 60);
+	int nr = value / 60;
+	if (maximum() < 600 )
+		return QString("%1:%2").arg(nr).arg( (int)value%60, 2, 10, QChar('0'));
+	return  QString::number(nr);
+}
+
+void TimeAxis::updateTicks()
+{
+	DiveCartesianAxis::updateTicks();
+	if (maximum() > 600){
+		for(int i = 0; i < labels.count(); i++){
+			labels[i]->setVisible(i % 2);
+		}
+	}
 }
 
 QString TemperatureAxis::textForValue(double value)
@@ -290,7 +347,7 @@ QString TemperatureAxis::textForValue(double value)
 void DiveCartesianPlane::setLeftAxis(DiveCartesianAxis* axis)
 {
 	leftAxis = axis;
-	connect(leftAxis, SIGNAL(sizeChanged()), this, SLOT(setup()));
+	connect(leftAxis, SIGNAL(maxChanged()), this, SLOT(setup()));
 	if (bottomAxis)
 		setup();
 }
@@ -298,7 +355,7 @@ void DiveCartesianPlane::setLeftAxis(DiveCartesianAxis* axis)
 void DiveCartesianPlane::setBottomAxis(DiveCartesianAxis* axis)
 {
 	bottomAxis = axis;
-	connect(bottomAxis, SIGNAL(sizeChanged()), this, SLOT(setup()));
+	connect(bottomAxis, SIGNAL(maxChanged()), this, SLOT(setup()));
 	if (leftAxis)
 		setup();
 }
@@ -310,7 +367,7 @@ QLineF DiveCartesianPlane::horizontalLine() const
 
 void DiveCartesianPlane::setHorizontalLine(QLineF line)
 {
-	if ( horizontalSize == line.length())
+	if (IS_FP_SAME(horizontalSize, line.length()))
 		return;
 	horizontalSize = line.length();
 	setup();
@@ -318,7 +375,7 @@ void DiveCartesianPlane::setHorizontalLine(QLineF line)
 
 void DiveCartesianPlane::setVerticalLine(QLineF line)
 {
-	if (verticalSize == line.length())
+	if (IS_FP_SAME(verticalSize, line.length()))
 		return;
 	verticalSize = line.length();
 	setup();
@@ -334,7 +391,8 @@ void DiveCartesianPlane::setup()
 	if (!leftAxis || !bottomAxis || !scene())
 		return;
 
-	// This creates a Grid around the axis, creating the cartesian plane.
+	setPen(gridPen());
+// This creates a Grid around the axis, creating the cartesian plane.
 	const int top = leftAxis->posAtValue(leftAxis->minimum());
 	// unused for now:
 	// const int bottom = leftAxis->posAtValue(leftAxis->maximum());
@@ -352,22 +410,58 @@ void DiveCartesianPlane::setup()
 
 	// DEPTH is M_OR_FEET(10,30), Minutes are 600, per line.
 	for (int i = leftAxis->minimum(), max = leftAxis->maximum(); i < max; i += M_OR_FT(10,30)) {
-		DiveLineItem *line = new DiveLineItem();
+		DiveLineItem *line = new DiveLineItem(this);
 		line->setLine(0, 0, horizontalSize, 0);
-		line->setPos(left,leftAxis->posAtValue(i));
+		line->setPos(0,leftAxis->posAtValue(i)-top);
 		line->setZValue(-1);
 		line->setPen(gridPen());
 		horizontalLines.push_back(line);
-		scene()->addItem(line);
 	}
 
 	for (int i = bottomAxis->minimum(), max = bottomAxis->maximum(); i < max; i += 600) { // increments by 10 minutes.
-		DiveLineItem *line = new DiveLineItem();
+		DiveLineItem *line = new DiveLineItem(this);
 		line->setLine(0, 0, 0, verticalSize);
-		line->setPos(bottomAxis->posAtValue(i), top);
+		line->setPos(bottomAxis->posAtValue(i)-left, 0);
 		line->setZValue(-1);
 		line->setPen(gridPen());
 		verticalLines.push_back(line);
-		scene()->addItem(line);
 	}
+}
+
+PartialGasPressureAxis::PartialGasPressureAxis()
+{
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(preferencesChanged()));
+}
+
+void PartialGasPressureAxis::setModel(DivePlotDataModel* m)
+{
+	model = m;
+	connect(model, SIGNAL(dataChanged(QModelIndex, QModelIndex)), this, SLOT(preferencesChanged()));
+	preferencesChanged();
+}
+
+void PartialGasPressureAxis::preferencesChanged()
+{
+	QSettings s;
+	s.beginGroup("TecDetails");
+	bool showPhe = s.value("phegraph").toBool();
+	bool showPn2 = s.value("pn2graph").toBool();
+	bool showPo2 = s.value("po2graph").toBool();
+	setVisible(showPhe || showPn2 || showPo2);
+	if (!model->rowCount())
+		return;
+
+	double max = showPhe ? model->pheMax() : -1;
+	if (showPn2 && model->pn2Max() > max)
+		 max = model->pn2Max();
+	if( showPo2 && model->po2Max() > max)
+		max = model->po2Max();
+
+	qreal pp = floor(max * 10.0) / 10.0 + 0.2;
+	if (IS_FP_SAME(maximum(), pp))
+		return;
+
+	setMaximum(pp);
+	setTickInterval( pp > 4 ? 0.5 : 0.25 );
+	updateTicks();
 }

@@ -7,6 +7,7 @@
 class QPropertyAnimation;
 class DiveTextItem;
 class DiveLineItem;
+class DivePlotDataModel;
 
 class DiveCartesianAxis : public QObject, public QGraphicsLineItem{
 	Q_OBJECT
@@ -18,6 +19,7 @@ public:
 	enum Orientation{TopToBottom, BottomToTop, LeftToRight, RightToLeft};
 	DiveCartesianAxis();
 	virtual ~DiveCartesianAxis();
+	void setup(double minimum, double maximum, double interval, Orientation o, qreal tickSize, const QPointF& pos);
 	void setMinimum(double minimum);
 	void setMaximum(double maximum);
 	void setTickInterval(double interval);
@@ -25,19 +27,22 @@ public:
 	void setTickSize(qreal size);
 	double minimum() const;
 	double maximum() const;
-	qreal valueAt(const QPointF& p);
+	double tickInterval() const;
+	double tickSize() const;
+	qreal valueAt(const QPointF& p) const;
 	qreal percentAt(const QPointF& p);
 	qreal posAtValue(qreal value);
 	void setColor(const QColor& color);
 	void setTextColor(const QColor& color);
-	void setShowTicks(bool show);
-	void setShowText(bool show);
 	void animateChangeLine(const QLineF& newLine);
+	void setTextVisible(bool arg1);
 	int unitSystem;
 public slots:
-	void updateTicks();
+	virtual void updateTicks();
+
 signals:
 	void sizeChanged();
+	void maxChanged();
 protected:
 	virtual QString textForValue(double value);
 	virtual QColor colorForValue(double value);
@@ -46,10 +51,9 @@ protected:
 	double min;
 	double max;
 	double interval;
-	double tickSize;
+	double tick_size;
 	QColor textColor;
-	bool showTicks;
-	bool showText;
+	bool textVisibility;
 };
 
 class DepthAxis : public DiveCartesianAxis {
@@ -61,9 +65,14 @@ protected:
 	QColor colorForValue(double value);
 private slots:
 	void settingsChanged();
+private:
+	bool showWithPPGraph;
 };
 
 class TimeAxis : public DiveCartesianAxis {
+	Q_OBJECT
+public:
+	virtual void updateTicks();
 protected:
 	QString textForValue(double value);
 	QColor colorForValue(double value);
@@ -73,6 +82,17 @@ class TemperatureAxis : public DiveCartesianAxis{
 	Q_OBJECT
 protected:
 	QString textForValue(double value);
+};
+
+class PartialGasPressureAxis : public DiveCartesianAxis{
+	Q_OBJECT
+public:
+	PartialGasPressureAxis();
+	void setModel(DivePlotDataModel *model);
+public slots:
+	void preferencesChanged();
+private:
+	DivePlotDataModel *model;
 };
 
 // This is a try. Maybe the CartesianPlane should have the X and Y
@@ -98,4 +118,4 @@ private:
 	qreal verticalSize;
 	qreal horizontalSize;
 };
-#endif
+#endif // DIVECARTESIANAXIS_H

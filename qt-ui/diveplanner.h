@@ -10,7 +10,6 @@
 #include "dive.h"
 
 class QListView;
-class QStringListModel;
 class QModelIndex;
 
 class DivePlannerPointsModel : public QAbstractTableModel{
@@ -179,7 +178,7 @@ private slots:
 	void increaseTime();
 	void increaseDepth();
 	void decreaseTime();
-	void decreaseDepth();;
+	void decreaseDepth();
 	void drawProfile();
 	void pointInserted(const QModelIndex&, int start, int end);
 	void pointsRemoved(const QModelIndex&, int start, int end);
@@ -242,4 +241,4 @@ private:
 	Ui::DivePlanner ui;
 };
 
-#endif
+#endif // DIVEPLANNER_H

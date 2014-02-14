@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QGraphicsPolygonItem>
+#include <QModelIndex>
+
 #include "graphicsview-common.h"
 #include "divelineitem.h"
 
@@ -39,10 +41,21 @@ public:
 	void setHorizontalDataColumn(int column);
 	void setVerticalDataColumn(int column);
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0) = 0;
+	virtual void clear(){}
 public slots:
 	virtual void preferencesChanged();
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
+	virtual void modelDataRemoved(const QModelIndex& parent, int from, int to);
 protected:
+	/* when the model emits a 'datachanged' signal, this method below should be used to check if the
+	 * modified data affects this particular item ( for example, when setting the '3m increment'
+	 * the data for Ceiling and tissues will be changed, and only those. so, the topLeft will be the CEILING
+	 * column and the bottomRight will have the TISSUE_16 column. this method takes the vDataColumn and hDataColumn
+	 * into consideration when returning 'true' for "yes, continue the calculation', and 'false' for
+	 * 'do not recalculate, we already have the right data.
+	 */
+	bool shouldCalculateStuff(const QModelIndex& topLeft, const QModelIndex& bottomRight);
+
 	DiveCartesianAxis *hAxis;
 	DiveCartesianAxis *vAxis;
 	DivePlotDataModel *dataModel;
@@ -55,8 +68,9 @@ class DiveProfileItem : public AbstractProfilePolygonItem{
 	Q_OBJECT
 
 public:
+	DiveProfileItem();
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void preferencesChanged();
 	void plot_depth_sample(struct plot_data *entry,QFlags<Qt::AlignmentFlag> flags,const QColor& color);
 private:
@@ -68,7 +82,7 @@ class DiveTemperatureItem : public AbstractProfilePolygonItem{
 	Q_OBJECT
 public:
 	DiveTemperatureItem();
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 private:
 	void createTextItem(int seconds, int mkelvin);
@@ -78,7 +92,7 @@ class DiveGasPressureItem : public AbstractProfilePolygonItem{
 	Q_OBJECT
 
 public:
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 private:
 	void plot_pressure_value(int mbar, int sec, QFlags<Qt::AlignmentFlag> align);
@@ -90,15 +104,20 @@ class DiveCalculatedCeiling : public AbstractProfilePolygonItem{
 	Q_OBJECT
 
 public:
-	virtual void modelDataChanged();
+	DiveCalculatedCeiling();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
+	virtual void preferencesChanged();
+private:
+	bool is3mIncrement;
+	DiveTextItem *gradientFactor;
 };
 
 class DiveReportedCeiling : public AbstractProfilePolygonItem{
 	Q_OBJECT
 
 public:
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
 	virtual void preferencesChanged();
 };
@@ -107,7 +126,7 @@ class DiveCalculatedTissue : public DiveCalculatedCeiling {
 	Q_OBJECT
 public:
 	DiveCalculatedTissue();
-	void preferencesChanged();
+	virtual void preferencesChanged();
 };
 
 class MeanDepthLine : public DiveLineItem {
@@ -116,10 +135,14 @@ public:
 	MeanDepthLine();
 	void setMeanDepth(int value);
 	void setLine(qreal x1, qreal y1, qreal x2, qreal y2);
+	void setAxis(DiveCartesianAxis *a);
+public slots:
+	void axisLineChanged();
 private:
 	int meanDepth;
 	DiveTextItem *leftText;
 	DiveTextItem *rightText;
+	DiveCartesianAxis *axis;
 };
 
 class PartialPressureGasItem : public AbstractProfilePolygonItem{
@@ -127,11 +150,16 @@ class PartialPressureGasItem : public AbstractProfilePolygonItem{
 public:
 	PartialPressureGasItem();
 	virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = 0);
-	virtual void modelDataChanged();
+	virtual void modelDataChanged(const QModelIndex& topLeft = QModelIndex(), const QModelIndex& bottomRight = QModelIndex());
 	virtual void preferencesChanged();
 	void setThreshouldSettingsKey(const QString& threshouldSettingsKey);
+	void setVisibilitySettingsKey(const QString& setVisibilitySettingsKey);
+	void setColors(const QColor& normalColor, const QColor& alertColor);
 private:
 	QPolygonF alertPoly;
 	QString threshouldKey;
+	QString visibilityKey;
+	QColor normalColor;
+	QColor alertColor;
 };
-#endif
+#endif // DIVEPROFILEITEM_H

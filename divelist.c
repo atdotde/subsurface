@@ -221,12 +221,12 @@ static int calculate_otu(struct dive *dive)
 			po2 = sample->po2;
 		} else {
 			int o2 = active_o2(dive, dc, sample->time);
-			po2 = o2 / 1000.0 * depth_to_mbar(sample->depth.mm, dive);
+			po2 = o2 * depth_to_atm(sample->depth.mm, dive);
 		}
 		if (po2 >= 500)
 			otu += pow((po2 - 500) / 1000.0, 0.83) * t / 30.0;
 	}
-	return otu + 0.5;
+	return rint(otu);
 }
 /* calculate CNS for a dive - this only takes the first divecomputer into account */
 int const cns_table[][3] = {
@@ -285,7 +285,7 @@ static int calculate_cns(struct dive *dive)
 			po2 = sample->po2;
 		} else {
 			int o2 = active_o2(dive, dc, sample->time);
-			po2 = o2 / 1000.0 * depth_to_mbar(sample->depth.mm, dive);
+			po2 = o2 / depth_to_atm(sample->depth.mm, dive);
 		}
 		/* Find what table-row we should calculate % for */
 		for (j = 1; j < sizeof(cns_table)/(sizeof(int) * 3); j++)
@@ -338,7 +338,7 @@ static int calculate_sac(struct dive *dive)
 		return 0;
 
 	/* Mean pressure in ATM (SAC calculations are in atm*l/min) */
-	pressure = (double) depth_to_mbar(meandepth, dive) / SURFACE_PRESSURE;
+	pressure = depth_to_atm(meandepth, dive);
 	sac = airuse / pressure * 60 / duration;
 
 	/* milliliters per minute.. */
@@ -665,7 +665,7 @@ void add_dive_to_trip(struct dive *dive, dive_trip_t *trip)
 
 dive_trip_t *create_and_hookup_trip_from_dive(struct dive *dive)
 {
-	dive_trip_t *dive_trip = calloc(sizeof(dive_trip_t),1);
+	dive_trip_t *dive_trip = calloc(1, sizeof(dive_trip_t));
 	dive_trip->when = dive->when;
 	if (dive->location)
 		dive_trip->location = strdup(dive->location);

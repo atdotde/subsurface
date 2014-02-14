@@ -326,7 +326,7 @@ static void pressure(char *buffer, void *_press)
 			break;
 		}
 		if (mbar > 5 && mbar < 500000) {
-			pressure->mbar = mbar + 0.5;
+			pressure->mbar = rint(mbar);
 			break;
 		}
 	/* fallthrough */
@@ -341,7 +341,7 @@ static void salinity(char *buffer, void *_salinity)
 	union int_or_float val;
 	switch (integer_or_float(buffer, &val)) {
 	case FLOAT:
-		*salinity = val.fp * 10.0 + 0.5;
+		*salinity = rint(val.fp * 10.0);
 		break;
 	default:
 		printf("Strange salinity reading %s\n", buffer);
@@ -357,7 +357,7 @@ static void depth(char *buffer, void *_depth)
 	case FLOAT:
 		switch (xml_parsing_units.length) {
 		case METERS:
-			depth->mm = val.fp * 1000 + 0.5;
+			depth->mm = rint(val.fp * 1000);
 			break;
 		case FEET:
 			depth->mm = feet_to_mm(val.fp);
@@ -378,7 +378,7 @@ static void weight(char *buffer, void *_weight)
 	case FLOAT:
 		switch (xml_parsing_units.weight) {
 		case KG:
-			weight->grams = val.fp * 1000 + 0.5;
+			weight->grams = rint(val.fp * 1000);
 			break;
 		case LBS:
 			weight->grams = lbs_to_grams(val.fp);
@@ -472,7 +472,7 @@ static void percent(char *buffer, void *_fraction)
 
 		/* Then turn percent into our integer permille format */
 		if (val >= 0 && val <= 100.0) {
-			fraction->permille = val * 10 + 0.5;
+			fraction->permille = rint(val * 10);
 			break;
 		}
 	default:
@@ -502,7 +502,7 @@ static void cylindersize(char *buffer, void *_volume)
 
 	switch (integer_or_float(buffer, &val)) {
 	case FLOAT:
-		volume->mliter = val.fp * 1000 + 0.5;
+		volume->mliter = rint(val.fp * 1000);
 		break;
 
 	default:
@@ -549,7 +549,7 @@ static void get_rating(char *buffer, void *_i)
 static void double_to_permil(char *buffer, void *_i)
 {
 	int *i = _i;
-	*i = ascii_strtod(buffer, NULL) * 1000.0 + 0.5;
+	*i = rint(ascii_strtod(buffer, NULL) * 1000.0);
 }
 
 static void hex_value(char *buffer, void *_i)
@@ -636,7 +636,7 @@ static void psi_or_bar(char *buffer, void *_pressure)
 		if (val.fp > 400)
 			pressure->mbar = psi_to_mbar(val.fp);
 		else
-			pressure->mbar = val.fp * 1000 + 0.5;
+			pressure->mbar = rint(val.fp * 1000);
 		break;
 	default:
 		fprintf(stderr, "Crazy Diving Log PSI reading %s\n", buffer);
@@ -852,6 +852,10 @@ static void try_to_fill_sample(struct sample *sample, const char *name, char *bu
 	if (MATCH("cns.sample", get_index, &sample->cns))
 		return;
 	if (MATCH("po2.sample", double_to_permil, &sample->po2))
+		return;
+	if (MATCH("heartbeat", get_index, &sample->heartbeat))
+		return;
+	if (MATCH("bearing", get_index, &sample->bearing))
 		return;
 
 	switch (import_source) {
@@ -1273,7 +1277,7 @@ static void trip_start(void)
 	if (cur_trip)
 		return;
 	dive_end();
-	cur_trip = calloc(sizeof(dive_trip_t),1);
+	cur_trip = calloc(1, sizeof(dive_trip_t));
 	memset(&cur_tm, 0, sizeof(cur_tm));
 }
 
@@ -1902,19 +1906,21 @@ void parse_xml_exit(void)
 static struct xslt_files {
 	const char *root;
 	const char *file;
+	const char *attribute;
 } xslt_files[] = {
-	{ "SUUNTO", "SuuntoSDM.xslt" },
-	{ "Dive", "SuuntoDM4.xslt" },
-	{ "JDiveLog", "jdivelog2subsurface.xslt" },
-	{ "dives", "MacDive.xslt" },
-	{ "DIVELOGSDATA", "divelogs.xslt" },
-	{ "uddf", "uddf.xslt" },
-	{ "UDDF", "uddf.xslt" },
-	{ "profile", "udcf.xslt" },
-	{ "Divinglog", "DivingLog.xslt" },
-	{ "csv", "csv2xml.xslt" },
-	{ "sensuscsv", "sensuscsv.xslt" },
-	{ "manualcsv", "manualcsv2xml.xslt" },
+	{ "SUUNTO", "SuuntoSDM.xslt", NULL },
+	{ "Dive", "SuuntoDM4.xslt", "xmlns" },
+	{ "Dive", "shearwater.xslt", "version" },
+	{ "JDiveLog", "jdivelog2subsurface.xslt", NULL },
+	{ "dives", "MacDive.xslt", NULL },
+	{ "DIVELOGSDATA", "divelogs.xslt", NULL },
+	{ "uddf", "uddf.xslt", NULL },
+	{ "UDDF", "uddf.xslt", NULL },
+	{ "profile", "udcf.xslt", NULL },
+	{ "Divinglog", "DivingLog.xslt", NULL },
+	{ "csv", "csv2xml.xslt", NULL },
+	{ "sensuscsv", "sensuscsv.xslt", NULL },
+	{ "manualcsv", "manualcsv2xml.xslt", NULL },
 	{ NULL, }
 };
 
@@ -1926,7 +1932,13 @@ static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **err
 	xmlNode *root_element = xmlDocGetRootElement(doc);
 	char *attribute;
 
-	while ((info->root) && (strcasecmp(root_element->name, info->root) != 0)) {
+	while (info->root) {
+		if ((strcasecmp(root_element->name, info->root) == 0)) {
+			if (info->attribute == NULL)
+				break;
+			else if (xmlGetProp(root_element, info->attribute) != NULL)
+				break;
+		}
 		info++;
 	}
 

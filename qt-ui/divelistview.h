@@ -12,6 +12,7 @@
 */
 
 #include <QTreeView>
+#include <QLineEdit>
 #include "models.h"
 
 class DiveListView : public QTreeView
@@ -49,6 +50,7 @@ public slots:
 	void saveSelectedDivesAs();
 	void exportSelectedDivesAsUDDF();
 	void shiftTimes();
+	void loadImages();
 	void uploadToDivelogsDE();
 
 signals:
@@ -60,7 +62,7 @@ private:
 	int sortColumn;
 	Qt::SortOrder currentOrder;
 	DiveTripModel::Layout currentLayout;
-	QLineEdit *searchBox;
+	QLineEdit searchBox;
 	QModelIndex contextMenuIndex;
 
 	/* if dive_trip_t is null, there's no problem. */
@@ -71,6 +73,8 @@ private:
 	void restoreExpandedRows();
 	int lastVisibleColumn();
 	void selectTrip ( dive_trip_t* trip );
+	QString lastUsedImageDir();
+	void updateLastUsedImageDir(const QString& s);
 };
 
 #endif // DIVELISTVIEW_H

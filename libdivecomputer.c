@@ -77,13 +77,13 @@ static bool get_tanksize(device_data_t *devdata, const unsigned char *data, cyli
 		case COBALT_CFATPSI:
 			airvolume = cuft_to_l(atomics_gas_info[idx].tanksize) * 1000.0;
 			mbar = psi_to_mbar(atomics_gas_info[idx].workingpressure);
-			cyl[idx].type.size.mliter = airvolume / bar_to_atm(mbar / 1000.0) + 0.5;
+			cyl[idx].type.size.mliter = rint(airvolume / bar_to_atm(mbar / 1000.0));
 			cyl[idx].type.workingpressure.mbar = mbar;
 			break;
 		case COBALT_CFATBAR:
 			airvolume = cuft_to_l(atomics_gas_info[idx].tanksize) * 1000.0;
 			mbar = atomics_gas_info[idx].workingpressure * 1000;
-			cyl[idx].type.size.mliter = airvolume / bar_to_atm(mbar / 1000.0) + 0.5;
+			cyl[idx].type.size.mliter = rint(airvolume / bar_to_atm(mbar / 1000.0));
 			cyl[idx].type.workingpressure.mbar = mbar;
 			break;
 		case COBALT_WETINDL:
@@ -112,8 +112,8 @@ static int parse_gasmixes(device_data_t *devdata, struct dive *dive, dc_parser_t
 		if (i >= MAX_CYLINDERS)
 			continue;
 
-		o2 = gasmix.oxygen * 1000 + 0.5;
-		he = gasmix.helium * 1000 + 0.5;
+		o2 = rint(gasmix.oxygen * 1000);
+		he = rint(gasmix.helium * 1000);
 
 		/* Ignore bogus data - libdivecomputer does some crazy stuff */
 		if (o2 + he <= O2_IN_AIR || o2 >= 1000)
@@ -204,11 +204,11 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 		finish_sample(dc);
 		break;
 	case DC_SAMPLE_DEPTH:
-		sample->depth.mm = value.depth * 1000 + 0.5;
+		sample->depth.mm = rint(value.depth * 1000);
 		break;
 	case DC_SAMPLE_PRESSURE:
 		sample->sensor = value.pressure.tank;
-		sample->cylinderpressure.mbar = value.pressure.value * 1000 + 0.5;
+		sample->cylinderpressure.mbar = rint(value.pressure.value * 1000);
 		break;
 	case DC_SAMPLE_TEMPERATURE:
 		sample->temperature.mkelvin = C_to_mkelvin(value.temperature);
@@ -220,10 +220,10 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 		printf("   <rbt>%u</rbt>\n", value.rbt);
 		break;
 	case DC_SAMPLE_HEARTBEAT:
-		printf("   <heartbeat>%u</heartbeat>\n", value.heartbeat);
+		sample->heartbeat = value.heartbeat;
 		break;
 	case DC_SAMPLE_BEARING:
-		printf("   <bearing>%u</bearing>\n", value.bearing);
+		sample->bearing = value.bearing;
 		break;
 	case DC_SAMPLE_VENDOR:
 		printf("   <vendor time='%u:%02u' type=\"%u\" size=\"%u\">", FRACTION(sample->time.seconds, 60),
@@ -235,28 +235,28 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 #if DC_VERSION_CHECK(0, 3, 0)
 	case DC_SAMPLE_SETPOINT:
 		/* for us a setpoint means constant pO2 from here */
-		sample->po2 = po2 = value.setpoint * 1000 + 0.5;
+		sample->po2 = po2 = rint(value.setpoint * 1000);
 		break;
 	case DC_SAMPLE_PPO2:
-		sample->po2 = po2 = value.ppo2 * 1000 + 0.5;
+		sample->po2 = po2 = rint(value.ppo2 * 1000);
 		break;
 	case DC_SAMPLE_CNS:
-		sample->cns = cns = value.cns * 100 + 0.5;
+		sample->cns = cns = rint(value.cns * 100);
 		break;
 	case DC_SAMPLE_DECO:
 		if (value.deco.type == DC_DECO_NDL) {
 			sample->ndl.seconds = ndl = value.deco.time;
-			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
+			sample->stopdepth.mm = stopdepth = rint(value.deco.depth * 1000.0);
 			sample->in_deco = in_deco = false;
 		} else if (value.deco.type == DC_DECO_DECOSTOP ||
 			   value.deco.type == DC_DECO_DEEPSTOP) {
 			sample->in_deco = in_deco = true;
-			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
+			sample->stopdepth.mm = stopdepth = rint(value.deco.depth * 1000.0);
 			sample->stoptime.seconds = stoptime = value.deco.time;
 			ndl = 0;
 		} else if (value.deco.type == DC_DECO_SAFETYSTOP) {
 			sample->in_deco = in_deco = false;
-			sample->stopdepth.mm = stopdepth = value.deco.depth * 1000.0 + 0.5;
+			sample->stopdepth.mm = stopdepth = rint(value.deco.depth * 1000.0);
 			sample->stoptime.seconds = stoptime = value.deco.time;
 		}
 #endif
@@ -381,6 +381,8 @@ static uint32_t calculate_diveid(const unsigned char *fingerprint, unsigned int 
 	return csum[0];
 }
 
+/* returns true if we want libdivecomputer's dc_device_foreach() to continue,
+ *  false otherwise */
 static int dive_cb(const unsigned char *data, unsigned int size,
 	const unsigned char *fingerprint, unsigned int fsize,
 	void *userdata)
@@ -399,14 +401,14 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	rc = create_parser(devdata, &parser);
 	if (rc != DC_STATUS_SUCCESS) {
 		dev_info(devdata, translate("gettextFromC","Unable to create parser for %s %s"), devdata->vendor, devdata->product);
-		return rc;
+		return false;
 	}
 
 	rc = dc_parser_set_data(parser, data, size);
 	if (rc != DC_STATUS_SUCCESS) {
 		dev_info(devdata, translate("gettextFromC","Error registering the data"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 
 	import_dive_number++;
@@ -415,7 +417,7 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the datetime"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 	dive->dc.model = strdup(devdata->model);
 	dive->dc.deviceid = devdata->deviceid;
@@ -437,7 +439,7 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the divetime"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 	dive->dc.duration.seconds = divetime;
 
@@ -447,9 +449,9 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the maxdepth"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
-	dive->dc.maxdepth.mm = maxdepth * 1000 + 0.5;
+	dive->dc.maxdepth.mm = rint(maxdepth * 1000);
 
 	// Parse the gas mixes.
 	unsigned int ngases = 0;
@@ -457,7 +459,7 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the gas mix count"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 
 #if DC_VERSION_CHECK(0, 3, 0)
@@ -470,25 +472,25 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error obtaining water salinity"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
-	dive->dc.salinity = salinity.density * 10.0 + 0.5;
+	dive->dc.salinity = rint(salinity.density * 10.0);
 
-	double surface_pressure = 1.0;
+	double surface_pressure = 0;
 	rc = dc_parser_get_field(parser, DC_FIELD_ATMOSPHERIC, 0, &surface_pressure);
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
 		dev_info(devdata, translate("gettextFromC","Error obtaining surface pressure"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
-	dive->dc.surface_pressure.mbar = surface_pressure * 1000.0 + 0.5;
+	dive->dc.surface_pressure.mbar = rint(surface_pressure * 1000.0);
 #endif
 
 	rc = parse_gasmixes(devdata, dive, parser, ngases, data);
 	if (rc != DC_STATUS_SUCCESS) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the gas mix"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 
 	// Initialize the sample data.
@@ -496,14 +498,14 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (rc != DC_STATUS_SUCCESS) {
 		dev_info(devdata, translate("gettextFromC","Error parsing the samples"));
 		dc_parser_destroy(parser);
-		return rc;
+		return false;
 	}
 
 	dc_parser_destroy(parser);
 
 	/* If we already saw this dive, abort. */
 	if (!devdata->force_download && find_dive(&dive->dc))
-		return 0;
+		return false;
 
 	/* Various libdivecomputer interface fixups */
 	if (first_temp_is_air && dive->dc.samples) {
@@ -514,7 +516,7 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	dive->downloaded = true;
 	record_dive(dive);
 	mark_divelist_changed(true);
-	return 1;
+	return true;
 }
 
 /*

@@ -28,6 +28,7 @@
 #include "../helpers.h"
 #include "../planner.h"
 #include "../gettextfromc.h"
+#include "profile/divetooltipitem.h"
 
 #include <libdivecomputer/parser.h>
 #include <libdivecomputer/version.h>
@@ -144,7 +145,7 @@ void ProfileGraphicsView::contextMenuEvent(QContextMenuEvent* event)
 		EventItem *item = dynamic_cast<EventItem*>(i);
 		if (!item)
 			continue;
-		QAction *action = new QAction(&m);
+		action = new QAction(&m);
 		action->setText(tr("Remove Event"));
 		action->setData(QVariant::fromValue<void*>(item)); // so we know what to remove.
 		connect(action, SIGNAL(triggered(bool)), this, SLOT(removeEvent()));
@@ -195,7 +196,7 @@ void ProfileGraphicsView::changeGas()
 	add_gas_switch_event(current_dive, current_dc, seconds, get_gasidx(current_dive, o2, he));
 	// this means we potentially have a new tank that is being used and needs to be shown
 	fixup_dive(current_dive);
-	mainWindow()->information()->updateDiveInfo(selected_dive);
+	MainWindow::instance()->information()->updateDiveInfo(selected_dive);
 	mark_divelist_changed(true);
 	plot(current_dive, true);
 }
@@ -206,7 +207,7 @@ void ProfileGraphicsView::hideEvents()
 	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
 	struct event *event = item->ev;
 
-	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+	if (QMessageBox::question(MainWindow::instance(), TITLE_OR_TEXT(
 				  tr("Hide events"),
 				  tr("Hide all %1 events?").arg(event->name)),
 				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok) {
@@ -236,7 +237,7 @@ void ProfileGraphicsView::removeEvent()
 	EventItem *item = static_cast<EventItem*>(action->data().value<void*>());
 	struct event *event = item->ev;
 
-	if (QMessageBox::question(mainWindow(), TITLE_OR_TEXT(
+	if (QMessageBox::question(MainWindow::instance(), TITLE_OR_TEXT(
 				  tr("Remove the selected event?"),
 				  tr("%1 @ %2:%3").arg(event->name)
 				  .arg(event->time.seconds / 60)
@@ -374,13 +375,13 @@ void ProfileGraphicsView::plot(struct dive *d, bool forceRedraw)
 	diveId = d ? d->id : 0;
 	diveDC = d ? dc : NULL;
 
-	if (!isVisible() || !d || !mainWindow()) {
+	if (!isVisible() || !d || !MainWindow::instance()) {
 		return;
 	}
 	setBackgroundBrush(getColor(BACKGROUND));
 
 	// best place to put the focus stealer code.
-	setFocusProxy(mainWindow()->dive_list());
+	setFocusProxy(MainWindow::instance()->dive_list());
 	scene()->setSceneRect(0,0, viewport()->width()-50, viewport()->height()-50);
 
 	toolTip = new ToolTipItem();
@@ -545,7 +546,7 @@ void ProfileGraphicsView::addControlItems(struct dive *d)
 	if (defaultDC == "manually added dive" || defaultDC == "planned dive") {
 		QAction *editAction = new QAction(QIcon(":edit"), tr("Edit"), this);
 		toolBar->addAction(editAction);
-		connect(editAction, SIGNAL(triggered()), mainWindow(), SLOT(editCurrentDive()));
+		connect(editAction, SIGNAL(triggered()), MainWindow::instance(), SLOT(editCurrentDive()));
 	}
 	toolBarProxy = scene()->addWidget(toolBar);
 	toolBarProxy->setPos(mapToScene(TOOLBAR_POS));
@@ -570,7 +571,7 @@ void ProfileGraphicsView::plot_pp_text()
 		QGraphicsLineItem *item = new QGraphicsLineItem(SCALEGC(0, m), SCALEGC(hpos, m));
 		QPen pen(defaultPen);
 		pen.setColor(c);
-		if ( QString::number(m).toDouble() != QString::number(m).toInt()) {
+		if ( IS_FP_SAME(QString::number(m).toDouble(), QString::number(m).toInt())) {
 			pen.setStyle(Qt::DashLine);
 			pen.setWidthF(1.2);
 		}
@@ -1017,6 +1018,13 @@ void ProfileGraphicsView::plot_one_event(struct event *ev)
 	item->setPos(x, y);
 	scene()->addItem(item);
 
+	if (ev->type == 123){
+		QPixmap picture;
+		picture.load(ev->name);
+		scene()->addPixmap(picture.scaledToHeight(100, Qt::SmoothTransformation))->setPos(x, y + 10);
+	}
+
+
 	/* we display the event on screen - so translate (with the correct context for events) */
 	QString name = gettextFromC::instance()->tr(ev->name);
 	if (ev->value) {
@@ -1184,11 +1192,11 @@ void ProfileGraphicsView::plot_depth_profile()
 		item->setPen(pen);
 		scene()->addItem(item);
 
-		struct text_render_options tro = {DEPTH_TEXT_SIZE, MEAN_DEPTH, LEFT, TOP};
+		struct text_render_options depth_tro = {DEPTH_TEXT_SIZE, MEAN_DEPTH, LEFT, TOP};
 		QString depthLabel = get_depth_string(gc.pi.meandepth, true, true);
-		plot_text(&tro, QPointF(gc.leftx, gc.pi.meandepth), depthLabel, item);
+		plot_text(&depth_tro, QPointF(gc.leftx, gc.pi.meandepth), depthLabel, item);
 		tro.hpos = RIGHT;
-		plot_text(&tro, QPointF(gc.pi.entry[gc.pi.nr - 1].sec, gc.pi.meandepth), depthLabel, item);
+		plot_text(&depth_tro, QPointF(gc.pi.entry[gc.pi.nr - 1].sec, gc.pi.meandepth), depthLabel, item);
 	}
 
 #if 0
@@ -1448,204 +1456,6 @@ void ProfileGraphicsView::on_scaleAction()
 	zoomed_plot = !zoomed_plot;
 	refresh();
 }
-
-void ToolTipItem::addToolTip(const QString& toolTip, const QIcon& icon)
-{
-	QGraphicsPixmapItem *iconItem = 0;
-	double yValue = title->boundingRect().height() + SPACING;
-	Q_FOREACH(ToolTip t, toolTips) {
-		yValue += t.second->boundingRect().height();
-	}
-	if (!icon.isNull()) {
-		iconItem = new QGraphicsPixmapItem(icon.pixmap(ICON_SMALL,ICON_SMALL), this);
-		iconItem->setPos(SPACING, yValue);
-	}
-
-	QGraphicsSimpleTextItem *textItem = new QGraphicsSimpleTextItem(toolTip, this);
-	textItem->setPos(SPACING + ICON_SMALL + SPACING, yValue);
-	textItem->setBrush(QBrush(Qt::white));
-	textItem->setFlag(ItemIgnoresTransformations);
-	toolTips.push_back(qMakePair(iconItem, textItem));
-	expand();
-}
-
-void ToolTipItem::refresh(struct graphics_context *gc, QPointF pos)
-{
-	clear();
-	int time = (pos.x() * gc->maxtime) / gc->maxx;
-	char buffer[500];
-	get_plot_details(gc, time, buffer, 500);
-	addToolTip(QString(buffer));
-
-	QList<QGraphicsItem*> items = scene()->items(pos, Qt::IntersectsItemShape, Qt::DescendingOrder, transform());
-	Q_FOREACH(QGraphicsItem *item, items) {
-		if (!item->toolTip().isEmpty())
-			addToolTip(item->toolTip());
-	}
-
-}
-
-void ToolTipItem::clear()
-{
-	Q_FOREACH(ToolTip t, toolTips) {
-		delete t.first;
-		delete t.second;
-	}
-	toolTips.clear();
-}
-
-void ToolTipItem::setRect(const QRectF& r)
-{
-	// qDeleteAll(childItems());
-	delete background;
-
-	rectangle = r;
-	setBrush(QBrush(Qt::white));
-	setPen(QPen(Qt::black, 0.5));
-
-	// Creates a 2pixels border
-	QPainterPath border;
-	border.addRoundedRect(-4, -4,  rectangle.width() + 8, rectangle.height() + 10, 3, 3);
-	border.addRoundedRect(-1, -1,  rectangle.width() + 3, rectangle.height() + 4, 3, 3);
-	setPath(border);
-
-	QPainterPath bg;
-	bg.addRoundedRect(-1, -1, rectangle.width() + 3, rectangle.height() + 4, 3, 3);
-
-	QColor c = QColor(Qt::black);
-	c.setAlpha(155);
-
-	QGraphicsPathItem *b = new QGraphicsPathItem(bg, this);
-	b->setFlag(ItemStacksBehindParent);
-	b->setFlags(ItemIgnoresTransformations);
-	b->setBrush(c);
-	b->setPen(QPen(QBrush(Qt::transparent), 0));
-	b->setZValue(-10);
-	background = b;
-
-	updateTitlePosition();
-}
-
-void ToolTipItem::collapse()
-{
-	QPropertyAnimation *animation = new QPropertyAnimation(this, "rect");
-	animation->setDuration(100);
-	animation->setStartValue(nextRectangle);
-	animation->setEndValue(QRect(0, 0, ICON_SMALL, ICON_SMALL));
-	animation->start(QAbstractAnimation::DeleteWhenStopped);
-	clear();
-
-	status = COLLAPSED;
-}
-
-void ToolTipItem::expand()
-{
-	if (!title)
-		return;
-
-	double width = 0, height = title->boundingRect().height() + SPACING;
-	Q_FOREACH(ToolTip t, toolTips) {
-		if (t.second->boundingRect().width() > width)
-			width = t.second->boundingRect().width();
-		height += t.second->boundingRect().height();
-	}
-	/*       Left padding, Icon Size,   space, right padding */
-	width += SPACING       + ICON_SMALL + SPACING + SPACING;
-
-	if (width < title->boundingRect().width() + SPACING*2)
-		width = title->boundingRect().width() + SPACING*2;
-
-	if (height < ICON_SMALL)
-		height = ICON_SMALL;
-
-	nextRectangle.setWidth(width);
-	nextRectangle.setHeight(height);
-
-	QPropertyAnimation *animation = new QPropertyAnimation(this, "rect");
-	animation->setDuration(100);
-	animation->setStartValue(rectangle);
-	animation->setEndValue(nextRectangle);
-	animation->start(QAbstractAnimation::DeleteWhenStopped);
-
-	status = EXPANDED;
-}
-
-ToolTipItem::ToolTipItem(QGraphicsItem* parent): QGraphicsPathItem(parent), background(0)
-{
-	title = new QGraphicsSimpleTextItem(tr("Information"), this);
-	separator = new QGraphicsLineItem(this);
-	setFlags(ItemIgnoresTransformations | ItemIsMovable | ItemClipsChildrenToShape);
-	status = COLLAPSED;
-	updateTitlePosition();
-	setZValue(99);
-}
-
-ToolTipItem::~ToolTipItem()
-{
-	clear();
-}
-
-void ToolTipItem::updateTitlePosition()
-{
-	if (rectangle.width() < title->boundingRect().width() + SPACING*4) {
-		QRectF newRect = rectangle;
-		newRect.setWidth(title->boundingRect().width() + SPACING*4);
-		newRect.setHeight((newRect.height() && isExpanded()) ? newRect.height() : ICON_SMALL);
-		setRect(newRect);
-	}
-
-	title->setPos(boundingRect().width()/2  - title->boundingRect().width()/2 -1, 0);
-	title->setFlag(ItemIgnoresTransformations);
-	title->setPen(QPen(Qt::white, 1));
-	title->setBrush(Qt::white);
-
-	if (toolTips.size() > 0) {
-		double x1 = 3;
-		double y1 = title->pos().y() + SPACING/2 + title->boundingRect().height();
-		double x2 = boundingRect().width() - 10;
-		double y2 = y1;
-
-		separator->setLine(x1, y1, x2, y2);
-		separator->setFlag(ItemIgnoresTransformations);
-		separator->setPen(QPen(Qt::white));
-		separator->show();
-	} else {
-		separator->hide();
-	}
-}
-
-bool ToolTipItem::isExpanded() {
-	return status == EXPANDED;
-}
-
-void ToolTipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
-{
-	persistPos();
-	QGraphicsPathItem::mouseReleaseEvent(event);
-}
-
-void ToolTipItem::persistPos()
-{
-	QPoint currentPos = scene()->views().at(0)->mapFromScene(pos());
-	QSettings s;
-	s.beginGroup("ProfileMap");
-	s.setValue("tooltip_position", currentPos);
-	s.endGroup();
-}
-
-void ToolTipItem::readPos()
-{
-	QSettings s;
-	s.beginGroup("ProfileMap");
-	QPointF value = scene()->views().at(0)->mapToScene(
-		s.value("tooltip_position").toPoint()
-	);
-	if (!scene()->sceneRect().contains(value)) {
-		value = QPointF(0,0);
-	}
-	setPos(value);
-}
-
 QColor EventItem::getColor(const color_indice_t i)
 {
 	return profile_color[i].at((isGrayscale) ? 1 : 0);
@@ -1818,7 +1628,7 @@ GraphicsTextEditor::GraphicsTextEditor(QGraphicsItem* parent): QGraphicsTextItem
 void GraphicsTextEditor::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
 	// Remove the proxy filter so we can focus here.
-	mainWindow()->graphics()->setFocusProxy(0);
+	MainWindow::instance()->graphics()->setFocusProxy(0);
 	setTextInteractionFlags(Qt::TextEditorInteraction | Qt::TextEditable);
 }
 
@@ -1827,7 +1637,7 @@ void GraphicsTextEditor::keyReleaseEvent(QKeyEvent* event)
 	if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
 		setTextInteractionFlags(Qt::NoTextInteraction);
 		emit editingFinished( toPlainText() );
-		mainWindow()->graphics()->setFocusProxy(mainWindow()->dive_list());
+		MainWindow::instance()->graphics()->setFocusProxy(MainWindow::instance()->dive_list());
 		return;
 	}
 	emit textChanged( toPlainText() );

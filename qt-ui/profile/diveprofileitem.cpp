@@ -30,6 +30,7 @@ void AbstractProfilePolygonItem::preferencesChanged()
 void AbstractProfilePolygonItem::setHorizontalAxis(DiveCartesianAxis* horizontal)
 {
 	hAxis = horizontal;
+	connect(hAxis, SIGNAL(sizeChanged()), this, SLOT(modelDataChanged()));
 	modelDataChanged();
 }
 
@@ -42,14 +43,23 @@ void AbstractProfilePolygonItem::setHorizontalDataColumn(int column)
 void AbstractProfilePolygonItem::setModel(DivePlotDataModel* model)
 {
 	dataModel = model;
-	connect(dataModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(modelDataChanged()));
-	connect(dataModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(modelDataChanged()));
+	connect(dataModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(modelDataChanged(QModelIndex, QModelIndex)));
+	connect(dataModel, SIGNAL(rowsAboutToBeRemoved(QModelIndex,int,int)), this, SLOT(modelDataRemoved(QModelIndex, int, int)));
 	modelDataChanged();
+}
+
+void AbstractProfilePolygonItem::modelDataRemoved(const QModelIndex& parent, int from, int to)
+{
+	setPolygon(QPolygonF());
+	qDeleteAll(texts);
+	texts.clear();
 }
 
 void AbstractProfilePolygonItem::setVerticalAxis(DiveCartesianAxis* vertical)
 {
 	vAxis = vertical;
+	connect(vAxis, SIGNAL(sizeChanged()), this, SLOT(modelDataChanged()));
+	connect(vAxis, SIGNAL(maxChanged()), this, SLOT(modelDataChanged()));
 	modelDataChanged();
 }
 
@@ -59,11 +69,26 @@ void AbstractProfilePolygonItem::setVerticalDataColumn(int column)
 	modelDataChanged();
 }
 
-void AbstractProfilePolygonItem::modelDataChanged()
+bool AbstractProfilePolygonItem::shouldCalculateStuff(const QModelIndex& topLeft, const QModelIndex& bottomRight)
+{
+	if (!hAxis || !vAxis)
+		return false;
+	if (!dataModel || dataModel->rowCount() == 0)
+		return false;
+	if (hDataColumn == -1 || vDataColumn == -1)
+		return false;
+	if ( topLeft.isValid() && bottomRight.isValid()){
+		if ((topLeft.column() >= vDataColumn || topLeft.column() >= hDataColumn ) &&
+		(bottomRight.column() <= vDataColumn || topLeft.column() <= hDataColumn )){
+			return true;
+		}
+	}
+	return true;
+}
+
+void AbstractProfilePolygonItem::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
 	// We don't have enougth data to calculate things, quit.
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1)
-		return;
 
 	// Calculate the polygon. This is the polygon that will be painted on screen
 	// on the ::paint method. Here we calculate the correct position of the points
@@ -83,8 +108,15 @@ void AbstractProfilePolygonItem::modelDataChanged()
 	texts.clear();
 }
 
+DiveProfileItem::DiveProfileItem() : show_reported_ceiling(0), reported_ceiling_in_red(0)
+{
+
+}
+
 void DiveProfileItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) {
 	Q_UNUSED(widget);
+	if(polygon().isEmpty())
+		return;
 
 	// This paints the Polygon + Background. I'm setting the pen to QPen() so we don't get a black line here,
 	// after all we need to plot the correct velocities colors later.
@@ -96,21 +128,22 @@ void DiveProfileItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* o
 	QPen pen;
 	pen.setCosmetic(true);
 	pen.setWidth(2);
+	QPolygonF poly = polygon();
 	// This paints the colors of the velocities.
 	for (int i = 1, count = dataModel->rowCount(); i < count; i++) {
 		QModelIndex colorIndex = dataModel->index(i, DivePlotDataModel::COLOR);
 		pen.setBrush(QBrush(colorIndex.data(Qt::BackgroundRole).value<QColor>()));
 		painter->setPen(pen);
-		painter->drawLine(polygon()[i-1],polygon()[i]);
+		painter->drawLine(poly[i-1],poly[i]);
 	}
 }
 
-void DiveProfileItem::modelDataChanged()
+void DiveProfileItem::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1 || dataModel->rowCount() == 0)
+	if(!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 
-	AbstractProfilePolygonItem::modelDataChanged();
+	AbstractProfilePolygonItem::modelDataChanged(topLeft, bottomRight);
 	if (polygon().isEmpty())
 		return;
 
@@ -120,7 +153,7 @@ void DiveProfileItem::modelDataChanged()
 	/* Show any ceiling we may have encountered */
 	if (prefs.profile_dc_ceiling && !prefs.profile_red_ceiling) {
 		QPolygonF p = polygon();
-		plot_data *entry = dataModel->data() + dataModel->rowCount()-1;
+		plot_data *entry = dataModel->data().entry + dataModel->rowCount()-1;
 		for (int i = dataModel->rowCount() - 1; i >= 0; i--, entry--) {
 			if (!entry->in_deco) {
 				/* not in deco implies this is a safety stop, no ceiling */
@@ -144,17 +177,17 @@ void DiveProfileItem::modelDataChanged()
 	int last = -1;
 	for (int i = 0, count  = dataModel->rowCount(); i < count; i++) {
 
-		struct plot_data *entry = dataModel->data()+i;
+		struct plot_data *entry = dataModel->data().entry+i;
 		if (entry->depth < 2000)
 			continue;
 
 		if ((entry == entry->max[2]) && entry->depth / 100 != last) {
-			plot_depth_sample(entry, Qt::AlignHCenter | Qt::AlignTop, getColor(SAMPLE_DEEP));
+			plot_depth_sample(entry, Qt::AlignHCenter | Qt::AlignBottom, getColor(SAMPLE_DEEP));
 			last = entry->depth / 100;
 		}
 
 		if ((entry == entry->min[2]) && entry->depth / 100 != last) {
-			plot_depth_sample(entry, Qt::AlignHCenter | Qt::AlignBottom, getColor(SAMPLE_SHALLOW));
+			plot_depth_sample(entry, Qt::AlignHCenter | Qt::AlignTop, getColor(SAMPLE_SHALLOW));
 			last = entry->depth / 100;
 		}
 
@@ -192,22 +225,22 @@ DiveTemperatureItem::DiveTemperatureItem()
 	setPen(pen);
 }
 
-void DiveTemperatureItem::modelDataChanged()
+void DiveTemperatureItem::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
+	int last = -300, last_printed_temp = 0, sec = 0;
 	// We don't have enougth data to calculate things, quit.
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1 || dataModel->rowCount() == 0)
+	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 
 	qDeleteAll(texts);
 	texts.clear();
 	// Ignore empty values. things do not look good with '0' as temperature in kelvin...
 	QPolygonF poly;
-	int last = -300, last_printed_temp = 0, sec = 0;
 	for (int i = 0, modelDataCount = dataModel->rowCount(); i < modelDataCount; i++) {
 		int mkelvin = dataModel->index(i, vDataColumn).data().toInt();
 		if (!mkelvin)
 			continue;
-		int sec = dataModel->index(i, hDataColumn).data().toInt();
+		sec = dataModel->index(i, hDataColumn).data().toInt();
 		QPointF point( hAxis->posAtValue(sec), vAxis->posAtValue(mkelvin));
 		poly.append(point);
 
@@ -244,7 +277,7 @@ void DiveTemperatureItem::createTextItem(int sec, int mkelvin)
 	deg = get_temp_units(mkelvin, &unit);
 
 	DiveTextItem *text = new DiveTextItem(this);
-	text->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
+	text->setAlignment(Qt::AlignRight | Qt::AlignBottom);
 	text->setBrush(getColor(TEMP_TEXT));
 	text->setPos(QPointF(hAxis->posAtValue(sec), vAxis->posAtValue(mkelvin)));
 	text->setText(QString("%1%2").arg(deg, 0, 'f', 1).arg(unit));
@@ -254,15 +287,16 @@ void DiveTemperatureItem::createTextItem(int sec, int mkelvin)
 
 void DiveTemperatureItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+	if(polygon().isEmpty())
+		return;
 	painter->setPen(pen());
 	painter->drawPolyline(polygon());
 }
 
-
-void DiveGasPressureItem::modelDataChanged()
+void DiveGasPressureItem::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
 	// We don't have enougth data to calculate things, quit.
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1 || dataModel->rowCount() == 0)
+	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 	int last_index = -1;
 	int lift_pen = false;
@@ -271,7 +305,7 @@ void DiveGasPressureItem::modelDataChanged()
 	polygons.clear();
 
 	for (int i = 0, count = dataModel->rowCount(); i < count; i++) {
-		plot_data* entry = dataModel->data() + i;
+		plot_data* entry = dataModel->data().entry + i;
 		int mbar = GET_PRESSURE(entry);
 
 		if (entry->cylinderindex != last_index) {
@@ -287,11 +321,8 @@ void DiveGasPressureItem::modelDataChanged()
 		polygons.last().push_back(point); // The polygon thta will be plotted.
 	}
 	setPolygon(boundingPoly);
-
-	//TODO: Instead of deleting all texts, move the existing ones to it's new location.
 	qDeleteAll(texts);
 	texts.clear();
-
 	int mbar, cyl;
 	int seen_cyl[MAX_CYLINDERS] = { false, };
 	int last_pressure[MAX_CYLINDERS] = { 0, };
@@ -302,7 +333,7 @@ void DiveGasPressureItem::modelDataChanged()
 
 	cyl = -1;
 	for (int i = 0, count = dataModel->rowCount(); i < count; i++) {
-		entry = dataModel->data() + i;
+		entry = dataModel->data().entry + i;
 		mbar = GET_PRESSURE(entry);
 
 		if (!mbar)
@@ -310,8 +341,8 @@ void DiveGasPressureItem::modelDataChanged()
 		if (cyl != entry->cylinderindex) {
 			cyl = entry->cylinderindex;
 			if (!seen_cyl[cyl]) {
-				plot_pressure_value(mbar, entry->sec, Qt::AlignLeft | Qt::AlignBottom);
-				plot_gas_value(mbar, entry->sec, Qt::AlignLeft | Qt::AlignTop,
+				plot_pressure_value(mbar, entry->sec, Qt::AlignRight | Qt::AlignTop);
+				plot_gas_value(mbar, entry->sec, Qt::AlignRight | Qt::AlignBottom,
 						get_o2(&dive->cylinder[cyl].gasmix),
 						get_he(&dive->cylinder[cyl].gasmix));
 				seen_cyl[cyl] = true;
@@ -323,7 +354,7 @@ void DiveGasPressureItem::modelDataChanged()
 
 	for (cyl = 0; cyl < MAX_CYLINDERS; cyl++) {
 		if (last_time[cyl]) {
-			plot_pressure_value(last_pressure[cyl], last_time[cyl], Qt::AlignHCenter | Qt::AlignTop);
+			plot_pressure_value(last_pressure[cyl], last_time[cyl], Qt::AlignRight | Qt::AlignTop);
 		}
 	}
 }
@@ -333,7 +364,7 @@ void DiveGasPressureItem::plot_pressure_value(int mbar, int sec, QFlags<Qt::Alig
 	const char *unit;
 	int pressure = get_pressure_units(mbar, &unit);
 	DiveTextItem *text = new DiveTextItem(this);
-	text->setPos(hAxis->posAtValue(sec), vAxis->posAtValue(mbar));
+	text->setPos(hAxis->posAtValue(sec), vAxis->posAtValue(mbar)-0.5);
 	text->setText(QString("%1 %2").arg(pressure).arg(unit));
 	text->setAlignment(flags);
 	text->setBrush(getColor(PRESSURE_TEXT));
@@ -355,24 +386,38 @@ void DiveGasPressureItem::plot_gas_value(int mbar, int sec, QFlags<Qt::Alignment
 
 void DiveGasPressureItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+	if(polygon().isEmpty())
+		return;
 	QPen pen;
 	pen.setCosmetic(true);
 	pen.setWidth(2);
+	struct dive *d = getDiveById(dataModel->id());
+	if (!d)
+		return;
+	struct plot_data *entry = dataModel->data().entry;
 	Q_FOREACH(const QPolygonF& poly, polygons) {
-		for (int i = 1, count = poly.count(); i < count; i++) {
-			pen.setBrush(QBrush(Qt::red)); // TODO: Fix the color.
+		for (int i = 1, count = poly.count(); i < count; i++, entry++) {
+			pen.setBrush(getSacColor(entry->sac, d->sac));
 			painter->setPen(pen);
 			painter->drawLine(poly[i-1],poly[i]);
 		}
 	}
 }
 
-void DiveCalculatedCeiling::modelDataChanged()
+DiveCalculatedCeiling::DiveCalculatedCeiling() : is3mIncrement(false), gradientFactor(new DiveTextItem(this))
+{
+	gradientFactor->setY(0);
+	gradientFactor->setBrush(getColor(PRESSURE_TEXT));
+	gradientFactor->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
+	preferencesChanged();
+}
+
+void DiveCalculatedCeiling::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
 	// We don't have enougth data to calculate things, quit.
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1)
+	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
-	AbstractProfilePolygonItem::modelDataChanged();
+	AbstractProfilePolygonItem::modelDataChanged(topLeft, bottomRight);
 	// Add 2 points to close the polygon.
 	QPolygonF poly = polygon();
 	if (poly.isEmpty())
@@ -389,10 +434,15 @@ void DiveCalculatedCeiling::modelDataChanged()
 	pat.setColorAt(1, getColor(CALC_CEILING_DEEP));
 	setPen(QPen(QBrush(Qt::NoBrush),0));
 	setBrush(pat);
+
+	gradientFactor->setX(poly.boundingRect().width()/2 + poly.boundingRect().x());
+	gradientFactor->setText(QString("GF %1/%2").arg(prefs.gflow).arg(prefs.gfhigh));
 }
 
 void DiveCalculatedCeiling::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+	if(polygon().isEmpty())
+		return;
 	QGraphicsPolygonItem::paint(painter, option, widget);
 }
 
@@ -405,17 +455,17 @@ void DiveCalculatedTissue::preferencesChanged()
 {
 	QSettings s;
 	s.beginGroup("TecDetails");
-	setVisible(s.value("calcalltissues").toBool());
+	setVisible(s.value("calcalltissues").toBool() && s.value("calcceiling").toBool());
 }
 
-void DiveReportedCeiling::modelDataChanged()
+void DiveReportedCeiling::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1)
+	if(!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 
 	QPolygonF p;
 	p.append(QPointF(hAxis->posAtValue(0), vAxis->posAtValue(0)));
-	plot_data *entry = dataModel->data();
+	plot_data *entry = dataModel->data().entry;
 	for (int i = 0, count = dataModel->rowCount(); i < count; i++, entry++) {
 		if (entry->in_deco && entry->stopdepth) {
 			if (entry->stopdepth < entry->depth) {
@@ -435,6 +485,20 @@ void DiveReportedCeiling::modelDataChanged()
 	setBrush(pat);
 }
 
+void DiveCalculatedCeiling::preferencesChanged()
+{
+	QSettings s;
+	s.beginGroup("TecDetails");
+
+	bool shouldShow3mIncrement = s.value("calcceiling3m").toBool();
+	if ( dataModel && is3mIncrement != shouldShow3mIncrement){
+		// recalculate that part.
+		dataModel->calculateDecompression();
+	}
+	is3mIncrement = shouldShow3mIncrement;
+	setVisible(s.value("calcceiling").toBool());
+}
+
 void DiveReportedCeiling::preferencesChanged()
 {
 	QSettings s;
@@ -444,15 +508,15 @@ void DiveReportedCeiling::preferencesChanged()
 
 void DiveReportedCeiling::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+	if(polygon().isEmpty())
+		return;
 	QGraphicsPolygonItem::paint(painter, option, widget);
 }
 
-MeanDepthLine::MeanDepthLine()
+MeanDepthLine::MeanDepthLine() : meanDepth(0), leftText(new DiveTextItem(this)), rightText(new DiveTextItem(this))
 {
-	leftText = new DiveTextItem(this);
 	leftText->setAlignment(Qt::AlignRight | Qt::AlignBottom);
 	leftText->setBrush(getColor(MEAN_DEPTH));
-	rightText = new DiveTextItem(this);
 	rightText->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
 	rightText->setBrush(getColor(MEAN_DEPTH));
 	leftText->setPos(0, 0);
@@ -470,21 +534,32 @@ void MeanDepthLine::setMeanDepth(int value)
 {
 	leftText->setText(get_depth_string(value, false, false));
 	rightText->setText(get_depth_string(value, false, false));
+	meanDepth = value;
 }
 
-void PartialPressureGasItem::modelDataChanged()
+void MeanDepthLine::setAxis(DiveCartesianAxis* a)
+{
+	connect(a, SIGNAL(sizeChanged()), this, SLOT(axisLineChanged()));
+}
+
+void MeanDepthLine::axisLineChanged()
+{
+	DiveCartesianAxis *axis = qobject_cast<DiveCartesianAxis*>(sender());
+	animateMoveTo(x(),axis->posAtValue(meanDepth));
+}
+
+void PartialPressureGasItem::modelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
 	//AbstractProfilePolygonItem::modelDataChanged();
-	if (!hAxis || !vAxis || !dataModel || hDataColumn == -1 || vDataColumn == -1 || dataModel->rowCount() == 0)
+	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 
-	plot_data *entry = dataModel->data();
+	plot_data *entry = dataModel->data().entry;
 	QPolygonF poly;
 	alertPoly.clear();
 	QSettings s;
 	s.beginGroup("TecDetails");
 	double threshould = s.value(threshouldKey).toDouble();
-
 	for(int i = 0;  i < dataModel->rowCount(); i++, entry++){
 		double value = dataModel->index(i, vDataColumn).data().toDouble();
 		int time = dataModel->index(i, hDataColumn).data().toInt();
@@ -493,17 +568,17 @@ void PartialPressureGasItem::modelDataChanged()
 		if (value >= threshould)
 			alertPoly.push_back(point);
 	}
-
 	setPolygon(poly);
 	/*
 	createPPLegend(trUtf8("pN" UTF8_SUBSCRIPT_2),getColor(PN2), legendPos);
 	*/
 }
+
 void PartialPressureGasItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{//TODO: fix the colors.
-	painter->setPen(getColor(PN2));
+{
+	painter->setPen(normalColor);
 	painter->drawPolyline(polygon());
-	painter->setPen(getColor(PN2_ALERT));
+	painter->setPen(alertColor);
 	painter->drawPolyline(alertPoly);
 }
 
@@ -514,10 +589,22 @@ void PartialPressureGasItem::setThreshouldSettingsKey(const QString& threshouldS
 
 PartialPressureGasItem::PartialPressureGasItem()
 {
-
 }
 
 void PartialPressureGasItem::preferencesChanged()
 {
-    AbstractProfilePolygonItem::preferencesChanged();
+	QSettings s;
+	s.beginGroup("TecDetails");
+	setVisible( s.value(visibilityKey).toBool() );
+}
+
+void PartialPressureGasItem::setVisibilitySettingsKey(const QString& key)
+{
+	visibilityKey = key;
+}
+
+void PartialPressureGasItem::setColors(const QColor& normal, const QColor& alert)
+{
+	normalColor = normal;
+	alertColor = alert;
 }

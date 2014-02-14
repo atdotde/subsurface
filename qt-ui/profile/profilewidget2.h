@@ -16,71 +16,73 @@
 #include "graphicsview-common.h"
 #include "divelineitem.h"
 
+struct dive;
+struct plot_info;
+class ToolTipItem;
 class MeanDepthLine;
 class DiveReportedCeiling;
 class DiveTextItem;
 class TemperatureAxis;
 class DiveEventItem;
-struct DivePlotDataModel;
-struct DivePixmapItem;
-struct DiveRectItem;
-struct DepthAxis;
-struct DiveCartesianAxis;
-struct DiveProfileItem;
-struct TimeAxis;
-struct dive;
-struct QStateMachine;
-struct DiveCartesianPlane;
-struct DiveTemperatureItem;
-struct plot_info;
-struct DiveGasPressureItem;
-struct DiveCalculatedCeiling;
-struct DiveReportedCeiling;
-struct DiveCalculatedTissue;
-struct PartialPressureGasItem;
+class DivePlotDataModel;
+class DivePixmapItem;
+class DiveRectItem;
+class DepthAxis;
+class DiveCartesianAxis;
+class DiveProfileItem;
+class TimeAxis;
+class DiveCartesianPlane;
+class DiveTemperatureItem;
+class DiveGasPressureItem;
+class DiveCalculatedCeiling;
+class DiveCalculatedTissue;
+class PartialPressureGasItem;
+class PartialGasPressureAxis;
+class AbstractProfilePolygonItem;
 
 class ProfileWidget2 : public QGraphicsView {
 	Q_OBJECT
-	void fixBackgroundPos();
 public:
 	enum State{ EMPTY, PROFILE, EDIT, ADD, PLAN, INVALID };
 	enum Items{BACKGROUND, PROFILE_Y_AXIS, GAS_Y_AXIS, TIME_AXIS, DEPTH_CONTROLLER, TIME_CONTROLLER, COLUMNS};
 
 	ProfileWidget2(QWidget *parent);
 	void plotDives(QList<dive*> dives);
+	virtual bool eventFilter(QObject*, QEvent*);
+	void setupItem( AbstractProfilePolygonItem *item, DiveCartesianAxis *hAxis, DiveCartesianAxis *vAxis, DivePlotDataModel *model, int vData, int hData, int zValue);
 
 public slots: // Necessary to call from QAction's signals.
 	void settingsChanged();
-protected:
-	virtual void contextMenuEvent(QContextMenuEvent* event);
-	virtual void resizeEvent(QResizeEvent* event);
+	void setEmptyState();
+	void setProfileState();
 
-signals:
-	void startProfileState();
-	void startAddState();
-	void startPlanState();
-	void startEmptyState();
-	void startEditState();
-	void startHideGasState();
-	void startShowGasState();
-	void startShowTissueState();
-	void startHideTissueState();
+protected:
+	virtual void resizeEvent(QResizeEvent* event);
+	virtual void wheelEvent(QWheelEvent* event);
+	virtual void mouseMoveEvent(QMouseEvent* event);
+private: /*methods*/
+	void fixBackgroundPos();
+	void scrollViewTo(const QPoint& pos);
+	void setupSceneAndFlags();
+	void setupItemSizes();
+	void addItemsToScene();
+	void setupItemOnScene();
 private:
 	DivePlotDataModel *dataModel;
 	State currentState;
-	QStateMachine *stateMachine;
-
-	DivePixmapItem *background ;
+	int zoomLevel;
+	QHash<QString, QPixmap> backgrounds;
+	DivePixmapItem *background;
+	QString backgroundFile;
+	ToolTipItem *toolTipItem;
 	// All those here should probably be merged into one structure,
 	// So it's esyer to replicate for more dives later.
 	// In the meantime, keep it here.
 	struct plot_info *plotInfo;
-	DepthAxis *profileYAxis ;
-	DiveCartesianAxis *gasYAxis;
+	DepthAxis *profileYAxis;
+	PartialGasPressureAxis *gasYAxis;
 	TemperatureAxis *temperatureAxis;
 	TimeAxis *timeAxis;
-	DiveRectItem *depthController;
-	DiveRectItem *timeController;
 	DiveProfileItem *diveProfileItem;
 	DiveCartesianPlane *cartesianPlane;
 	DiveTemperatureItem *temperatureItem;
@@ -97,4 +99,4 @@ private:
 	PartialPressureGasItem *po2GasItem;
 };
 
-#endif
+#endif // PROFILEWIDGET2_H

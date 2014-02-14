@@ -1,5 +1,5 @@
-#ifndef PREFERENCES_DIALOG_H
-#define PREFERENCES_DIALOG_H
+#ifndef PREFERENCES_H
+#define PREFERENCES_H
 
 #include <QDialog>
 #include "../dive.h"
@@ -14,12 +14,14 @@ Q_OBJECT
 public:
 	static PreferencesDialog* instance();
 	void showEvent(QShowEvent* );
+	void emitSettingsChanged();
 signals:
 	void settingsChanged();
 public slots:
 	void buttonClicked(QAbstractButton* button);
 	void on_chooseFile_clicked();
 	void syncSettings();
+	void loadSettings();
 	void restorePrefs();
 	void rememberPrefs();
 	void gflowChanged(int gf);
@@ -32,4 +34,4 @@ private:
 	struct preferences oldPrefs;
 };
 
-#endif
+#endif // PREFERENCES_H

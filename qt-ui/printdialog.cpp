@@ -11,14 +11,7 @@
 #include <QPrintPreviewDialog>
 #include <QPrintDialog>
 
-PrintDialog *PrintDialog::instance()
-{
-	static PrintDialog *self = new PrintDialog(mainWindow());
-	self->setAttribute(Qt::WA_QuitOnClose, false);
-	return self;
-}
-
-PrintDialog::PrintDialog(QWidget *parent, Qt::WindowFlags f)
+PrintDialog::PrintDialog(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f)
 {
 	// options template (are we storing these in the settings?)
 	struct options tempOptions = {options::PRETTY, 0, 2, false, 65, 15, 12};
@@ -45,13 +38,14 @@ PrintDialog::PrintDialog(QWidget *parent, Qt::WindowFlags f)
 	hLayout->addWidget(printButton);
 
 	QPushButton *closeButton = new QPushButton(tr("&Close"));
-	connect(closeButton, SIGNAL(clicked(bool)), this, SLOT(closeClicked()));
+	connect(closeButton, SIGNAL(clicked(bool)), this, SLOT(accept()));
 	hLayout->addWidget(closeButton);
 
 	progressBar = new QProgressBar();
 	connect(printLayout, SIGNAL(signalProgress(int)), progressBar, SLOT(setValue(int)));
 	progressBar->setMinimum(0);
 	progressBar->setMaximum(100);
+	progressBar->setValue(0);
 	progressBar->setTextVisible(false);
 	layout->addWidget(progressBar);
 
@@ -62,16 +56,10 @@ PrintDialog::PrintDialog(QWidget *parent, Qt::WindowFlags f)
 	setWindowIcon(QIcon(":subsurface-icon"));
 }
 
-void PrintDialog::runDialog()
-{
-	progressBar->setValue(0);
-	exec();
-}
-
 void PrintDialog::previewClicked(void)
 {
 	QPrintPreviewDialog previewDialog(&printer, this);
-	QObject::connect(&previewDialog, SIGNAL(paintRequested(QPrinter *)), this, SLOT(onPaintRequested(QPrinter *)));
+	connect(&previewDialog, SIGNAL(paintRequested(QPrinter *)), this, SLOT(onPaintRequested(QPrinter *)));
 	previewDialog.exec();
 }
 
@@ -80,11 +68,6 @@ void PrintDialog::printClicked(void)
 	QPrintDialog printDialog(&printer, this);
 	if (printDialog.exec() == QDialog::Accepted)
 		printLayout->print();
-}
-
-void PrintDialog::closeClicked(void)
-{
-	close();
 }
 
 void PrintDialog::onPaintRequested(QPrinter *printerPtr)

@@ -9,15 +9,12 @@ class SubsurfaceAbout : public QDialog {
 	Q_OBJECT
 
 public:
-	static SubsurfaceAbout* instance();
-private slots:
-	void licenseClicked();
-	void websiteClicked();
-private:
 	explicit SubsurfaceAbout(QWidget* parent = 0, Qt::WindowFlags f = 0);
-	QPushButton *licenseButton;
-	QPushButton *websiteButton;
+private slots:
+	void on_licenseButton_clicked();
+	void on_websiteButton_clicked();
+private:
 	Ui::SubsurfaceAbout ui;
 };
 
-#endif
+#endif // ABOUT_H

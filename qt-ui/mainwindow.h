@@ -41,8 +41,12 @@ public:
 	enum CurrentState{ VIEWALL, GLOBE_MAXIMIZED, INFO_MAXIMIZED, PROFILE_MAXIMIZED, LIST_MAXIMIZED};
 
 	MainWindow();
+	virtual ~MainWindow();
+	static MainWindow *instance();
 	ProfileGraphicsView *graphics();
 	MainTab *information();
+	void loadRecentFiles(QSettings *s);
+	void addRecentFile(const QStringList &newFiles);
 	DiveListView *dive_list();
 	GlobeGPS *globe();
 	void showError(QString message);
@@ -58,6 +62,7 @@ public:
 	QTabWidget *tabWidget();
 private slots:
 	/* file menu action */
+	void recentFileTriggered(bool checked);
 	void on_actionNew_triggered();
 	void on_actionOpen_triggered();
 	void on_actionSave_triggered();
@@ -105,6 +110,20 @@ private slots:
 
 	void on_actionImportDiveLog_triggered();
 
+	/* TODO: Move those slots below to it's own class */
+	void on_profCalcAllTissues_clicked(bool triggered);
+	void on_profCalcCeiling_clicked(bool triggered);
+	void on_profDcCeiling_clicked(bool triggered);
+	void on_profEad_clicked(bool triggered);
+	void on_profIncrement3m_clicked(bool triggered);
+	void on_profMod_clicked(bool triggered);
+	void on_profNtl_tts_clicked(bool triggered);
+	void on_profPO2_clicked(bool triggered);
+	void on_profPhe_clicked(bool triggered);
+	void on_profPn2_clicked(bool triggered);
+	void on_profRuler_clicked(bool triggered);
+	void on_profSAC_clicked(bool triggered);
+
 protected:
 	void closeEvent(QCloseEvent *);
 
@@ -121,6 +140,7 @@ private:
 	UserManual *helpView;
 	CurrentState state;
 	QString filter();
+	static MainWindow *m_Instance;
 	bool askSaveChanges();
 	void writeSettings();
 	void redrawProfile();
@@ -134,4 +154,4 @@ private:
 
 MainWindow *mainWindow();
 
-#endif
+#endif // MAINWINDOW_H
