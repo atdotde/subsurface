@@ -151,9 +151,45 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char
 	return 0;
 }
 
+int db_test_func(void *param, int columns, char **data, char **column)
+{
+	return *data[0] == '0';
+}
+
+
 static int try_to_open_db(const char *filename, struct memblock *mem, char **error)
 {
-	return parse_dm4_buffer(filename, mem->buffer, mem->size, &dive_table, error);
+	sqlite3 *handle;
+	char dm4_test[] = "select count(*) from sqlite_master where type='table' and name='Dive' and sql like '%ProfileBlob%'";
+	char shearwater_test[] = "select count(*) from sqlite_master where type='table' and name='system' and sql like '%dbVersion%'";
+	int retval;
+
+	retval = sqlite3_open(filename, &handle);
+
+	if (retval) {
+		fprintf(stderr, translate("gettextFromC","Database connection failed '%s'.\n"), filename);
+		return 1;
+	}
+
+	/* Testing if DB schema resembles Suunto DM4 database format */
+	retval = sqlite3_exec(handle, dm4_test, &db_test_func, 0, NULL);
+	if (!retval) {
+		retval = parse_dm4_buffer(handle, filename, mem->buffer, mem->size, &dive_table, error);
+		sqlite3_close(handle);
+		return retval;
+	}
+
+	/* Testing if DB schema resembles Shearwater database format */
+	retval = sqlite3_exec(handle, shearwater_test, &db_test_func, 0, NULL);
+	if (!retval) {
+		retval = parse_shearwater_buffer(handle, filename, mem->buffer, mem->size, &dive_table, error);
+		sqlite3_close(handle);
+		return retval;
+	}
+
+	sqlite3_close(handle);
+
+	return retval;
 }
 
 timestamp_t parse_date(const char *date)
@@ -349,17 +385,18 @@ void parse_file(const char *filename, char **error)
 
 #define MAXCOLDIGITS 3
 #define MAXCOLS 100
-void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, char **error)
+void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int unitidx, char **error)
 {
 	struct memblock mem;
 	int pnr=0;
-	char *params[19];
+	char *params[21];
 	char timebuf[MAXCOLDIGITS];
 	char depthbuf[MAXCOLDIGITS];
 	char tempbuf[MAXCOLDIGITS];
 	char po2buf[MAXCOLDIGITS];
 	char cnsbuf[MAXCOLDIGITS];
 	char stopdepthbuf[MAXCOLDIGITS];
+	char unitbuf[MAXCOLDIGITS];
 	char separator_index[MAXCOLDIGITS];
 	time_t now;
 	struct tm *timep;
@@ -380,6 +417,7 @@ void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int 
 	snprintf(cnsbuf, MAXCOLDIGITS, "%d", cnsf);
 	snprintf(stopdepthbuf, MAXCOLDIGITS, "%d", stopdepthf);
 	snprintf(separator_index, MAXCOLDIGITS, "%d", sepidx);
+	snprintf(unitbuf, MAXCOLDIGITS, "%d", unitidx);
 	time(&now);
 	timep = localtime(&now);
 	strftime(curdate, sizeof(curdate), "%Y%m%d", timep);
@@ -404,6 +442,8 @@ void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int 
 	params[pnr++] = curdate;
 	params[pnr++] = "time";
 	params[pnr++] = curtime;
+	params[pnr++] = "units";
+	params[pnr++] = unitbuf;
 	params[pnr++] = "separatorIndex";
 	params[pnr++] = separator_index;
 	params[pnr++] = NULL;

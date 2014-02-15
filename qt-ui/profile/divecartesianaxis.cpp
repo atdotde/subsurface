@@ -20,16 +20,6 @@ static QPen gridPen(){
 	return pen;
 }
 
-void DiveCartesianAxis::setup(double minimum, double maximum, double interval, DiveCartesianAxis::Orientation o, qreal tick_size, const QPointF& pos)
-{
-	setMinimum(minimum);
-	setMaximum(maximum);
-	setTickInterval(interval);
-	setOrientation(o);
-	setTickSize(tick_size);
-	setPos(pos);
-}
-
 double DiveCartesianAxis::tickInterval() const
 {
 	return interval;
@@ -38,6 +28,11 @@ double DiveCartesianAxis::tickInterval() const
 double DiveCartesianAxis::tickSize() const
 {
 	return tick_size;
+}
+
+void DiveCartesianAxis::setFontLabelScale(qreal scale)
+{
+	labelScale = scale;
 }
 
 void DiveCartesianAxis::setMaximum(double maximum)
@@ -67,6 +62,7 @@ DiveCartesianAxis::DiveCartesianAxis() : QObject(),
 	min(0),
 	max(0),
 	interval(1),
+	labelScale(1.0),
 	tick_size(0),
 	textVisibility(true)
 {
@@ -164,6 +160,7 @@ void DiveCartesianAxis::updateTicks()
 		label->setText(textForValue(currValue));
 		label->setBrush(QBrush(textColor));
 		label->setBrush(colorForValue(currValue));
+		label->setScale(fontLabelScale());
 		labels.push_back(label);
 		if (orientation == RightToLeft || orientation == LeftToRight) {
 			label->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
@@ -259,6 +256,11 @@ double DiveCartesianAxis::maximum() const
 double DiveCartesianAxis::minimum() const
 {
 	return min;
+}
+
+double DiveCartesianAxis::fontLabelScale() const
+{
+	return labelScale;
 }
 
 void DiveCartesianAxis::setColor(const QColor& color)

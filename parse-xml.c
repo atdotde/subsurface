@@ -14,12 +14,11 @@
 
 #include "gettext.h"
 
-#include<sqlite3.h>
-
 #include "dive.h"
 #include "device.h"
 
 int verbose, quit;
+int metric = 1;
 
 static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **error);
 
@@ -1863,24 +1862,16 @@ extern int dm4_dive(void *param, int columns, char **data, char **column)
 	return SQLITE_OK;
 }
 
-int parse_dm4_buffer(const char *url, const char *buffer, int size,
+int parse_dm4_buffer(sqlite3 *handle, const char *url, const char *buffer, int size,
 			struct dive_table *table, char **error)
 {
 	int retval;
 	char *err = NULL;
-	sqlite3 *handle;
 	target_table = table;
 
 	/* StartTime is converted from Suunto's nano seconds to standard
 	 * time. We also need epoch, not seconds since year 1. */
 	char get_dives[] = "select D.DiveId,StartTime/10000000-62135596800,Note,Duration,SourceSerialNumber,Source,MaxDepth,SampleInterval,StartTemperature,BottomTemperature,D.StartPressure,D.EndPressure,Size,CylinderWorkPressure,SurfacePressure,DiveTime,SampleInterval,ProfileBlob,TemperatureBlob,PressureBlob,Oxygen,Helium,MIX.StartPressure,MIX.EndPressure FROM Dive AS D JOIN DiveMixture AS MIX ON D.DiveId=MIX.DiveId";
-
-	retval = sqlite3_open(url, &handle);
-
-	if (retval) {
-		fprintf(stderr, translate("gettextFromC","Database connection failed '%s'.\n"), url);
-		return 1;
-	}
 
 	retval = sqlite3_exec(handle, get_dives, &dm4_dive, handle, &err);
 
@@ -1889,7 +1880,155 @@ int parse_dm4_buffer(const char *url, const char *buffer, int size,
 		return 1;
 	}
 
-	sqlite3_close(handle);
+	return 0;
+}
+
+extern int shearwater_cylinders(void *handle, int columns, char **data, char **column)
+{
+	cylinder_start();
+	if (data[0])
+		cur_dive->cylinder[cur_cylinder_index].gasmix.o2.permille = atof(data[0]) * 1000;
+	if (data[1])
+		cur_dive->cylinder[cur_cylinder_index].gasmix.he.permille = atof(data[1]) * 1000;
+	cylinder_end();
+
+	return 0;
+}
+
+extern int shearwater_changes(void *handle, int columns, char **data, char **column)
+{
+	event_start();
+	if (data[0])
+		cur_event.time.seconds = atoi(data[0]);
+	if (data[1]) {
+		cur_event.name = strdup("gaschange");
+		cur_event.value = atof(data[1]) * 100;
+	}
+	event_end();
+
+	return 0;
+}
+
+extern int shearwater_profile_sample(void *handle, int columns, char **data, char **column)
+{
+	sample_start();
+	if (data[0])
+		cur_sample->time.seconds = atoi(data[0]);
+	if (data[1])
+		cur_sample->depth.mm = metric ? atof(data[1]) * 1000 : feet_to_mm(atof(data[1]));
+	if (data[2])
+		cur_sample->temperature.mkelvin = metric ? C_to_mkelvin(atof(data[2])) : F_to_mkelvin(atof(data[2]));
+	if (data[3])
+		cur_sample->po2 = atof(data[3]) * 1000;
+	if (data[4])
+		cur_sample->ndl.seconds = atoi(data[4]) * 60;
+	if (data[5])
+		cur_sample->cns = atoi(data[5]);
+	if (data[6])
+		cur_sample->stopdepth.mm = metric ?  atoi(data[6]) * 1000 : feet_to_mm(atoi(data[6]));
+
+	/* We don't actually have data[3], but it should appear in the
+	 * SQL query at some point.
+	if (data[3])
+		cur_sample->cylinderpressure.mbar = metric ? atoi(data[3]) * 1000 : psi_to_mbar(atoi(data[3]));
+	 */
+	sample_end();
+
+	return 0;
+}
+
+extern int shearwater_dive(void *param, int columns, char **data, char **column)
+{
+	int i, interval, retval = 0;
+	sqlite3 *handle = (sqlite3 *)param;
+	float *profileBlob;
+	unsigned char *tempBlob;
+	char *err = NULL;
+	char get_profile_template[] = "select currentTime,currentDepth,waterTemp,averagePPO2,currentNdl,CNSPercent,decoCeiling from dive_log_records where diveLogId = %d";
+	char get_cylinder_template[] = "select fractionO2,fractionHe from dive_log_records where diveLogId = %d group by fractionO2,fractionHe";
+	char get_changes_template[] = "select a.currentTime,a.fractionO2,a.fractionHe from dive_log_records as a,dive_log_records as b where a.diveLogId = %d and b.diveLogId = %d and (a.id - 1) = b.id and (a.fractionO2 != b.fractionO2 or a.fractionHe != b.fractionHe) union select min(currentTime),fractionO2,fractionHe from dive_log_records";
+	char get_buffer[1024];
+
+	dive_start();
+	cur_dive->number = atoi(data[0]);
+
+	cur_dive->when = (time_t)(atol(data[1]));
+
+	if (data[2])
+		utf8_string(data[2], &cur_dive->location);
+	if (data[3])
+		utf8_string(data[3], &cur_dive->buddy);
+	if (data[4])
+		utf8_string(data[4], &cur_dive->notes);
+
+	metric = atoi(data[5]) == 1 ? 0 : 1;
+
+	/* TODO: verify that metric calculation is correct */
+	if (data[6])
+		cur_dive->dc.maxdepth.mm = metric ? atof(data[6]) * 1000 : feet_to_mm(atof(data[6]));
+
+	if (data[7])
+		cur_dive->dc.duration.seconds = atoi(data[7]) * 60;
+
+	if (data[8])
+		cur_dive->dc.surface_pressure.mbar = atoi(data[8]);
+	/*
+	 * TODO: the deviceid hash should be calculated here.
+	 */
+	settings_start();
+	dc_settings_start();
+	if (data[9])
+		utf8_string(data[9], &cur_settings.dc.serial_nr);
+	if (data[10])
+		utf8_string(data[10], &cur_settings.dc.model);
+
+	cur_settings.dc.deviceid = 0xffffffff;
+	dc_settings_end();
+	settings_end();
+
+	snprintf(get_buffer, sizeof(get_buffer) - 1, get_cylinder_template, cur_dive->number);
+	retval = sqlite3_exec(handle, get_buffer, &shearwater_cylinders, 0, &err);
+	if (retval != SQLITE_OK) {
+		fprintf(stderr, "%s", translate("gettextFromC","Database query get_cylinders failed.\n"));
+		return 1;
+	}
+
+	snprintf(get_buffer, sizeof(get_buffer) - 1, get_changes_template, cur_dive->number, cur_dive->number);
+	retval = sqlite3_exec(handle, get_buffer, &shearwater_changes, 0, &err);
+	if (retval != SQLITE_OK) {
+		fprintf(stderr, "%s", translate("gettextFromC","Database query get_changes failed.\n"));
+		return 1;
+	}
+
+	snprintf(get_buffer, sizeof(get_buffer) - 1, get_profile_template, cur_dive->number);
+	retval = sqlite3_exec(handle, get_buffer, &shearwater_profile_sample, 0, &err);
+	if (retval != SQLITE_OK) {
+		fprintf(stderr, "%s", translate("gettextFromC","Database query get_profile_sample failed.\n"));
+		return 1;
+	}
+
+	dive_end();
+
+	return SQLITE_OK;
+}
+
+
+int parse_shearwater_buffer(sqlite3 *handle, const char *url, const char *buffer, int size,
+			struct dive_table *table, char **error)
+{
+	int retval;
+	char *err = NULL;
+	target_table = table;
+
+	char get_dives[] = "select i.diveId,timestamp,location||' / '||site,buddy,notes,imperialUnits,maxDepth,maxTime,startSurfacePressure,computerSerial,computerModel FROM dive_info AS i JOIN dive_logs AS l ON i.diveId=l.diveId";
+
+	retval = sqlite3_exec(handle, get_dives, &shearwater_dive, handle, &err);
+
+	if (retval != SQLITE_OK) {
+		fprintf(stderr, translate("gettextFromC","Database query failed '%s'.\n"), url);
+		return 1;
+	}
+
 	return 0;
 }
 
