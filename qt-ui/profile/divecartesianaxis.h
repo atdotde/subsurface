@@ -37,6 +37,8 @@ public:
 	void setTextColor(const QColor& color);
 	void animateChangeLine(const QLineF& newLine);
 	void setTextVisible(bool arg1);
+	void setLinesVisible(bool arg1);
+	void setLineSize(qreal lineSize);
 	int unitSystem;
 public slots:
 	virtual void updateTicks();
@@ -49,13 +51,16 @@ protected:
 	virtual QColor colorForValue(double value);
 	Orientation orientation;
 	QList<DiveTextItem*> labels;
+	QList<DiveLineItem*> lines;
 	double min;
 	double max;
 	double interval;
 	double tick_size;
 	QColor textColor;
 	bool textVisibility;
+	bool lineVisibility;
 	double labelScale;
+	qreal line_size;
 };
 
 class DepthAxis : public DiveCartesianAxis {
@@ -97,27 +102,4 @@ private:
 	DivePlotDataModel *model;
 };
 
-// This is a try. Maybe the CartesianPlane should have the X and Y
-// axis and handle things internally?
-class DiveCartesianPlane :public QObject, public QGraphicsRectItem{
-	Q_OBJECT
-	Q_PROPERTY(QLineF verticalLine READ verticalLine WRITE setVerticalLine)
-	Q_PROPERTY(QLineF horizontalLine READ horizontalLine WRITE setHorizontalLine)
-public:
-	void setLeftAxis(DiveCartesianAxis *axis);
-	void setBottomAxis(DiveCartesianAxis *axis);
-	void setHorizontalLine(QLineF line);
-	void setVerticalLine(QLineF line);
-	QLineF horizontalLine() const;
-	QLineF verticalLine() const;
-public slots:
-	void setup();
-private:
-	DiveCartesianAxis *leftAxis;
-	DiveCartesianAxis *bottomAxis;
-	QList<DiveLineItem*> verticalLines;
-	QList<DiveLineItem*> horizontalLines;
-	qreal verticalSize;
-	qreal horizontalSize;
-};
 #endif // DIVECARTESIANAXIS_H

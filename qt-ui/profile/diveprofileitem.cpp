@@ -267,14 +267,14 @@ void DiveTemperatureItem::modelDataChanged(const QModelIndex& topLeft, const QMo
 	    ((abs(last_valid_temp - last_printed_temp) > 500) || ((double)last / (double)sec < 0.75))) {
 		createTextItem(sec, last_valid_temp);
 	}
-	texts.last()->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+	if( texts.count())
+		texts.last()->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
 }
 
 void DiveTemperatureItem::createTextItem(int sec, int mkelvin)
 {
 	double deg;
 	const char *unit;
-	static text_render_options_t tro = {TEMP_TEXT_SIZE, TEMP_TEXT};
 	deg = get_temp_units(mkelvin, &unit);
 
 	DiveTextItem *text = new DiveTextItem(this);
@@ -300,8 +300,6 @@ void DiveGasPressureItem::modelDataChanged(const QModelIndex& topLeft, const QMo
 	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
 	int last_index = -1;
-	int lift_pen = false;
-	int first_plot = true;
 	QPolygonF boundingPoly; // This is the "Whole Item", but a pressure can be divided in N Polygons.
 	polygons.clear();
 
@@ -533,8 +531,8 @@ void MeanDepthLine::setLine(qreal x1, qreal y1, qreal x2, qreal y2)
 
 void MeanDepthLine::setMeanDepth(int value)
 {
-	leftText->setText(get_depth_string(value, false, false));
-	rightText->setText(get_depth_string(value, false, false));
+	leftText->setText(get_depth_string(value, false, true));
+	rightText->setText(get_depth_string(value, false, true));
 	meanDepth = value;
 }
 

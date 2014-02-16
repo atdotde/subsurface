@@ -62,9 +62,10 @@ DiveCartesianAxis::DiveCartesianAxis() : QObject(),
 	min(0),
 	max(0),
 	interval(1),
-	labelScale(1.0),
 	tick_size(0),
-	textVisibility(true)
+	labelScale(1.0),
+	textVisibility(true),
+	line_size(1)
 {
 	setPen(gridPen());
 }
@@ -72,6 +73,11 @@ DiveCartesianAxis::DiveCartesianAxis() : QObject(),
 DiveCartesianAxis::~DiveCartesianAxis()
 {
 
+}
+
+void DiveCartesianAxis::setLineSize(qreal lineSize)
+{
+	line_size = lineSize;
 }
 
 void DiveCartesianAxis::setOrientation(Orientation o)
@@ -95,6 +101,26 @@ void DiveCartesianAxis::setTextVisible(bool arg1)
 	}
 }
 
+void DiveCartesianAxis::setLinesVisible(bool arg1)
+{
+	if(lineVisibility == arg1){
+		return;
+	}
+	lineVisibility  = arg1;
+	Q_FOREACH(DiveLineItem *item, lines){
+		item->setVisible(lineVisibility );
+	}
+}
+
+template<typename T> void emptyList( QList<T*>& list, double steps){
+	if (!list.isEmpty() && list.size() > steps) {
+		while (list.size() > steps) {
+				T *removedItem = list.takeLast();
+				Animations::animDelete(removedItem);
+		}
+	}
+}
+
 void DiveCartesianAxis::updateTicks()
 {
 	if (!scene())
@@ -103,17 +129,15 @@ void DiveCartesianAxis::updateTicks()
 	// unused so far:
 	// QGraphicsView *view = scene()->views().first();
 	double steps = (max - min) / interval;
-	double currValue = min;
+	double currValueText = min;
+	double currValueLine = min;
 
 	if (steps < 1)
 		return;
 
-	if (!labels.isEmpty() && labels.size() > steps) {
-		while (labels.size() > steps) {
-				DiveTextItem *removedText = labels.takeLast();
-				Animations::animDelete(removedText);
-		}
-	}
+	emptyList(labels, steps);
+	emptyList(lines, steps);
+
 	// Move the remaining Ticks / Text to it's corerct position
 	// Regartind the possibly new values for the Axis
 	qreal begin, stepSize;
@@ -132,15 +156,12 @@ void DiveCartesianAxis::updateTicks()
 	}
 	stepSize = stepSize / steps;
 
-	for (int i = 0, count = labels.size(); i < count; i++, currValue += interval) {
-		qreal childPos;
-		if (orientation == TopToBottom || orientation == LeftToRight) {
-			childPos = begin + i * stepSize;
-		} else {
-			childPos = begin - i * stepSize;
-		}
+	for (int i = 0, count = labels.size(); i < count; i++, currValueText += interval) {
+		qreal childPos = (orientation == TopToBottom || orientation == LeftToRight) ?
+			begin + i * stepSize :
+			begin - i * stepSize;
 
-		labels[i]->setText(textForValue(currValue));
+		labels[i]->setText(textForValue(currValueText));
 		if ( orientation == LeftToRight || orientation == RightToLeft) {
 			labels[i]->animateMoveTo(childPos, m.y1() + tick_size);
 		} else {
@@ -148,8 +169,20 @@ void DiveCartesianAxis::updateTicks()
 		}
 	}
 
+	for (int i = 0, count = lines.size(); i < count; i++, currValueLine += interval) {
+		qreal childPos = (orientation == TopToBottom || orientation == LeftToRight) ?
+			begin + i * stepSize :
+			begin - i * stepSize;
+
+		if ( orientation == LeftToRight || orientation == RightToLeft) {
+			lines[i]->animateMoveTo(childPos, m.y1());
+		} else {
+			lines[i]->animateMoveTo(m.x1(), childPos);
+		}
+	}
+
 	// Add's the rest of the needed Ticks / Text.
-	for (int i = labels.size(); i < steps; i++,  currValue += interval) {
+	for (int i = labels.size(); i < steps; i++,  currValueText += interval) {
 		qreal childPos;
 		if (orientation == TopToBottom || orientation == LeftToRight) {
 		childPos = begin + i * stepSize;
@@ -157,10 +190,11 @@ void DiveCartesianAxis::updateTicks()
 			childPos = begin - i * stepSize;
 		}
 		DiveTextItem *label = new DiveTextItem(this);
-		label->setText(textForValue(currValue));
+		label->setText(textForValue(currValueText));
 		label->setBrush(QBrush(textColor));
-		label->setBrush(colorForValue(currValue));
+		label->setBrush(colorForValue(currValueText));
 		label->setScale(fontLabelScale());
+		label->setZValue(1);
 		labels.push_back(label);
 		if (orientation == RightToLeft || orientation == LeftToRight) {
 			label->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
@@ -173,9 +207,37 @@ void DiveCartesianAxis::updateTicks()
 		}
 	}
 
-	Q_FOREACH(DiveTextItem *item, labels){
-		item->setVisible(textVisibility);
+	// Add's the rest of the needed Ticks / Text.
+	for (int i = lines.size(); i < steps; i++,  currValueText += interval) {
+		qreal childPos;
+		if (orientation == TopToBottom || orientation == LeftToRight) {
+		childPos = begin + i * stepSize;
+		} else {
+			childPos = begin - i * stepSize;
+		}
+		DiveLineItem *line = new DiveLineItem(this);
+		QPen pen;
+		pen.setBrush(getColor(TIME_GRID));
+		pen.setCosmetic(true);
+		pen.setWidthF(2);
+		line->setPen(pen);
+		line->setZValue(0);
+		lines.push_back(line);
+		if (orientation == RightToLeft || orientation == LeftToRight) {
+			line->setLine(0,-line_size,0, 0);
+			line->animateMoveTo(childPos, m.y1());
+		} else {
+			QPointF p1 = mapFromScene(3, 0);
+			QPointF p2 = mapFromScene(line_size, 0);
+			line->setLine(p1.x(), 0, p2.x(), 0);
+			line->animateMoveTo(m.x1(), childPos);
+		}
 	}
+
+	Q_FOREACH(DiveTextItem *item, labels)
+		item->setVisible(textVisibility);
+	Q_FOREACH(DiveLineItem  *item, lines)
+		item->setVisible(lineVisibility);
 }
 
 void DiveCartesianAxis::animateChangeLine(const QLineF& newLine)
@@ -275,6 +337,8 @@ void DiveCartesianAxis::setColor(const QColor& color)
 
 QString DepthAxis::textForValue(double value)
 {
+	if (value == 0)
+		return QString();
 	return get_depth_string(value, false, false);
 }
 
@@ -343,91 +407,6 @@ void TimeAxis::updateTicks()
 QString TemperatureAxis::textForValue(double value)
 {
 	return QString::number(mkelvin_to_C( (int) value));
-}
-
-
-void DiveCartesianPlane::setLeftAxis(DiveCartesianAxis* axis)
-{
-	leftAxis = axis;
-	connect(leftAxis, SIGNAL(maxChanged()), this, SLOT(setup()));
-	if (bottomAxis)
-		setup();
-}
-
-void DiveCartesianPlane::setBottomAxis(DiveCartesianAxis* axis)
-{
-	bottomAxis = axis;
-	connect(bottomAxis, SIGNAL(maxChanged()), this, SLOT(setup()));
-	if (leftAxis)
-		setup();
-}
-
-QLineF DiveCartesianPlane::horizontalLine() const
-{
-	return (bottomAxis) ? bottomAxis->line() : QLineF();
-}
-
-void DiveCartesianPlane::setHorizontalLine(QLineF line)
-{
-	if (IS_FP_SAME(horizontalSize, line.length()))
-		return;
-	horizontalSize = line.length();
-	setup();
-}
-
-void DiveCartesianPlane::setVerticalLine(QLineF line)
-{
-	if (IS_FP_SAME(verticalSize, line.length()))
-		return;
-	verticalSize = line.length();
-	setup();
-}
-
-QLineF DiveCartesianPlane::verticalLine() const
-{
-	return (leftAxis) ? leftAxis->line() : QLineF();
-}
-
-void DiveCartesianPlane::setup()
-{
-	if (!leftAxis || !bottomAxis || !scene())
-		return;
-
-	setPen(gridPen());
-// This creates a Grid around the axis, creating the cartesian plane.
-	const int top = leftAxis->posAtValue(leftAxis->minimum());
-	// unused for now:
-	// const int bottom = leftAxis->posAtValue(leftAxis->maximum());
-	const int left = bottomAxis->posAtValue(bottomAxis->minimum());
-	// unused for now:
-	// const int right = bottomAxis->posAtValue(bottomAxis->maximum());
-
-	setRect(0, 0, horizontalSize, verticalSize);
-	setPos(left, top);
-
-	qDeleteAll(horizontalLines);
-	qDeleteAll(verticalLines);
-	horizontalLines.clear();
-	verticalLines.clear();
-
-	// DEPTH is M_OR_FEET(10,30), Minutes are 600, per line.
-	for (int i = leftAxis->minimum(), max = leftAxis->maximum(); i < max; i += M_OR_FT(10,30)) {
-		DiveLineItem *line = new DiveLineItem(this);
-		line->setLine(0, 0, horizontalSize, 0);
-		line->setPos(0,leftAxis->posAtValue(i)-top);
-		line->setZValue(-1);
-		line->setPen(gridPen());
-		horizontalLines.push_back(line);
-	}
-
-	for (int i = bottomAxis->minimum(), max = bottomAxis->maximum(); i < max; i += 600) { // increments by 10 minutes.
-		DiveLineItem *line = new DiveLineItem(this);
-		line->setLine(0, 0, 0, verticalSize);
-		line->setPos(bottomAxis->posAtValue(i)-left, 0);
-		line->setZValue(-1);
-		line->setPen(gridPen());
-		verticalLines.push_back(line);
-	}
 }
 
 PartialGasPressureAxis::PartialGasPressureAxis()

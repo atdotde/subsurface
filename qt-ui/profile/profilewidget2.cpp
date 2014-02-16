@@ -63,7 +63,6 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	temperatureAxis(new TemperatureAxis()),
 	timeAxis(new TimeAxis()),
 	diveProfileItem(new DiveProfileItem()),
-	cartesianPlane(new DiveCartesianPlane()),
 	temperatureItem(new DiveTemperatureItem()),
 	cylinderPressureAxis(new DiveCartesianAxis()),
 	gasPressureItem(new DiveGasPressureItem()),
@@ -104,7 +103,6 @@ void ProfileWidget2::addItemsToScene()
 	scene()->addItem(cylinderPressureAxis);
 	scene()->addItem(temperatureItem);
 	scene()->addItem(gasPressureItem);
-	scene()->addItem(cartesianPlane);
 	scene()->addItem(meanDepth);
 	scene()->addItem(diveComputerText);
 	scene()->addItem(diveCeiling);
@@ -126,6 +124,9 @@ void ProfileWidget2::setupItemOnScene()
 	profileYAxis->setMinimum(0);
 	profileYAxis->setTickInterval(M_OR_FT(10,30));
 	profileYAxis->setTickSize(1);
+	profileYAxis->setLineSize(96);
+
+	timeAxis->setLineSize(94);
 
 	gasYAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	gasYAxis->setTickInterval(1);
@@ -133,6 +134,7 @@ void ProfileWidget2::setupItemOnScene()
 	gasYAxis->setMinimum(0);
 	gasYAxis->setModel(dataModel);
 	gasYAxis->setFontLabelScale(0.7);
+	gasYAxis->setLineSize(96);
 
 	temperatureAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	temperatureAxis->setTickSize(2);
@@ -147,10 +149,6 @@ void ProfileWidget2::setupItemOnScene()
 	meanDepth->setPen(QPen(QBrush(Qt::red), 0, Qt::SolidLine));
 	meanDepth->setZValue(1);
 	meanDepth->setAxis(profileYAxis);
-
-	cartesianPlane->setBottomAxis(timeAxis);
-	cartesianPlane->setLeftAxis(profileYAxis);
-	cartesianPlane->setZValue(-1);
 
 	diveComputerText->setAlignment(Qt::AlignRight | Qt::AlignBottom);
 	diveComputerText->setBrush(getColor(TIME_TEXT));
@@ -171,20 +169,21 @@ void ProfileWidget2::setupItemOnScene()
 	ITEM->setThreshouldSettingsKey(THRESHOULD_SETTINGS); \
 	ITEM->setVisibilitySettingsKey(VISIBILITY_SETTINGS); \
 	ITEM->setColors(getColor(COLOR), getColor(COLOR_ALERT)); \
-	ITEM->preferencesChanged();
+	ITEM->preferencesChanged(); \
+	ITEM->setZValue(99);
 
 	CREATE_PP_GAS( pn2GasItem, PN2, PN2, PN2_ALERT, "pn2threshold", "pn2graph");
 	CREATE_PP_GAS( pheGasItem, PHE, PHE, PHE_ALERT, "phethreshold", "phegraph");
 	CREATE_PP_GAS( po2GasItem, PO2, PO2, PO2_ALERT, "po2threshold", "po2graph");
 #undef CREATE_PP_GAS
 
-#ifdef QT_NO_DEBUG // Some debug helpers.
 	temperatureAxis->setTextVisible(false);
+	temperatureAxis->setLinesVisible(false);
 	cylinderPressureAxis->setTextVisible(false);
-#else
-	temperatureAxis->setTextVisible(true);
-	cylinderPressureAxis->setTextVisible(true);
-#endif
+	cylinderPressureAxis->setLinesVisible(false);
+	timeAxis->setLinesVisible(true);
+	profileYAxis->setLinesVisible(true);
+	gasYAxis->setZValue(timeAxis->zValue()+1);
 
 }
 
@@ -222,9 +221,9 @@ void ProfileWidget2::setupItemSizes()
 
 	// Partial Gas Axis Config
 	itemPos.partialPressure.pos.on.setX(97);
-	itemPos.partialPressure.pos.on.setY(60);
+	itemPos.partialPressure.pos.on.setY(67);
 	itemPos.partialPressure.pos.off.setX(110);
-	itemPos.partialPressure.pos.off.setY(60);
+	itemPos.partialPressure.pos.off.setY(63);
 	itemPos.partialPressure.expanded.setP1(QPointF(0,0));
 	itemPos.partialPressure.expanded.setP2(QPointF(0,30));
 
@@ -233,20 +232,20 @@ void ProfileWidget2::setupItemSizes()
 	itemPos.cylinder.pos.on.setY(20);
 	itemPos.cylinder.pos.off.setX(-10);
 	itemPos.cylinder.pos.off.setY(20);
-	itemPos.cylinder.expanded.setP1(QPointF(0,0));
-	itemPos.cylinder.expanded.setP2(QPointF(0,20));
+	itemPos.cylinder.expanded.setP1(QPointF(0,15));
+	itemPos.cylinder.expanded.setP2(QPointF(0,50));
 	itemPos.cylinder.shrinked.setP1(QPointF(0,0));
-	itemPos.cylinder.shrinked.setP2(QPointF(0,10));
+	itemPos.cylinder.shrinked.setP2(QPointF(0,20));
 
 		// Temperature axis config
 	itemPos.temperature.pos.on.setX(3);
 	itemPos.temperature.pos.on.setY(40);
 	itemPos.temperature.pos.off.setX(-10);
 	itemPos.temperature.pos.off.setY(40);
-	itemPos.temperature.expanded.setP1(QPointF(0,0));
-	itemPos.temperature.expanded.setP2(QPointF(0,20));
-	itemPos.temperature.shrinked.setP1(QPointF(0,0));
-	itemPos.temperature.shrinked.setP2(QPointF(0,10));
+	itemPos.temperature.expanded.setP1(QPointF(0,30));
+	itemPos.temperature.expanded.setP2(QPointF(0,50));
+	itemPos.temperature.shrinked.setP1(QPointF(0,5));
+	itemPos.temperature.shrinked.setP2(QPointF(0,15));
 
 	itemPos.dcLabel.on.setX(3);
 	itemPos.dcLabel.on.setY(97);
@@ -348,10 +347,10 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	cylinderPressureAxis->setMinimum(pInfo.minpressure);
 	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
 	meanDepth->setMeanDepth(pInfo.meandepth);
+	meanDepth->setLine(0,0,timeAxis->posAtValue(d->duration.seconds),0);
 	meanDepth->animateMoveTo(3, profileYAxis->posAtValue(pInfo.meandepth));
 
 	dataModel->emitDataChanged();
-	cartesianPlane->setup();
 	// The event items are a bit special since we don't know how many events are going to
 	// exist on a dive, so I cant create cache items for that. that's why they are here
 	// while all other items are up there on the constructor.
@@ -484,7 +483,6 @@ void ProfileWidget2::setEmptyState()
 	diveComputerText->setVisible(false);
 	diveCeiling->setVisible(false);
 	reportedCeiling->setVisible(false);
-	cartesianPlane->setVisible(false);
 	Q_FOREACH(DiveCalculatedTissue *tissue, allTissues){
 		tissue->setVisible(false);
 	}
@@ -525,18 +523,12 @@ void ProfileWidget2::setProfileState()
 	timeAxis->setLine(itemPos.time.expanded);
 
 	cylinderPressureAxis->setPos(itemPos.cylinder.pos.on);
-
-
 	temperatureAxis->setPos(itemPos.temperature.pos.on);
 
-	cartesianPlane->setVisible(true);
 	meanDepth->setVisible(true);
 
 	diveComputerText->setVisible(true);
 	diveComputerText->setPos(itemPos.dcLabel.on);
-
-	cartesianPlane->setHorizontalLine( itemPos.time.expanded );
-	cartesianPlane->setVerticalLine( itemPos.depth.expanded );
 
 	diveCeiling->setVisible(s.value("calcceiling").toBool());
 	reportedCeiling->setVisible(s.value("dcceiling").toBool());
