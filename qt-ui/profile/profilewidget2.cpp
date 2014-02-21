@@ -10,6 +10,7 @@
 #include "divetextitem.h"
 #include "divetooltipitem.h"
 #include "animationfunctions.h"
+#include "planner.h"
 #include <QSignalTransition>
 #include <QPropertyAnimation>
 #include <QMenu>
@@ -49,6 +50,7 @@ static struct _ItemPos{
 	_Axis time;
 	_Axis cylinder;
 	_Axis temperature;
+	_Axis heartBeat;
 } itemPos;
 
 ProfileWidget2::ProfileWidget2(QWidget *parent) :
@@ -72,7 +74,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	reportedCeiling(new DiveReportedCeiling()),
 	pn2GasItem( new PartialPressureGasItem()),
 	pheGasItem( new PartialPressureGasItem()),
-	po2GasItem( new PartialPressureGasItem())
+	po2GasItem( new PartialPressureGasItem()),
+	heartBeatAxis(new DiveCartesianAxis()),
+	heartBeatItem(new DiveTemperatureItem()) // FIXME: making this a DiveTemperatureItem is a hack
 {
 	memset(&plotInfo, 0, sizeof(plotInfo));
 
@@ -110,6 +114,8 @@ void ProfileWidget2::addItemsToScene()
 	scene()->addItem(pn2GasItem);
 	scene()->addItem(pheGasItem);
 	scene()->addItem(po2GasItem);
+	scene()->addItem(heartBeatAxis);
+	scene()->addItem(heartBeatItem);
 	Q_FOREACH(DiveCalculatedTissue *tissue, allTissues){
 		scene()->addItem(tissue);
 	}
@@ -126,7 +132,7 @@ void ProfileWidget2::setupItemOnScene()
 	profileYAxis->setTickSize(1);
 	profileYAxis->setLineSize(96);
 
-	timeAxis->setLineSize(94);
+	timeAxis->setLineSize(92);
 
 	gasYAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	gasYAxis->setTickInterval(1);
@@ -135,6 +141,12 @@ void ProfileWidget2::setupItemOnScene()
 	gasYAxis->setModel(dataModel);
 	gasYAxis->setFontLabelScale(0.7);
 	gasYAxis->setLineSize(96);
+
+	heartBeatAxis->setOrientation(DiveCartesianAxis::BottomToTop);
+	heartBeatAxis->setTickSize(2);
+	heartBeatAxis->setTickInterval(10);
+	heartBeatAxis->setFontLabelScale(0.7);
+	heartBeatAxis->setLineSize(96);
 
 	temperatureAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	temperatureAxis->setTickSize(2);
@@ -150,7 +162,7 @@ void ProfileWidget2::setupItemOnScene()
 	meanDepth->setZValue(1);
 	meanDepth->setAxis(profileYAxis);
 
-	diveComputerText->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+	diveComputerText->setAlignment(Qt::AlignRight | Qt::AlignTop);
 	diveComputerText->setBrush(getColor(TIME_TEXT));
 
 	setupItem(reportedCeiling, timeAxis, profileYAxis, dataModel, DivePlotDataModel::CEILING, DivePlotDataModel::TIME, 1);
@@ -162,6 +174,7 @@ void ProfileWidget2::setupItemOnScene()
 	}
 	setupItem(gasPressureItem, timeAxis, cylinderPressureAxis, dataModel, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
 	setupItem(temperatureItem, timeAxis, temperatureAxis, dataModel, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
+	setupItem(heartBeatItem, timeAxis, heartBeatAxis, dataModel, DivePlotDataModel::HEARTBEAT, DivePlotDataModel::TIME, 1);
 	setupItem(diveProfileItem, timeAxis, profileYAxis, dataModel, DivePlotDataModel::DEPTH, DivePlotDataModel::TIME, 0);
 
 #define CREATE_PP_GAS( ITEM, VERTICAL_COLUMN, COLOR, COLOR_ALERT, THRESHOULD_SETTINGS, VISIBILITY_SETTINGS ) \
@@ -184,7 +197,8 @@ void ProfileWidget2::setupItemOnScene()
 	timeAxis->setLinesVisible(true);
 	profileYAxis->setLinesVisible(true);
 	gasYAxis->setZValue(timeAxis->zValue()+1);
-
+	heartBeatAxis->setTextVisible(true);
+	heartBeatAxis->setLinesVisible(true);
 }
 
 void ProfileWidget2::setupItemSizes()
@@ -207,13 +221,13 @@ void ProfileWidget2::setupItemSizes()
 	itemPos.depth.pos.off.setX(-2);
 	itemPos.depth.pos.off.setY(3);
 	itemPos.depth.expanded.setP1(QPointF(0,0));
-	itemPos.depth.expanded.setP2(QPointF(0,94));
+	itemPos.depth.expanded.setP2(QPointF(0,86));
 	itemPos.depth.shrinked.setP1(QPointF(0,0));
 	itemPos.depth.shrinked.setP2(QPointF(0,60));
 
 	// Time Axis Config
 	itemPos.time.pos.on.setX(3);
-	itemPos.time.pos.on.setY(97);
+	itemPos.time.pos.on.setY(95);
 	itemPos.time.pos.off.setX(3);
 	itemPos.time.pos.off.setY(110);
 	itemPos.time.expanded.setP1(QPointF(0,0));
@@ -221,7 +235,7 @@ void ProfileWidget2::setupItemSizes()
 
 	// Partial Gas Axis Config
 	itemPos.partialPressure.pos.on.setX(97);
-	itemPos.partialPressure.pos.on.setY(67);
+	itemPos.partialPressure.pos.on.setY(65);
 	itemPos.partialPressure.pos.off.setX(110);
 	itemPos.partialPressure.pos.off.setY(63);
 	itemPos.partialPressure.expanded.setP1(QPointF(0,0));
@@ -237,7 +251,7 @@ void ProfileWidget2::setupItemSizes()
 	itemPos.cylinder.shrinked.setP1(QPointF(0,0));
 	itemPos.cylinder.shrinked.setP2(QPointF(0,20));
 
-		// Temperature axis config
+	// Temperature axis config
 	itemPos.temperature.pos.on.setX(3);
 	itemPos.temperature.pos.on.setY(40);
 	itemPos.temperature.pos.off.setX(-10);
@@ -247,10 +261,15 @@ void ProfileWidget2::setupItemSizes()
 	itemPos.temperature.shrinked.setP1(QPointF(0,5));
 	itemPos.temperature.shrinked.setP2(QPointF(0,15));
 
+	itemPos.heartBeat.pos.on.setX(3);
+	itemPos.heartBeat.pos.on.setY(60);
+	itemPos.heartBeat.expanded.setP1(QPointF(0,0));
+	itemPos.heartBeat.expanded.setP2(QPointF(0,20));
+
 	itemPos.dcLabel.on.setX(3);
-	itemPos.dcLabel.on.setY(97);
+	itemPos.dcLabel.on.setY(100);
 	itemPos.dcLabel.off.setX(-10);
-	itemPos.dcLabel.off.setY(97);
+	itemPos.dcLabel.off.setY(100);
 }
 
 void ProfileWidget2::setupItem(AbstractProfilePolygonItem* item, DiveCartesianAxis* hAxis, DiveCartesianAxis* vAxis, DivePlotDataModel* model, int vData, int hData, int zValue)
@@ -325,6 +344,11 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 
 	temperatureAxis->setMinimum(pInfo.mintemp);
 	temperatureAxis->setMaximum(pInfo.maxtemp);
+
+	heartBeatAxis->setMinimum(20); // FIXME: find minimum
+	heartBeatAxis->setMaximum(200); // FIXME: find maximum
+	heartBeatAxis->updateTicks(); // this shows the ticks
+
 	timeAxis->setMaximum(maxtime);
 
 	int i, incr;
@@ -524,7 +548,8 @@ void ProfileWidget2::setProfileState()
 
 	cylinderPressureAxis->setPos(itemPos.cylinder.pos.on);
 	temperatureAxis->setPos(itemPos.temperature.pos.on);
-
+	heartBeatAxis->setPos(itemPos.heartBeat.pos.on);
+	heartBeatAxis->setLine(itemPos.heartBeat.expanded);
 	meanDepth->setVisible(true);
 
 	diveComputerText->setVisible(true);
@@ -542,4 +567,81 @@ void ProfileWidget2::setProfileState()
 	Q_FOREACH(DiveEventItem *event, eventItems){
 		event->setVisible(true);
 	}
+}
+
+extern struct ev_select *ev_namelist;
+extern int evn_allocated;
+extern int evn_used;
+
+void ProfileWidget2::contextMenuEvent(QContextMenuEvent* event)
+{
+	if (selected_dive == -1)
+		return;
+	QMenu m;
+	QMenu *gasChange = m.addMenu(tr("Add Gas Change"));
+	GasSelectionModel *model = GasSelectionModel::instance();
+	model->repopulate();
+	int rowCount = model->rowCount();
+	for (int i = 0; i < rowCount; i++) {
+		QAction *action = new QAction(&m);
+		action->setText( model->data(model->index(i, 0),Qt::DisplayRole).toString());
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(changeGas()));
+		action->setData(event->globalPos());
+		gasChange->addAction(action);
+	}
+	QAction *action = m.addAction(tr("Add Bookmark"), this, SLOT(addBookmark()));
+	action->setData(event->globalPos());
+	QList<QGraphicsItem*> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
+	Q_FOREACH(QGraphicsItem *i, itemsAtPos) {
+		EventItem *item = dynamic_cast<EventItem*>(i);
+		if (!item)
+			continue;
+		action = new QAction(&m);
+		action->setText(tr("Remove Event"));
+		action->setData(QVariant::fromValue<void*>(item)); // so we know what to remove.
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(removeEvent()));
+		m.addAction(action);
+		action = new QAction(&m);
+		action->setText(tr("Hide similar events"));
+		action->setData(QVariant::fromValue<void*>(item));
+		connect(action, SIGNAL(triggered(bool)), this, SLOT(hideEvents()));
+		m.addAction(action);
+		break;
+	}
+	bool some_hidden = false;
+	for (int i = 0; i < evn_used; i++) {
+		if (ev_namelist[i].plot_ev == false) {
+			some_hidden = true;
+			break;
+		}
+	}
+	if (some_hidden) {
+		action = m.addAction(tr("Unhide all events"), this, SLOT(unhideEvents()));
+		action->setData(event->globalPos());
+	}
+	m.exec(event->globalPos());
+}
+
+void ProfileWidget2::changeGas()
+{
+	QAction *action = qobject_cast<QAction*>(sender());
+	QPointF scenePos = mapToScene(mapFromGlobal(action->data().toPoint()));
+	QString gas = action->text();
+	// backup the things on the dataModel, since we will clear that out.
+	int diveComputer = dataModel->dcShown();
+	int diveId = dataModel->id();
+	int o2, he;
+	int seconds = timeAxis->valueAt(scenePos);
+	struct dive *d = getDiveById(diveId);
+
+	validate_gas(gas.toUtf8().constData(), &o2, &he);
+	add_gas_switch_event(d, get_dive_dc(d, diveComputer), seconds, get_gasidx(d, o2, he));
+	// this means we potentially have a new tank that is being used and needs to be shown
+	fixup_dive(d);
+	MainWindow::instance()->information()->updateDiveInfo(selected_dive);
+	mark_divelist_changed(true);
+	// force the redraw of the dive.
+	//TODO: find a way to make this do not need a full redraw
+	dataModel->clear();
+	plotDives(QList<dive*>() << getDiveById(diveId));
 }
