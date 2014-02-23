@@ -177,7 +177,7 @@ void ShiftImageTimesDialog::syncCameraClicked()
 	EXIFInfo exiv;
 	int retval;
 	QPixmap picture;
-	QDateTime dcDateTime = QDateTime::QDateTime();
+	QDateTime dcDateTime = QDateTime();
 	QStringList fileNames = QFileDialog::getOpenFileNames(this,
 							      tr("Open Image File"),
 							      DiveListView::lastUsedImageDir(),
@@ -186,7 +186,7 @@ void ShiftImageTimesDialog::syncCameraClicked()
 		return;
 
 	picture.load(fileNames.at(0));
-	ui.displayDC->setEnabled(TRUE);
+	ui.displayDC->setEnabled(true);
 	QGraphicsScene *scene = new QGraphicsScene (this);
 
 	scene->addPixmap(picture.scaled(ui.DCImage->size()));
@@ -208,7 +208,10 @@ time_t ShiftImageTimesDialog::epochFromExiv(EXIFInfo *exif)
 	struct tm tm;
 	int year, month, day, hour, min, sec;
 
-	sscanf(exif->DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+	if (strlen(exif->DateTime.c_str()))
+		sscanf(exif->DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+	else
+		sscanf(exif->DateTimeOriginal.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
 	tm.tm_year = year;
 	tm.tm_mon = month - 1;
 	tm.tm_mday = day;
@@ -241,12 +244,12 @@ time_t ShiftImageTimesDialog::amount() const
 void ShiftImageTimesDialog::setOffset(time_t offset)
 {
 	if (offset >= 0) {
-		ui.forward->setChecked(TRUE);
+		ui.forward->setChecked(true);
 	} else {
-		ui.backwards->setChecked(TRUE);
+		ui.backwards->setChecked(true);
 		offset *= -1;
 	}
-	ui.timeEdit->setTime(QTime::QTime(offset / 3600, (offset % 3600) / 60, offset % 60));
+	ui.timeEdit->setTime(QTime(offset / 3600, (offset % 3600) / 60, offset % 60));
 }
 
 bool isGnome3Session()
