@@ -216,6 +216,89 @@ void DiveProfileItem::plot_depth_sample(struct plot_data *entry,QFlags<Qt::Align
 	texts.append(item);
 }
 
+DiveHeartrateItem::DiveHeartrateItem()
+{
+	QPen pen;
+	pen.setBrush(QBrush(getColor(::HR_PLOT)));
+	pen.setCosmetic(true);
+	pen.setWidth(1);
+	setPen(pen);
+}
+
+void DiveHeartrateItem::modelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+	int last = -300, last_printed_hr = 0, sec = 0;
+	struct {
+		int sec;
+		int hr;
+	} hist[3] = {0};
+
+	// We don't have enougth data to calculate things, quit.
+	if (!shouldCalculateStuff(topLeft, bottomRight))
+		return;
+
+	qDeleteAll(texts);
+	texts.clear();
+	// Ignore empty values. a heartrate of 0 would be a bad sign.
+	QPolygonF poly;
+	for (int i = 0, modelDataCount = dataModel->rowCount(); i < modelDataCount; i++) {
+		int hr = dataModel->index(i, vDataColumn).data().toInt();
+		if (!hr)
+			continue;
+		sec = dataModel->index(i, hDataColumn).data().toInt();
+		QPointF point( hAxis->posAtValue(sec), vAxis->posAtValue(hr));
+		poly.append(point);
+		if (hr == hist[2].hr)
+			// same as last one, no point in looking at printing
+			continue;
+		hist[0] = hist[1];
+		hist[1] = hist[2];
+		hist[2].sec = sec;
+		hist[2].hr = hr;
+		// don't print a HR
+		// if it's not a local min / max
+		// if it's been less than 5min and less than a 20 beats change OR
+		// if it's been less than 2min OR if the change from the
+		// last print is less than 10 beats
+		// to test min / max requires three points, so we now look at the
+		// previous one
+		sec = hist[1].sec;
+		hr = hist[1].hr;
+		if ((hist[0].hr < hr && hr < hist[2].hr) ||
+		    (hist[0].hr > hr && hr > hist[2].hr) ||
+		    ((sec < last + 300) && (abs(hr - last_printed_hr) < 20)) ||
+		    (sec < last + 120) ||
+		    (abs(hr - last_printed_hr) < 10))
+			continue;
+		last = sec;
+		createTextItem(sec, hr);
+		last_printed_hr = hr;
+	}
+	setPolygon(poly);
+
+	if( texts.count())
+		texts.last()->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+}
+
+void DiveHeartrateItem::createTextItem(int sec, int hr)
+{
+	DiveTextItem *text = new DiveTextItem(this);
+	text->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+	text->setBrush(getColor(HR_TEXT));
+	text->setPos(QPointF(hAxis->posAtValue(sec), vAxis->posAtValue(hr)));
+	text->setScale(0.7); // need to call this BEFORE setText()
+	text->setText(QString("%1").arg(hr));
+	texts.append(text);
+}
+
+void DiveHeartrateItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+{
+	if(polygon().isEmpty())
+		return;
+	painter->setPen(pen());
+	painter->drawPolyline(polygon());
+}
+
 DiveTemperatureItem::DiveTemperatureItem()
 {
 	QPen pen;
@@ -281,8 +364,8 @@ void DiveTemperatureItem::createTextItem(int sec, int mkelvin)
 	text->setAlignment(Qt::AlignRight | Qt::AlignBottom);
 	text->setBrush(getColor(TEMP_TEXT));
 	text->setPos(QPointF(hAxis->posAtValue(sec), vAxis->posAtValue(mkelvin)));
+	text->setScale(0.8); // need to call this BEFORE setText()
 	text->setText(QString("%1%2").arg(deg, 0, 'f', 1).arg(unit));
-	// text->setSize(TEMP_TEXT_SIZE); //TODO: TEXT SIZE!
 	texts.append(text);
 }
 

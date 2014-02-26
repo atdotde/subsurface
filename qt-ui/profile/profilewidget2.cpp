@@ -76,7 +76,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) :
 	pheGasItem( new PartialPressureGasItem()),
 	po2GasItem( new PartialPressureGasItem()),
 	heartBeatAxis(new DiveCartesianAxis()),
-	heartBeatItem(new DiveTemperatureItem()) // FIXME: making this a DiveTemperatureItem is a hack
+	heartBeatItem(new DiveHeartrateItem())
 {
 	memset(&plotInfo, 0, sizeof(plotInfo));
 
@@ -143,7 +143,7 @@ void ProfileWidget2::setupItemOnScene()
 	gasYAxis->setLineSize(96);
 
 	heartBeatAxis->setOrientation(DiveCartesianAxis::BottomToTop);
-	heartBeatAxis->setTickSize(2);
+	heartBeatAxis->setTickSize(1);
 	heartBeatAxis->setTickInterval(10);
 	heartBeatAxis->setFontLabelScale(0.7);
 	heartBeatAxis->setLineSize(96);
@@ -345,10 +345,14 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 	temperatureAxis->setMinimum(pInfo.mintemp);
 	temperatureAxis->setMaximum(pInfo.maxtemp);
 
-	heartBeatAxis->setMinimum(20); // FIXME: find minimum
-	heartBeatAxis->setMaximum(200); // FIXME: find maximum
-	heartBeatAxis->updateTicks(); // this shows the ticks
-
+	if (pInfo.maxhr) {
+		heartBeatAxis->setMinimum(pInfo.minhr);
+		heartBeatAxis->setMaximum(pInfo.maxhr);
+		heartBeatAxis->updateTicks(); // this shows the ticks
+		heartBeatAxis->setVisible(true);
+	} else {
+		heartBeatAxis->setVisible(false);
+	}
 	timeAxis->setMaximum(maxtime);
 
 	int i, incr;
@@ -392,7 +396,11 @@ void ProfileWidget2::plotDives(QList<dive*> dives)
 		eventItems.push_back(item);
 		event = event->next;
 	}
-
+	// Only set visible the ones that should be visible, but how?
+	Q_FOREACH(DiveEventItem *event, eventItems){
+		event->setVisible(true);
+		// qDebug() << event->getEvent()->name << "@" << event->getEvent()->time.seconds;
+	}
 	diveComputerText->setText(currentdc->model);
 }
 
@@ -562,10 +570,6 @@ void ProfileWidget2::setProfileState()
 		Q_FOREACH(DiveCalculatedTissue *tissue, allTissues){
 			tissue->setVisible(true);
 		}
-	}
-	// Only set visible the ones that should be visible, but how?
-	Q_FOREACH(DiveEventItem *event, eventItems){
-		event->setVisible(true);
 	}
 }
 
