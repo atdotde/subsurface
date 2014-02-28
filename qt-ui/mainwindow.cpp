@@ -364,12 +364,6 @@ void MainWindow::on_actionAutoGroup_triggered()
 	mark_divelist_changed(true);
 }
 
-void MainWindow::on_actionToggleZoom_triggered()
-{
-	zoomed_plot = !zoomed_plot;
-	ui.ProfileWidget->refresh();
-}
-
 void MainWindow::on_actionYearlyStatistics_triggered()
 {
 	QTreeView *view = new QTreeView();
@@ -763,9 +757,8 @@ void MainWindow::addRecentFile(const QStringList &newFiles)
 	QStringList files;
 	QSettings s;
 
-	if (newFiles.isEmpty()) {
+	if (newFiles.isEmpty())
 		return;
-	}
 
 	s.beginGroup("Recent_Files");
 
@@ -798,17 +791,58 @@ void MainWindow::addRecentFile(const QStringList &newFiles)
 		files.removeLast();
 	}
 
-	for (int c = 0; c < 4; c++) {
-		QString key = QString("File_%1").arg(c + 1);
+	for (int c = 1; c <= 4; c++) {
+		QString key = QString("File_%1").arg(c);
 
-		if (files.count() > c) {
-			s.setValue(key, files.at(c));
+		if (files.count() >= c) {
+			s.setValue(key, files.at(c - 1));
 		} else {
 			if (s.contains(key)) {
 				s.remove(key);
 			}
 		}
 	}
+	s.endGroup();
+	s.sync();
+
+	loadRecentFiles(&s);
+}
+
+void MainWindow::removeRecentFile(QStringList failedFiles)
+{
+	QStringList files;
+	QSettings s;
+
+	if (failedFiles.isEmpty())
+		return;
+
+	s.beginGroup("Recent_Files");
+
+	for (int c = 1; c <= 4; c++) {
+		QString key = QString("File_%1").arg(c);
+
+		if (s.contains(key)) {
+			QString file = s.value(key).toString();
+			files.append(file);
+		} else {
+			break;
+		}
+	}
+
+	foreach (QString file, failedFiles)
+		files.removeAll(file);
+
+	for (int c = 1; c <= 4; c++) {
+		QString key = QString("File_%1").arg(c);
+
+		if (files.count() >= c) {
+			s.setValue(key, files.at(c - 1));
+		} else {
+			if (s.contains(key))
+				s.remove(key);
+		}
+	}
+
 	s.endGroup();
 	s.sync();
 
@@ -931,6 +965,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 
 	char *error = NULL;
 	QByteArray fileNamePtr;
+	QStringList failedParses;
 
 	for (int i = 0; i < fileNames.size(); ++i) {
 		fileNamePtr = QFile::encodeName(fileNames.at(i));
@@ -939,6 +974,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 		setTitle(MWTF_FILENAME);
 
 		if (error != NULL) {
+			failedParses.append(fileNames.at(i));
 			showError(error);
 			free(error);
 		}
@@ -946,6 +982,7 @@ void MainWindow::loadFiles(const QStringList fileNames)
 
 	process_dives(false, false);
 	addRecentFile(fileNames);
+	removeRecentFile(failedParses);
 
 	refreshDisplay();
 	ui.actionAutoGroup->setChecked(autogroup);
@@ -976,7 +1013,7 @@ void MainWindow::on_actionImportDiveLog_triggered()
 void MainWindow::editCurrentDive()
 {
 	if (information()->isEditing() || DivePlannerPointsModel::instance()->currentMode() != DivePlannerPointsModel::NOTHING) {
-		QMessageBox::warning(this, tr("Warning"), tr("First finish the current edition before trying to do another."));
+		QMessageBox::warning(this, tr("Warning"), tr("Please, first finish the current edition before trying to do another."));
 		return;
 	}
 
@@ -1006,64 +1043,70 @@ void MainWindow::editCurrentDive()
 	s.setValue(#PREFS, triggered); \
 	PreferencesDialog::instance()->emitSettingsChanged();
 
-void MainWindow::on_profCalcAllTissues_clicked(bool triggered)
+void MainWindow::on_profCalcAllTissues_toggled(bool triggered)
 {
 	prefs.calc_all_tissues = triggered;
 	TOOLBOX_PREF_PROFILE(calcalltissues);
 }
-void MainWindow::on_profCalcCeiling_clicked(bool triggered)
+void MainWindow::on_profCalcCeiling_toggled(bool triggered)
 {
 	prefs.profile_calc_ceiling = triggered;
 	TOOLBOX_PREF_PROFILE(calcceiling);
 }
-void MainWindow::on_profDcCeiling_clicked(bool triggered)
+void MainWindow::on_profDcCeiling_toggled(bool triggered)
 {
 	prefs.profile_dc_ceiling = triggered;
 	TOOLBOX_PREF_PROFILE(dcceiling);
 }
-void MainWindow::on_profEad_clicked(bool triggered)
+void MainWindow::on_profEad_toggled(bool triggered)
 {
 	prefs.ead = triggered;
 	TOOLBOX_PREF_PROFILE(ead);
 }
-void MainWindow::on_profIncrement3m_clicked(bool triggered)
+void MainWindow::on_profIncrement3m_toggled(bool triggered)
 {
 	prefs.calc_ceiling_3m_incr = triggered;
 	TOOLBOX_PREF_PROFILE(calcceiling3m);
 }
-void MainWindow::on_profMod_clicked(bool triggered)
+void MainWindow::on_profMod_toggled(bool triggered)
 {
 	prefs.mod = triggered;
 	TOOLBOX_PREF_PROFILE(mod);
 }
-void MainWindow::on_profNtl_tts_clicked(bool triggered)
+void MainWindow::on_profNtl_tts_toggled(bool triggered)
 {
 	prefs.calc_ndl_tts = triggered;
 	TOOLBOX_PREF_PROFILE(calcndltts);
 }
-void MainWindow::on_profPhe_clicked(bool triggered)
+void MainWindow::on_profPhe_toggled(bool triggered)
 {
 	prefs.pp_graphs.phe = triggered;
 	TOOLBOX_PREF_PROFILE(phegraph);
 }
-void MainWindow::on_profPn2_clicked(bool triggered)
+void MainWindow::on_profPn2_toggled(bool triggered)
 {
 	prefs.pp_graphs.pn2 = triggered;
 	TOOLBOX_PREF_PROFILE(pn2graph);
 }
-void MainWindow::on_profPO2_clicked(bool triggered)
+void MainWindow::on_profPO2_toggled(bool triggered)
 {
 	prefs.pp_graphs.po2 = triggered;
 	TOOLBOX_PREF_PROFILE(po2graph);
 }
-void MainWindow::on_profRuler_clicked(bool triggered)
+void MainWindow::on_profRuler_toggled(bool triggered)
 {
 	TOOLBOX_PREF_PROFILE(rulergraph);
 }
-void MainWindow::on_profSAC_clicked(bool triggered)
+void MainWindow::on_profSAC_toggled(bool triggered)
 {
 	prefs.show_sac = triggered;
 	TOOLBOX_PREF_PROFILE(show_sac);
+}
+
+void MainWindow::on_profScaled_toggled(bool triggered)
+{
+	prefs.zoomed_plot = triggered;
+	TOOLBOX_PREF_PROFILE(zoomed_plot);
 }
 
 #undef TOOLBOX_PREF_PROFILE

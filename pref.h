@@ -6,7 +6,8 @@ extern "C" {
 #endif
 
 /* can't use 'bool' for the boolean values - different size in C and C++ */
-typedef struct {
+typedef struct
+{
 	short po2;
 	short pn2;
 	short phe;
@@ -38,8 +39,13 @@ struct preferences {
 	struct units units;
 	short show_sac;
 	bool display_unused_tanks;
+	bool zoomed_plot;
 };
-enum unit_system_values { METRIC, IMPERIAL, PERSONALIZE };
+enum unit_system_values {
+	METRIC,
+	IMPERIAL,
+	PERSONALIZE
+};
 
 extern struct preferences prefs, default_prefs;
 

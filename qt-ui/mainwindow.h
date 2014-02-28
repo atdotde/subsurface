@@ -29,16 +29,33 @@ class MainTab;
 class ProfileGraphicsView;
 class QWebView;
 
-enum MainWindowTitleFormat { MWTF_DEFAULT, MWTF_FILENAME };
+enum MainWindowTitleFormat {
+	MWTF_DEFAULT,
+	MWTF_FILENAME
+};
 
-class MainWindow : public QMainWindow
-{
-Q_OBJECT
+class MainWindow : public QMainWindow {
+	Q_OBJECT
 public:
-	enum {COLLAPSED, EXPANDED};
-	enum StackWidgetIndexes{ PROFILE, PLANNERPROFILE};
-	enum InfoWidgetIndexes{ MAINTAB, PLANNERWIDGET};
-	enum CurrentState{ VIEWALL, GLOBE_MAXIMIZED, INFO_MAXIMIZED, PROFILE_MAXIMIZED, LIST_MAXIMIZED};
+	enum {
+		COLLAPSED,
+		EXPANDED
+	};
+	enum StackWidgetIndexes {
+		PROFILE,
+		PLANNERPROFILE
+	};
+	enum InfoWidgetIndexes {
+		MAINTAB,
+		PLANNERWIDGET
+	};
+	enum CurrentState {
+		VIEWALL,
+		GLOBE_MAXIMIZED,
+		INFO_MAXIMIZED,
+		PROFILE_MAXIMIZED,
+		LIST_MAXIMIZED
+	};
 
 	MainWindow();
 	virtual ~MainWindow();
@@ -47,6 +64,7 @@ public:
 	MainTab *information();
 	void loadRecentFiles(QSettings *s);
 	void addRecentFile(const QStringList &newFiles);
+	void removeRecentFile(QStringList failedFiles);
 	DiveListView *dive_list();
 	GlobeGPS *globe();
 	void showError(QString message);
@@ -60,7 +78,8 @@ public:
 	void importFiles(const QStringList importFiles);
 	void cleanUpEmpty();
 	QTabWidget *tabWidget();
-private slots:
+private
+slots:
 	/* file menu action */
 	void recentFileTriggered(bool checked);
 	void on_actionNew_triggered();
@@ -81,7 +100,6 @@ private slots:
 	void on_actionAddDive_triggered();
 	void on_actionRenumber_triggered();
 	void on_actionAutoGroup_triggered();
-	void on_actionToggleZoom_triggered();
 	void on_actionYearlyStatistics_triggered();
 
 	/* view menu actions */
@@ -111,23 +129,25 @@ private slots:
 	void on_actionImportDiveLog_triggered();
 
 	/* TODO: Move those slots below to it's own class */
-	void on_profCalcAllTissues_clicked(bool triggered);
-	void on_profCalcCeiling_clicked(bool triggered);
-	void on_profDcCeiling_clicked(bool triggered);
-	void on_profEad_clicked(bool triggered);
-	void on_profIncrement3m_clicked(bool triggered);
-	void on_profMod_clicked(bool triggered);
-	void on_profNtl_tts_clicked(bool triggered);
-	void on_profPO2_clicked(bool triggered);
-	void on_profPhe_clicked(bool triggered);
-	void on_profPn2_clicked(bool triggered);
-	void on_profRuler_clicked(bool triggered);
-	void on_profSAC_clicked(bool triggered);
+	void on_profCalcAllTissues_toggled(bool triggered);
+	void on_profCalcCeiling_toggled(bool triggered);
+	void on_profDcCeiling_toggled(bool triggered);
+	void on_profEad_toggled(bool triggered);
+	void on_profIncrement3m_toggled(bool triggered);
+	void on_profMod_toggled(bool triggered);
+	void on_profNtl_tts_toggled(bool triggered);
+	void on_profPO2_toggled(bool triggered);
+	void on_profPhe_toggled(bool triggered);
+	void on_profPn2_toggled(bool triggered);
+	void on_profRuler_toggled(bool triggered);
+	void on_profSAC_toggled(bool triggered);
+	void on_profScaled_toggled(bool triggered);
 
 protected:
 	void closeEvent(QCloseEvent *);
 
-public slots:
+public
+slots:
 	void readSettings();
 	void refreshDisplay(bool recreateDiveList = true);
 	void showProfile();
@@ -149,7 +169,7 @@ private:
 	void beginChangeState(CurrentState s);
 	void saveSplitterSizes();
 	QString lastUsedDir();
-	void updateLastUsedDir(const QString& s);
+	void updateLastUsedDir(const QString &s);
 };
 
 MainWindow *mainWindow();

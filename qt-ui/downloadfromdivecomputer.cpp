@@ -32,11 +32,12 @@ struct mydescriptor {
 	unsigned int model;
 };
 
-namespace DownloadFromDcGlobal {
+namespace DownloadFromDcGlobal
+{
 	const char *err_string;
 };
 
-DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) : QDialog(parent, f),
+DownloadFromDCWidget::DownloadFromDCWidget(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f),
 	thread(0),
 	downloading(false),
 	previousLast(0),
@@ -50,6 +51,8 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget* parent, Qt::WindowFlags f) :
 	ui.progressBar->hide();
 	ui.progressBar->setMinimum(0);
 	ui.progressBar->setMaximum(100);
+
+	progress_bar_text = "";
 
 	fill_device_list();
 	fill_computer_list();
@@ -85,7 +88,7 @@ void DownloadFromDCWidget::updateProgressBar()
 		ui.progressBar->setFormat(progress_bar_text);
 	} else {
 		ui.progressBar->setFormat("%p%");
-		ui.progressBar->setValue(progress_bar_fraction *100);
+		ui.progressBar->setValue(progress_bar_fraction * 100);
 	}
 }
 
@@ -109,8 +112,7 @@ void DownloadFromDCWidget::updateState(states state)
 
 	// user pressed cancel but the application isn't doing anything.
 	// means close the window
-	else if ((currentState == INITIAL || currentState == CANCELLED || currentState == DONE || currentState == ERROR)
-		&& state == CANCELLING) {
+	else if ((currentState == INITIAL || currentState == CANCELLED || currentState == DONE || currentState == ERROR) && state == CANCELLING) {
 		timer->stop();
 		reject();
 		ui.ok->setText(tr("OK"));
@@ -166,7 +168,7 @@ void DownloadFromDCWidget::updateState(states state)
 	currentState = state;
 }
 
-void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString& vendor)
+void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString &vendor)
 {
 	QAbstractItemModel *currentModel = ui.product->model();
 	if (!currentModel)
@@ -203,7 +205,7 @@ void DownloadFromDCWidget::fill_computer_list()
 
 	QStringList computer;
 	dc_descriptor_iterator(&iterator);
-	while (dc_iterator_next (iterator, &descriptor) == DC_STATUS_SUCCESS) {
+	while (dc_iterator_next(iterator, &descriptor) == DC_STATUS_SUCCESS) {
 		const char *vendor = dc_descriptor_get_vendor(descriptor);
 		const char *product = dc_descriptor_get_product(descriptor);
 
@@ -223,7 +225,7 @@ void DownloadFromDCWidget::fill_computer_list()
 	   this WILL BREAK if libdivecomputer changes the dc_descriptor struct...
 	   eventually the UEMIS code needs to move into libdivecomputer, I guess */
 
-	mydescriptor = (struct mydescriptor*) malloc(sizeof(struct mydescriptor));
+	mydescriptor = (struct mydescriptor *)malloc(sizeof(struct mydescriptor));
 	mydescriptor->vendor = "Uemis";
 	mydescriptor->product = "Zurich";
 	mydescriptor->type = DC_FAMILY_NULL;
@@ -244,9 +246,9 @@ void DownloadFromDCWidget::on_search_clicked()
 {
 	if (ui.vendor->currentText() == "Uemis") {
 		QString dirName = QFileDialog::getExistingDirectory(this,
-								     tr("Find Uemis dive computer"),
-								     QDir::homePath(),
-								     QFileDialog::ShowDirsOnly);
+								    tr("Find Uemis dive computer"),
+								    QDir::homePath(),
+								    QFileDialog::ShowDirsOnly);
 		qDebug() << dirName;
 		if (ui.device->findText(dirName) == -1)
 			ui.device->addItem(dirName);
@@ -282,7 +284,7 @@ void DownloadFromDCWidget::on_ok_clicked()
 	thread = new DownloadThread(this, &data);
 
 	connect(thread, SIGNAL(finished()),
-			this, SLOT(onDownloadThreadFinished()), Qt::QueuedConnection);
+		this, SLOT(onDownloadThreadFinished()), Qt::QueuedConnection);
 
 	MainWindow *w = MainWindow::instance();
 	connect(thread, SIGNAL(finished()), w, SLOT(refreshDisplay()));
@@ -309,7 +311,7 @@ void DownloadFromDCWidget::checkLogFile(int state)
 
 void DownloadFromDCWidget::pickLogFile()
 {
-	QString filename = existing_filename ? : prefs.default_filename;
+	QString filename = existing_filename ?: prefs.default_filename;
 	QFileInfo fi(filename);
 	filename = fi.absolutePath().append(QDir::separator()).append("subsurface.log");
 	logFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer download logfile"),
@@ -338,7 +340,7 @@ void DownloadFromDCWidget::checkDumpFile(int state)
 
 void DownloadFromDCWidget::pickDumpFile()
 {
-	QString filename = existing_filename ? : prefs.default_filename;
+	QString filename = existing_filename ?: prefs.default_filename;
 	QFileInfo fi(filename);
 	filename = fi.absolutePath().append(QDir::separator()).append("subsurface.bin");
 	dumpFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer binary dump file"),
@@ -390,6 +392,10 @@ void DownloadFromDCWidget::markChildrenAsDisabled()
 	ui.preferDownloaded->setDisabled(true);
 	ui.ok->setDisabled(true);
 	ui.search->setDisabled(true);
+	ui.logToFile->setDisabled(true);
+	ui.dumpToFile->setDisabled(true);
+	ui.chooseLogFile->setDisabled(true);
+	ui.chooseDumpFile->setDisabled(true);
 }
 
 void DownloadFromDCWidget::markChildrenAsEnabled()
@@ -402,6 +408,10 @@ void DownloadFromDCWidget::markChildrenAsEnabled()
 	ui.ok->setDisabled(false);
 	ui.cancel->setDisabled(false);
 	ui.search->setDisabled(false);
+	ui.logToFile->setDisabled(false);
+	ui.dumpToFile->setDisabled(false);
+	ui.chooseLogFile->setDisabled(false);
+	ui.chooseDumpFile->setDisabled(false);
 }
 
 static void fillDeviceList(const char *name, void *data)
@@ -419,7 +429,7 @@ void DownloadFromDCWidget::fill_device_list()
 		ui.device->setCurrentIndex(deviceIndex);
 }
 
-DownloadThread::DownloadThread(QObject* parent, device_data_t* data): QThread(parent),
+DownloadThread::DownloadThread(QObject *parent, device_data_t *data) : QThread(parent),
 	data(data)
 {
 }
@@ -428,7 +438,7 @@ static QString str_error(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	const QString str = QString().vsprintf( fmt, args );
+	const QString str = QString().vsprintf(fmt, args);
 	va_end(args);
 
 	return str;
@@ -443,5 +453,5 @@ void DownloadThread::run()
 	else
 		errorText = do_libdivecomputer_import(data);
 	if (errorText)
-		error =  str_error(errorText, data->devname, data->vendor, data->product);
+		error = str_error(errorText, data->devname, data->vendor, data->product);
 }

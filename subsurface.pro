@@ -22,7 +22,6 @@ HEADERS = \
 	dive.h \
 	divelist.h \
 	file.h \
-	flag.h \
 	gettextfromc.h \
 	gettext.h \
 	helpers.h \
@@ -57,7 +56,6 @@ HEADERS = \
 	qt-ui/exif.h \
 	sha1.h \
 	statistics.h \
-	subsurface-icon.h \
 	subsurfacestartup.h \
 	uemis.h \
 	webservice.h \
@@ -75,7 +73,8 @@ HEADERS = \
 	qt-ui/profile/diveplotdatamodel.h \
 	qt-ui/profile/diveprofileitem.h \
 	qt-ui/profile/diveeventitem.h \
-	qt-ui/profile/divetooltipitem.h
+	qt-ui/profile/divetooltipitem.h \
+	qt-ui/profile/ruleritem.h
 
 SOURCES =  \
 	deco.c \
@@ -138,7 +137,8 @@ SOURCES =  \
 	qt-ui/profile/diveplotdatamodel.cpp \
 	qt-ui/profile/diveprofileitem.cpp \
 	qt-ui/profile/diveeventitem.cpp \
-	qt-ui/profile/divetooltipitem.cpp
+	qt-ui/profile/divetooltipitem.cpp \
+	qt-ui/profile/ruleritem.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
