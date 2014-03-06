@@ -1194,8 +1194,8 @@ static void calculate_ndl_tts(double tissue_tolerance, struct plot_data *entry, 
 		if (deco_allowed_depth(tissue_tolerance, surface_pressure, dive, 1) <= next_stop) {
 			/* move to the next stop and add the travel between stops */
 			for (; ascent_depth > next_stop; ascent_depth -= ascent_mm_per_deco_step, entry->tts_calc += ascent_s_per_deco_step)
-				tissue_tolerance = add_segment(depth_to_mbar(ascent_depth, dive) / 1000.0,
-							       &dive->cylinder[cylinderindex].gasmix, ascent_s_per_deco_step, entry->po2 * 1000, dive);
+				add_segment(depth_to_mbar(ascent_depth, dive) / 1000.0,
+					    &dive->cylinder[cylinderindex].gasmix, ascent_s_per_deco_step, entry->po2 * 1000, dive);
 			ascent_depth = next_stop;
 			next_stop -= deco_stepsize;
 		}
@@ -1278,17 +1278,14 @@ static void calculate_gas_information(struct dive *dive, struct plot_info *pi)
 		 * END just uses N2 */
 		entry->mod = (prefs.mod_ppO2 / fo2 * 1000 - 1) * 10000;
 		entry->ead = (entry->depth + 10000) *
-				 (entry->po2 + (amb_pressure - entry->po2) * (1 - ratio)) / amb_pressure -
-			     10000;
+				 (entry->po2 + (amb_pressure - entry->po2) * (1 - ratio)) / amb_pressure - 10000;
 		entry->end = (entry->depth + 10000) *
-				 (amb_pressure - entry->po2) * (1 - ratio) / amb_pressure / N2_IN_AIR * 1000 -
-			     10000;
+				 (amb_pressure - entry->po2) * (1 - ratio) / amb_pressure / N2_IN_AIR * 1000 - 10000;
 		entry->eadd = (entry->depth + 10000) *
 				  (entry->po2 / amb_pressure * O2_DENSITY + entry->pn2 / amb_pressure *
 										N2_DENSITY +
 				   entry->phe / amb_pressure * HE_DENSITY) /
-				  (O2_IN_AIR * O2_DENSITY + N2_IN_AIR * N2_DENSITY) * 1000 -
-			      10000;
+				  (O2_IN_AIR * O2_DENSITY + N2_IN_AIR * N2_DENSITY) * 1000 - 10000;
 		if (entry->mod < 0)
 			entry->mod = 0;
 		if (entry->ead < 0)
@@ -1343,17 +1340,14 @@ static void calculate_gas_information_new(struct dive *dive, struct plot_info *p
 		 * END just uses N2 */
 		entry->mod = (prefs.mod_ppO2 / fo2 * 1000 - 1) * 10000;
 		entry->ead = (entry->depth + 10000) *
-				 (entry->po2 + (amb_pressure - entry->po2) * (1 - ratio)) / amb_pressure -
-			     10000;
+				 (entry->po2 + (amb_pressure - entry->po2) * (1 - ratio)) / amb_pressure - 10000;
 		entry->end = (entry->depth + 10000) *
-				 (amb_pressure - entry->po2) * (1 - ratio) / amb_pressure / N2_IN_AIR * 1000 -
-			     10000;
+				 (amb_pressure - entry->po2) * (1 - ratio) / amb_pressure / N2_IN_AIR * 1000 - 10000;
 		entry->eadd = (entry->depth + 10000) *
 				  (entry->po2 / amb_pressure * O2_DENSITY + entry->pn2 / amb_pressure *
 										N2_DENSITY +
 				   entry->phe / amb_pressure * HE_DENSITY) /
-				  (O2_IN_AIR * O2_DENSITY + N2_IN_AIR * N2_DENSITY) * 1000 -
-			      10000;
+				  (O2_IN_AIR * O2_DENSITY + N2_IN_AIR * N2_DENSITY) * 1000 - 10000;
 		if (entry->mod < 0)
 			entry->mod = 0;
 		if (entry->ead < 0)

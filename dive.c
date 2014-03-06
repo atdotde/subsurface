@@ -670,7 +670,7 @@ static void fixup_duration(struct dive *dive)
 	int duration = 0;
 
 	for_each_dc(dive, dc)
-	duration = MAX(duration, dc->duration.seconds);
+		duration = MAX(duration, dc->duration.seconds);
 
 	dive->duration.seconds = duration;
 }
@@ -896,7 +896,7 @@ struct dive *fixup_dive(struct dive *dive)
 	dive->maxcns = dive->cns;
 
 	for_each_dc(dive, dc)
-	fixup_dive_dc(dive, dc);
+		fixup_dive_dc(dive, dc);
 
 	fixup_water_salinity(dive);
 	fixup_surface_pressure(dive);
@@ -1084,7 +1084,7 @@ static char *merge_text(const char *a, const char *b)
 
 #define SORT(a, b, field)         \
 	if (a->field != b->field) \
-	return a->field < b->field ? -1 : 1
+		return a->field < b->field ? -1 : 1
 
 static int sort_event(struct event *a, struct event *b)
 {
