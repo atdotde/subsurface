@@ -75,6 +75,7 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.cuft->setChecked(prefs.units.volume == units::CUFT);
 	ui.kg->setChecked(prefs.units.weight == units::KG);
 	ui.lbs->setChecked(prefs.units.weight == units::LBS);
+	ui.text_label_with_units->setChecked(prefs.text_label_with_units);
 
 	ui.font->setCurrentFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
@@ -104,6 +105,11 @@ void PreferencesDialog::setUiFromPrefs()
 	QModelIndexList languages = m->match(m->index(0, 0), Qt::UserRole, s.value("UiLanguage").toString());
 	if (languages.count())
 		ui.languageView->setCurrentIndex(languages.first());
+
+	s.endGroup();
+	s.beginGroup("Animations");
+	int animVelocity = s.value("animation_speed",500).toInt();
+	ui.velocitySlider->setValue(animVelocity);
 }
 
 void PreferencesDialog::restorePrefs()
@@ -190,6 +196,7 @@ void PreferencesDialog::syncSettings()
 	s.setValue("volume", ui.cuft->isChecked() ? units::CUFT : units::LITER);
 	s.setValue("weight", ui.lbs->isChecked() ? units::LBS : units::KG);
 	s.setValue("vertical_speed_time", ui.vertical_speed_minutes->isChecked() ? units::MINUTES : units::SECONDS);
+	SB("text_label_with_units", ui.text_label_with_units);
 	s.endGroup();
 	// Defaults
 	s.beginGroup("GeneralSettings");
@@ -216,6 +223,8 @@ void PreferencesDialog::syncSettings()
 	s.setValue("UiLanguage", ui.languageView->currentIndex().data(Qt::UserRole));
 	s.endGroup();
 
+	s.beginGroup("Animations");
+	s.setValue("animation_speed",ui.velocitySlider->value());
 	loadSettings();
 	emit settingsChanged();
 }
@@ -244,6 +253,7 @@ void PreferencesDialog::loadSettings()
 		GET_UNIT("weight", weight, units::LBS, units::KG);
 	}
 	GET_UNIT("vertical_speed_time", vertical_speed_time, units::MINUTES, units::SECONDS);
+	GET_BOOL("text_label_with_units", text_label_with_units);
 	s.endGroup();
 	s.beginGroup("TecDetails");
 	GET_BOOL("po2graph", pp_graphs.po2);
@@ -286,6 +296,10 @@ void PreferencesDialog::loadSettings()
 		prefs.font_size = defaultFont.pointSizeF();
 	GET_INT("displayinvalid", display_invalid_dives);
 	s.endGroup();
+
+	s.beginGroup("Animations");
+	int animVelocity = s.value("animation_speed",500).toInt();
+	ui.velocitySlider->setValue(animVelocity);
 }
 
 void PreferencesDialog::buttonClicked(QAbstractButton *button)

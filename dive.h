@@ -315,7 +315,7 @@ struct tag_entry {
 
 extern struct tag_entry *g_tag_list;
 
-struct divetag *taglist_add_tag(struct tag_entry *tag_list, const char *tag);
+struct divetag *taglist_add_tag(struct tag_entry **tag_list, const char *tag);
 
 /*
  * Writes all divetags in tag_list to buffer, limited by the buffer's (len)gth.
@@ -323,10 +323,8 @@ struct divetag *taglist_add_tag(struct tag_entry *tag_list, const char *tag);
  */
 int taglist_get_tagstring(struct tag_entry *tag_list, char *buffer, int len);
 
-void taglist_init(struct tag_entry **tag_list);
-void taglist_clear(struct tag_entry *tag_list);
 void taglist_init_global();
-
+void taglist_free(struct tag_entry *tag_list);
 
 /*
  * Events are currently pretty meaningless. This is
@@ -662,6 +660,8 @@ static inline struct dive *getDiveById(int id)
 extern "C" {
 #endif
 
+extern int report_error(const char *fmt, ...);
+
 extern struct dive *find_dive_including(timestamp_t when);
 extern bool dive_within_time_range(struct dive *dive, timestamp_t when, timestamp_t offset);
 struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset);
@@ -685,6 +685,15 @@ extern void save_dives(const char *filename);
 extern void save_dives_logic(const char *filename, bool select_only);
 extern void save_dive(FILE *f, struct dive *dive);
 extern void export_dives_uddf(const char *filename, const bool selected);
+
+struct git_oid;
+struct git_repository;
+extern struct git_repository *is_git_repository(const char *filename, const char **branchp);
+extern int git_save_dives(struct git_repository *, const char *, bool select_only);
+extern int git_load_dives(struct git_repository *, const char *);
+extern const char *saved_git_id;
+extern void clear_git_id(void);
+extern void set_git_id(const struct git_oid *);
 
 extern int subsurface_rename(const char *path, const char *newpath);
 extern int subsurface_open(const char *path, int oflags, mode_t mode);
@@ -723,6 +732,8 @@ extern void add_gas_switch_event(struct dive *dive, struct divecomputer *dc, int
 extern void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
 extern void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration);
 extern int get_cylinder_index(struct dive *dive, struct event *ev);
+extern int nr_cylinders(struct dive *dive);
+extern int nr_weightsystems(struct dive *dive);
 
 /* UI related protopypes */
 

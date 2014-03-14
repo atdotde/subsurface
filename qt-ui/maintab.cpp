@@ -15,6 +15,7 @@
 #include "diveplanner.h"
 #include "divelist.h"
 #include "qthelper.h"
+#include "display.h"
 
 #include <QLabel>
 #include <QCompleter>
@@ -200,6 +201,7 @@ void MainTab::hideMessage()
 	ui.diveEquipmentMessage->animatedHide();
 	ui.diveInfoMessage->animatedHide();
 	ui.diveStatisticsMessage->animatedHide();
+	updateTextLabels();
 }
 
 void MainTab::closeMessage()
@@ -221,6 +223,18 @@ void MainTab::displayMessage(QString str)
 	ui.diveInfoMessage->animatedShow();
 	ui.diveStatisticsMessage->setText(str);
 	ui.diveStatisticsMessage->animatedShow();
+	updateTextLabels(true);
+}
+
+void MainTab::updateTextLabels(bool showUnits)
+{
+	if (showUnits && prefs.text_label_with_units) {
+		ui.airTempLabel->setText(QApplication::translate("MainTab", "Air temp [%1]").arg(get_temp_unit()));
+		ui.waterTempLabel->setText(QApplication::translate("MainTab", "Water temp [%1]").arg(get_temp_unit()));
+	} else {
+		ui.airTempLabel->setText(QApplication::translate("MainTab", "Air temp", 0, QApplication::UnicodeUTF8));
+		ui.waterTempLabel->setText(QApplication::translate("MainTab", "Water temp", 0, QApplication::UnicodeUTF8));
+	}
 }
 
 void MainTab::enableEdition(EditMode newEditMode)
@@ -670,6 +684,8 @@ void MainTab::acceptChanges()
 		editMode = NONE;
 		MainWindow::instance()->refreshDisplay();
 		MainWindow::instance()->dive_list()->selectDive(i, true);
+		MainWindow::instance()->graphics()->replot();
+
 	} else {
 		editMode = NONE;
 		MainWindow::instance()->dive_list()->rememberSelection();
@@ -870,9 +886,10 @@ void MainTab::saveTags()
 {
 	EDIT_SELECTED_DIVES(
 	    QString tag;
-	    taglist_clear(mydive->tag_list);
+	    taglist_free(mydive->tag_list);
+	    mydive->tag_list = NULL;
 	    foreach(tag, ui.tagWidget->getBlockStringList())
-		    taglist_add_tag(mydive->tag_list, tag.toUtf8().data()););
+		    taglist_add_tag(&mydive->tag_list, tag.toUtf8().data()););
 }
 
 void MainTab::on_tagWidget_textChanged()

@@ -37,23 +37,6 @@ void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon)
 	expand();
 }
 
-void ToolTipItem::refresh(struct graphics_context *gc, QPointF pos)
-{
-	clear();
-	int time = (pos.x() * gc->maxtime) / gc->maxx;
-	struct membuffer mb = { 0 };
-
-	get_plot_details(gc, time, &mb);
-	addToolTip(QString::fromUtf8(mb.buffer, mb.len));
-	free_buffer(&mb);
-
-	QList<QGraphicsItem *> items = scene()->items(pos, Qt::IntersectsItemShape, Qt::DescendingOrder, transform());
-	Q_FOREACH(QGraphicsItem * item, items) {
-		if (!item->toolTip().isEmpty())
-			addToolTip(item->toolTip());
-	}
-}
-
 void ToolTipItem::clear()
 {
 	Q_FOREACH(ToolTip t, toolTips) {
@@ -201,10 +184,9 @@ void ToolTipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
 void ToolTipItem::persistPos()
 {
-	QPoint currentPos = scene()->views().at(0)->mapFromScene(pos());
 	QSettings s;
 	s.beginGroup("ProfileMap");
-	s.setValue("tooltip_position", currentPos);
+	s.setValue("tooltip_position", pos());
 	s.endGroup();
 }
 
@@ -212,8 +194,7 @@ void ToolTipItem::readPos()
 {
 	QSettings s;
 	s.beginGroup("ProfileMap");
-	QPointF value = scene()->views().at(0)->mapToScene(
-	    s.value("tooltip_position").toPoint());
+	QPointF value = s.value("tooltip_position").toPoint();
 	if (!scene()->sceneRect().contains(value)) {
 		value = QPointF(0, 0);
 	}

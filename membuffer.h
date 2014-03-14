@@ -23,6 +23,7 @@ extern void flush_buffer(struct membuffer *, FILE *);
 extern void put_bytes(struct membuffer *, const char *, int);
 extern void put_string(struct membuffer *, const char *);
 extern void strip_mb(struct membuffer *);
+extern const char *mb_cstring(struct membuffer *);
 extern __printf(2, 0) void put_vformat(struct membuffer *, const char *, va_list);
 extern __printf(2, 3) void put_format(struct membuffer *, const char *fmt, ...);
 
@@ -50,11 +51,11 @@ extern void put_milli(struct membuffer *, const char *, int, const char *);
  * to the memory buffer (typically the post/pre will be some XML
  * pattern and unit string or whatever).
  */
-extern int put_temperature(struct membuffer *, temperature_t, const char *, const char *);
-extern int put_depth(struct membuffer *, depth_t, const char *, const char *);
-extern int put_duration(struct membuffer *, duration_t, const char *, const char *);
-extern int put_pressure(struct membuffer *, pressure_t, const char *, const char *);
-extern int put_salinity(struct membuffer *, int, const char *, const char *);
+extern void put_temperature(struct membuffer *, temperature_t, const char *, const char *);
+extern void put_depth(struct membuffer *, depth_t, const char *, const char *);
+extern void put_duration(struct membuffer *, duration_t, const char *, const char *);
+extern void put_pressure(struct membuffer *, pressure_t, const char *, const char *);
+extern void put_salinity(struct membuffer *, int, const char *, const char *);
 
 #ifdef __cplusplus
 }

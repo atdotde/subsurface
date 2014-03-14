@@ -44,6 +44,8 @@ MainWindow::MainWindow() : QMainWindow(),
 	actionNextDive(0),
 	actionPreviousDive(0),
 	helpView(0),
+	yearlyStats(0),
+	yearlyStatsModel(0),
 	state(VIEWALL)
 {
 	Q_ASSERT_X(m_Instance == NULL, "MainWindow", "MainWindow recreated!");
@@ -54,7 +56,6 @@ MainWindow::MainWindow() : QMainWindow(),
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(readSettings()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(update()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ListWidget, SLOT(reloadHeaderActions()));
-	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.ProfileWidget, SLOT(refresh()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.InfoWidget, SLOT(updateDiveInfo()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlanner, SLOT(settingsChanged()));
 	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), ui.divePlannerWidget, SLOT(settingsChanged()));
@@ -86,6 +87,16 @@ MainWindow::~MainWindow()
 	m_Instance = NULL;
 }
 
+void MainWindow::setLoadedWithFiles(bool f)
+{
+	filesAsArguments = f;
+}
+
+bool MainWindow::filesFromCommandLine() const
+{
+	return filesAsArguments;
+}
+
 MainWindow *MainWindow::instance()
 {
 	return m_Instance;
@@ -96,12 +107,18 @@ void MainWindow::refreshDisplay(bool recreateDiveList)
 {
 	ui.InfoWidget->reload();
 	TankInfoModel::instance()->update();
-	ui.ProfileWidget->refresh();
 	ui.globe->reload();
 	if (recreateDiveList)
 		ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
 	WSInfoModel::instance()->updateInfo();
+	// refresh the yearly stats if the window has an instance
+	if (yearlyStats) {
+		if (yearlyStatsModel)
+			delete yearlyStatsModel;
+		yearlyStatsModel = new YearlyStatisticsModel();
+		yearlyStats->setModel(yearlyStatsModel);
+	}
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -110,7 +127,6 @@ void MainWindow::current_dive_changed(int divenr)
 		select_dive(divenr);
 		ui.globe->centerOn(get_dive(selected_dive));
 	}
-	redrawProfile();
 
 	/* It looks like it's a bit too cumberstone to send *one* dive using a QList,
 	 * but this is just futureproofness, it's the best way in the future to show more than
@@ -119,11 +135,6 @@ void MainWindow::current_dive_changed(int divenr)
 	 */
 	ui.newProfile->plotDives(QList<dive *>() << (current_dive));
 	ui.InfoWidget->updateDiveInfo(divenr);
-}
-
-void MainWindow::redrawProfile()
-{
-	ui.ProfileWidget->refresh();
 }
 
 void MainWindow::on_actionNew_triggered()
@@ -146,10 +157,6 @@ void MainWindow::on_actionOpen_triggered()
 	loadFiles(QStringList() << filename);
 }
 
-QTabWidget *MainWindow::tabWidget()
-{
-	return ui.tabWidget;
-}
 void MainWindow::on_actionSave_triggered()
 {
 	file_save();
@@ -160,17 +167,39 @@ void MainWindow::on_actionSaveAs_triggered()
 	file_save_as();
 }
 
+ProfileWidget2* MainWindow::graphics() const
+{
+	return ui.newProfile;
+}
+
 void MainWindow::cleanUpEmpty()
 {
 	ui.InfoWidget->clearStats();
 	ui.InfoWidget->clearInfo();
 	ui.InfoWidget->clearEquipment();
 	ui.InfoWidget->updateDiveInfo(-1);
-	ui.ProfileWidget->clear();
+	ui.newProfile->setEmptyState();
 	ui.ListWidget->reload(DiveTripModel::TREE);
 	ui.globe->reload();
 	if (!existing_filename)
 		setTitle(MWTF_DEFAULT);
+}
+
+void MainWindow::setToolButtonsEnabled(bool enabled)
+{
+	ui.profPO2->setEnabled(enabled);
+	ui.profPn2->setEnabled(enabled);
+	ui.profPhe->setEnabled(enabled);
+	ui.profDcCeiling->setEnabled(enabled);
+	ui.profCalcCeiling->setEnabled(enabled);
+	ui.profCalcAllTissues->setEnabled(enabled);
+	ui.profIncrement3m->setEnabled(enabled);
+	ui.profMod->setEnabled(enabled);
+	ui.profEad->setEnabled(enabled);
+	ui.profNdl_tts->setEnabled(enabled);
+	ui.profSAC->setEnabled(enabled);
+	ui.profRuler->setEnabled(enabled);
+	ui.profScaled->setEnabled(enabled);
 }
 
 void MainWindow::on_actionClose_triggered()
@@ -185,6 +214,7 @@ void MainWindow::on_actionClose_triggered()
 
 	ui.newProfile->setEmptyState();
 	/* free the dives and trips */
+	clear_git_id();
 	while (dive_table.nr)
 		delete_single_dive(0);
 
@@ -366,38 +396,24 @@ void MainWindow::on_actionAutoGroup_triggered()
 
 void MainWindow::on_actionYearlyStatistics_triggered()
 {
-	QTreeView *view = new QTreeView();
-	QAbstractItemModel *model = new YearlyStatisticsModel();
-	view->setModel(model);
-	view->setWindowModality(Qt::NonModal);
-	view->setMinimumWidth(600);
-	view->setAttribute(Qt::WA_QuitOnClose, false);
-	view->setWindowTitle(tr("Yearly Statistics"));
-	view->setWindowIcon(QIcon(":subsurface-icon"));
-	view->show();
+	// create the widget only once
+	if (!yearlyStats) {
+		yearlyStats = new QTreeView();
+		yearlyStats->setWindowModality(Qt::NonModal);
+		yearlyStats->setMinimumWidth(600);
+		yearlyStats->setWindowTitle(tr("Yearly Statistics"));
+		yearlyStats->setWindowIcon(QIcon(":subsurface-icon"));
+	}
+	/* problem here is that without more MainWindow variables or a separate YearlyStatistics
+	 * class the user needs to close the window/widget and re-open it for it to update.
+	 */
+	if (yearlyStatsModel)
+		delete yearlyStatsModel;
+	yearlyStatsModel = new YearlyStatisticsModel();
+	yearlyStats->setModel(yearlyStatsModel);
+	yearlyStats->raise();
+	yearlyStats->show();
 }
-
-void MainWindow::on_mainSplitter_splitterMoved(int pos, int idx)
-{
-	redrawProfile();
-}
-
-void MainWindow::on_infoProfileSplitter_splitterMoved(int pos, int idx)
-{
-	redrawProfile();
-}
-
-/**
- * So, here's the deal.
- * We have a few QSplitters that takes care of helping us with the
- * size of a few widgets, they are ok, and we should continue using them
- * to manage the visibility of them too. But the way that we did before was to
- * widget->hide(); something, and if you hided something using the splitter,
- * by holding it's handle and collapsing the widget, then you used the 'ctrl+number'
- * shortcut to show it, it whould only show a gray panel.
- *
- * This patch makes everything behave using the splitters.
- */
 
 #define BEHAVIOR QList<int>()
 void MainWindow::on_actionViewList_triggered()
@@ -412,7 +428,6 @@ void MainWindow::on_actionViewProfile_triggered()
 	beginChangeState(PROFILE_MAXIMIZED);
 	ui.infoProfileSplitter->setSizes(BEHAVIOR << COLLAPSED << EXPANDED);
 	ui.mainSplitter->setSizes(BEHAVIOR << EXPANDED << COLLAPSED);
-	redrawProfile();
 }
 
 void MainWindow::on_actionViewInfo_triggered()
@@ -470,7 +485,6 @@ void MainWindow::on_actionViewAll_triggered()
 		ui.infoProfileSplitter->setSizes(infoProfileSizes);
 		ui.listGlobeSplitter->setSizes(listGlobeSizes);
 	}
-	redrawProfile();
 }
 
 void MainWindow::beginChangeState(CurrentState s)
@@ -495,7 +509,6 @@ void MainWindow::on_actionPreviousDC_triggered()
 	dc_number--;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
-	redrawProfile();
 }
 
 void MainWindow::on_actionNextDC_triggered()
@@ -503,7 +516,6 @@ void MainWindow::on_actionNextDC_triggered()
 	dc_number++;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
-	redrawProfile();
 }
 
 void MainWindow::on_actionFullScreen_triggered(bool checked)
@@ -678,12 +690,19 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		helpView->deleteLater();
 	}
 
+	if (yearlyStats && yearlyStats->isVisible()) {
+		yearlyStats->close();
+		yearlyStats->deleteLater();
+		yearlyStatsModel->deleteLater();
+	}
+
 	if (unsaved_changes() && (askSaveChanges() == false)) {
 		event->ignore();
 		return;
 	}
 	event->accept();
 	writeSettings();
+	QApplication::closeAllWindows();
 }
 
 DiveListView *MainWindow::dive_list()
@@ -694,11 +713,6 @@ DiveListView *MainWindow::dive_list()
 GlobeGPS *MainWindow::globe()
 {
 	return ui.globe;
-}
-
-ProfileGraphicsView *MainWindow::graphics()
-{
-	return ui.ProfileWidget;
 }
 
 MainTab *MainWindow::information()

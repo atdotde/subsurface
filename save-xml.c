@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "dive.h"
 #include "device.h"
@@ -210,18 +211,6 @@ static void save_overview(struct membuffer *b, struct dive *dive)
 	show_utf8(b, dive->suit, "  <suit>", "</suit>\n", 0);
 }
 
-static int nr_cylinders(struct dive *dive)
-{
-	int nr;
-
-	for (nr = MAX_CYLINDERS; nr; --nr) {
-		cylinder_t *cylinder = dive->cylinder + nr - 1;
-		if (!cylinder_nodata(cylinder))
-			break;
-	}
-	return nr;
-}
-
 static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 {
 	int i, nr;
@@ -249,18 +238,6 @@ static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 		put_pressure(b, cylinder->end, " end='", " bar'");
 		put_format(b, " />\n");
 	}
-}
-
-static int nr_weightsystems(struct dive *dive)
-{
-	int nr;
-
-	for (nr = MAX_WEIGHTSYSTEMS; nr; --nr) {
-		weightsystem_t *ws = dive->weightsystem + nr - 1;
-		if (!weightsystem_none(ws))
-			break;
-	}
-	return nr;
 }
 
 static void save_weightsystem_info(struct membuffer *b, struct dive *dive)
@@ -355,27 +332,18 @@ static void save_events(struct membuffer *b, struct event *ev)
 	}
 }
 
-static void save_tags(struct membuffer *b, struct tag_entry *tag_list)
+static void save_tags(struct membuffer *b, struct tag_entry *entry)
 {
-	int more = 0;
-	struct tag_entry *tmp = tag_list->next;
-
-	/* Only write tag attribute if the list contains at least one item  */
-	if (tmp != NULL) {
-		put_format(b, " tags='");
-
-		while (tmp != NULL) {
-			if (more)
-				put_format(b, ", ");
+	if (entry) {
+		const char *sep = " tags='";
+		do {
+			struct divetag *tag = entry->tag;
+			put_string(b, sep);
 			/* If the tag has been translated, write the source to the xml file */
-			if (tmp->tag->source != NULL)
-				quote(b, tmp->tag->source, 0);
-			else
-				quote(b, tmp->tag->name, 0);
-			tmp = tmp->next;
-			more = 1;
-		}
-		put_format(b, "'");
+			quote(b, tag->source ?: tag->name, 0);
+			sep = ", ";
+		} while ((entry = entry->next) != NULL);
+		put_string(b, "'");
 	}
 }
 
@@ -439,8 +407,7 @@ void save_one_dive(struct membuffer *b, struct dive *dive)
 		put_format(b, " rating='%d'", dive->rating);
 	if (dive->visibility)
 		put_format(b, " visibility='%d'", dive->visibility);
-	if (dive->tag_list != NULL)
-		save_tags(b, dive->tag_list);
+	save_tags(b, dive->tag_list);
 
 	show_date(b, dive->when);
 	put_format(b, " duration='%u:%02u min'>\n",
@@ -609,15 +576,12 @@ static void save_backup(const char *name, const char *ext, const char *new_ext)
 	free(newname);
 }
 
-void save_dives_logic(const char *filename, const bool select_only)
+static void try_to_backup(const char *filename)
 {
-	struct membuffer buf = { 0 };
-	FILE *f;
 	char extension[][5] = { "xml", "ssrf", "" };
 	int i = 0;
 	int flen = strlen(filename);
 
-	save_dives_buffer(&buf, select_only);
 	/* Maybe we might want to make this configurable? */
 	while (extension[i][0] != '\0') {
 		int elen = strlen(extension[i]);
@@ -627,6 +591,26 @@ void save_dives_logic(const char *filename, const bool select_only)
 		}
 		i++;
 	}
+}
+
+void save_dives_logic(const char *filename, const bool select_only)
+{
+	struct membuffer buf = { 0 };
+	FILE *f;
+	void *git;
+	const char *branch;
+
+	git = is_git_repository(filename, &branch);
+	if (git) {
+		/* error returns, anybody? */
+		git_save_dives(git, branch, select_only);
+		return;
+	}
+
+	try_to_backup(filename);
+
+	save_dives_buffer(&buf, select_only);
+
 	f = subsurface_fopen(filename, "w");
 	if (f) {
 		flush_buffer(&buf, f);

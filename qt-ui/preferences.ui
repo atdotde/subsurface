@@ -232,6 +232,39 @@
           </widget>
          </item>
          <item>
+          <widget class="QGroupBox" name="groupBox_7">
+           <property name="title">
+            <string>Animations</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_7">
+            <item>
+             <widget class="QLabel" name="label_15">
+              <property name="text">
+               <string>Speed</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSlider" name="velocitySlider">
+              <property name="maximum">
+               <number>500</number>
+              </property>
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="velocitySpinBox">
+              <property name="maximum">
+               <number>500</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
           <spacer name="verticalSpacer_2">
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -478,7 +511,21 @@
             </widget>
            </item>
           </layout>
-         </item>
+	 </item>
+	 <item>
+	  <layout class="QHBoxLayout" name="text_label_with_units_hbox">
+	   <item>
+	    <widget class="QCheckBox" name="text_label_with_units">
+	     <property name="enabled">
+	      <bool>true</bool>
+	     </property>
+	     <property name="text">
+	      <string>Show units in text labels</string>
+	     </property>
+	    </widget>
+	   </item>
+	  </layout>
+	 </item>
          <item>
           <spacer name="verticalSpacer">
            <property name="orientation">
@@ -732,8 +779,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>235</x>
-     <y>511</y>
+     <x>247</x>
+     <y>635</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -748,8 +795,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>303</x>
-     <y>511</y>
+     <x>315</x>
+     <y>635</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
@@ -780,12 +827,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>195</x>
-     <y>39</y>
+     <x>845</x>
+     <y>51</y>
     </hint>
     <hint type="destinationlabel">
-     <x>195</x>
-     <y>39</y>
+     <x>308</x>
+     <y>100</y>
     </hint>
    </hints>
   </connection>
@@ -828,12 +875,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>504</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>623</x>
+     <y>119</y>
     </hint>
    </hints>
   </connection>
@@ -844,12 +891,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>319</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>385</x>
+     <y>119</y>
     </hint>
    </hints>
   </connection>
@@ -860,12 +907,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>504</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>623</x>
+     <y>153</y>
     </hint>
    </hints>
   </connection>
@@ -876,12 +923,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>319</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>385</x>
+     <y>153</y>
     </hint>
    </hints>
   </connection>
@@ -892,12 +939,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>504</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>623</x>
+     <y>187</y>
     </hint>
    </hints>
   </connection>
@@ -908,12 +955,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>319</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>385</x>
+     <y>187</y>
     </hint>
    </hints>
   </connection>
@@ -924,12 +971,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>504</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>623</x>
+     <y>221</y>
     </hint>
    </hints>
   </connection>
@@ -940,12 +987,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>319</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>385</x>
+     <y>221</y>
     </hint>
    </hints>
   </connection>
@@ -956,12 +1003,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>504</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>623</x>
+     <y>255</y>
     </hint>
    </hints>
   </connection>
@@ -972,23 +1019,55 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
+     <x>319</x>
+     <y>46</y>
     </hint>
     <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>385</x>
+     <y>255</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>velocitySlider</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>velocitySpinBox</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>718</x>
+     <y>415</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>823</x>
+     <y>414</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>velocitySpinBox</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>velocitySlider</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>790</x>
+     <y>400</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>580</x>
+     <y>417</y>
     </hint>
    </hints>
   </connection>
  </connections>
  <buttongroups>
+  <buttongroup name="buttonGroup_5"/>
+  <buttongroup name="buttonGroup_6"/>
+  <buttongroup name="buttonGroup"/>
   <buttongroup name="verticalSpeed"/>
   <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup_3"/>
   <buttongroup name="buttonGroup_4"/>
-  <buttongroup name="buttonGroup_5"/>
-  <buttongroup name="buttonGroup_6"/>
-  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

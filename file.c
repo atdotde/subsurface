@@ -126,6 +126,12 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char
 		endtag = malloc(4 + strlen(tag));
 
 		if (starttag == NULL || endtag == NULL) {
+			/* this is fairly silly - so the malloc fails, but we strdup the error?
+			 * let's complete the silliness by freeing the two pointers in case one malloc succeeded
+			 *  and the other one failed - this will make static analysis tools happy */
+			free(starttag);
+			free(endtag);
+			free(buf);
 			*error = strdup("Memory allocation failed in __func__\n");
 			return 1;
 		}
@@ -356,8 +362,14 @@ static void parse_file_buffer(const char *filename, struct memblock *mem, char *
 
 void parse_file(const char *filename, char **error)
 {
+	struct git_repository *git;
+	const char *branch;
 	struct memblock mem;
 	char *fmt;
+
+	git = is_git_repository(filename, &branch);
+	if (git && !git_load_dives(git, branch))
+		return;
 
 	if (readfile(filename, &mem) < 0) {
 		/* we don't want to display an error if this was the default file */

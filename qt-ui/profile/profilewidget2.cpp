@@ -20,6 +20,7 @@
 #include <QDebug>
 #include <QSettings>
 #include <QScrollBar>
+#include <QtCore/qmath.h>
 
 #ifndef QT_NO_DEBUG
 #include <QTableView>
@@ -59,8 +60,10 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) : QGraphicsView(parent),
 	dataModel(new DivePlotDataModel(this)),
 	currentState(INVALID),
 	zoomLevel(0),
+	zoomFactor(1.15),
 	background(new DivePixmapItem()),
 	toolTipItem(new ToolTipItem()),
+	isPlotZoomed(prefs.zoomed_plot),
 	profileYAxis(new DepthAxis()),
 	gasYAxis(new PartialGasPressureAxis()),
 	temperatureAxis(new TemperatureAxis()),
@@ -78,7 +81,6 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) : QGraphicsView(parent),
 	po2GasItem(new PartialPressureGasItem()),
 	heartBeatAxis(new DiveCartesianAxis()),
 	heartBeatItem(new DiveHeartrateItem()),
-	isPlotZoomed(prefs.zoomed_plot),
 	rulerItem(new RulerItem2())
 {
 	memset(&plotInfo, 0, sizeof(plotInfo));
@@ -94,7 +96,7 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) : QGraphicsView(parent),
 #ifndef QT_NO_DEBUG
 	QTableView *diveDepthTableView = new QTableView();
 	diveDepthTableView->setModel(dataModel);
-	MainWindow::instance()->tabWidget()->addTab(diveDepthTableView, "Depth Model");
+	diveDepthTableView->show();
 #endif
 }
 
@@ -130,7 +132,9 @@ void ProfileWidget2::addItemsToScene()
 void ProfileWidget2::setupItemOnScene()
 {
 	background->setZValue(9999);
+	toolTipItem->setZValue(9998);
 	toolTipItem->setTimeAxis(timeAxis);
+	rulerItem->setZValue(9997);
 
 	profileYAxis->setOrientation(DiveCartesianAxis::TopToBottom);
 	profileYAxis->setMinimum(0);
@@ -207,6 +211,13 @@ void ProfileWidget2::setupItemOnScene()
 	gasYAxis->setZValue(timeAxis->zValue() + 1);
 	heartBeatAxis->setTextVisible(true);
 	heartBeatAxis->setLinesVisible(true);
+}
+
+void ProfileWidget2::replot()
+{
+		int diveId = dataModel->id();
+		dataModel->clear();
+		plotDives(QList<dive *>() << getDiveById(diveId));
 }
 
 void ProfileWidget2::setupItemSizes()
@@ -307,11 +318,29 @@ void ProfileWidget2::setupSceneAndFlags()
 // Currently just one dive, but the plan is to enable All of the selected dives.
 void ProfileWidget2::plotDives(QList<dive *> dives)
 {
+	static bool firstCall = true;
+
 	// I Know that it's a list, but currently we are
 	// using just the first.
 	struct dive *d = dives.first();
 	if (!d)
 		return;
+
+	int animSpeedBackup = -1;
+	if(firstCall && MainWindow::instance()->filesFromCommandLine()){
+		QSettings s;
+		s.beginGroup("Animations");
+		animSpeedBackup = s.value("animation_speed",500).toInt();
+		s.setValue("animation_speed",0);
+		firstCall = false;
+	}
+
+	// restore default zoom level
+	if (zoomLevel) {
+		const qreal defScale = 1.0 / qPow(zoomFactor, (qreal)zoomLevel);
+		scale(defScale, defScale);
+		zoomLevel = 0;
+	}
 
 	// No need to do this again if we are already showing the same dive
 	// computer of the same dive, so we check the unique id of the dive
@@ -365,7 +394,6 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 		heartBeatAxis->setVisible(false);
 	}
 	timeAxis->setMaximum(maxtime);
-	rulerItem->setPlotInfo(pInfo);
 	int i, incr;
 	static int increments[8] = { 10, 20, 30, 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60 };
 	/* Time markers: at most every 10 seconds, but no more than 12 markers.
@@ -385,6 +413,8 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 	timeAxis->updateTicks();
 	cylinderPressureAxis->setMinimum(pInfo.minpressure);
 	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
+
+	rulerItem->setPlotInfo(pInfo);
 	meanDepth->setMeanDepth(pInfo.meandepth);
 	meanDepth->setLine(0, 0, timeAxis->posAtValue(d->duration.seconds), 0);
 	meanDepth->animateMoveTo(3, profileYAxis->posAtValue(pInfo.meandepth));
@@ -413,6 +443,11 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 		// qDebug() << event->getEvent()->name << "@" << event->getEvent()->time.seconds;
 	}
 	diveComputerText->setText(currentdc->model);
+	if (MainWindow::instance()->filesFromCommandLine() && animSpeedBackup != -1){
+		QSettings s;
+		s.beginGroup("Animations");
+		s.setValue("animation_speed",animSpeedBackup);
+	}
 }
 
 void ProfileWidget2::settingsChanged()
@@ -430,9 +465,7 @@ void ProfileWidget2::settingsChanged()
 	}
 	if (s.value("zoomed_plot").toBool() != isPlotZoomed) {
 		isPlotZoomed = s.value("zoomed_plot").toBool();
-		int diveId = dataModel->id();
-		dataModel->clear();
-		plotDives(QList<dive *>() << getDiveById(diveId));
+		replot();
 	}
 
 	if (currentState == PROFILE) {
@@ -458,27 +491,26 @@ void ProfileWidget2::fixBackgroundPos()
 {
 	if (currentState != EMPTY)
 		return;
-	QPixmap toBeScaled;
-	if (!backgrounds.keys().contains(backgroundFile)) {
-		backgrounds[backgroundFile] = QPixmap(backgroundFile);
-	}
-	toBeScaled = backgrounds[backgroundFile];
-	QPixmap p = toBeScaled.scaledToHeight(viewport()->height());
+	QPixmap toBeScaled = QPixmap(backgroundFile);
+	QPixmap p = toBeScaled.scaledToHeight(viewport()->height() - 40, Qt::SmoothTransformation);
 	int x = viewport()->width() / 2 - p.width() / 2;
+	int y = viewport()->height() / 2 - p.height() / 2;
 	background->setPixmap(p);
 	background->setX(mapToScene(x, 0).x());
+	background->setY(mapToScene(y, 20).y());
 }
 
 void ProfileWidget2::wheelEvent(QWheelEvent *event)
 {
+	if (currentState == EMPTY)
+		return;
 	QPoint toolTipPos = mapFromScene(toolTipItem->pos());
-	double scaleFactor = 1.15;
 	if (event->delta() > 0 && zoomLevel < 20) {
-		scale(scaleFactor, scaleFactor);
+		scale(zoomFactor, zoomFactor);
 		zoomLevel++;
 	} else if (event->delta() < 0 && zoomLevel > 0) {
 		// Zooming out
-		scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+		scale(1.0 / zoomFactor, 1.0 / zoomFactor);
 		zoomLevel--;
 	}
 	scrollViewTo(event->pos());
@@ -489,7 +521,7 @@ void ProfileWidget2::scrollViewTo(const QPoint &pos)
 {
 	/* since we cannot use translate() directly on the scene we hack on
  * the scroll bars (hidden) functionality */
-	if (!zoomLevel)
+	if (!zoomLevel || currentState == EMPTY)
 		return;
 	QScrollBar *vs = verticalScrollBar();
 	QScrollBar *hs = horizontalScrollBar();
@@ -528,17 +560,19 @@ void ProfileWidget2::setEmptyState()
 		return;
 
 	dataModel->clear();
-	backgroundFile = QString(":poster%1").arg(rand() % 3 + 1);
 	currentState = EMPTY;
+	MainWindow::instance()->setToolButtonsEnabled(false);
+
+	backgroundFile = QString(":poster");
 	fixBackgroundPos();
-	profileYAxis->setPos(itemPos.depth.pos.off);
-	gasYAxis->setPos(itemPos.partialPressure.pos.off);
-	timeAxis->setPos(itemPos.time.pos.off);
-	background->setY(itemPos.background.on.y());
 	background->setVisible(true);
+
+	profileYAxis->setVisible(false);
+	gasYAxis->setVisible(false);
+	timeAxis->setVisible(false);
+	temperatureAxis->setVisible(false);
+	cylinderPressureAxis->setVisible(false);
 	toolTipItem->setVisible(false);
-	temperatureAxis->setPos(itemPos.temperature.pos.off);
-	cylinderPressureAxis->setPos(itemPos.cylinder.pos.off);
 	meanDepth->setVisible(false);
 	diveComputerText->setVisible(false);
 	diveCeiling->setVisible(false);
@@ -561,10 +595,17 @@ void ProfileWidget2::setProfileState()
 		return;
 
 	currentState = PROFILE;
+	MainWindow::instance()->setToolButtonsEnabled(true);
+	toolTipItem->readPos();
 	setBackgroundBrush(getColor(::BACKGROUND));
 
 	background->setVisible(false);
 	toolTipItem->setVisible(true);
+	profileYAxis->setVisible(true);
+	gasYAxis->setVisible(true);
+	timeAxis->setVisible(true);
+	temperatureAxis->setVisible(true);
+	cylinderPressureAxis->setVisible(true);
 
 	profileYAxis->setPos(itemPos.depth.pos.on);
 	QSettings s;
@@ -633,7 +674,7 @@ void ProfileWidget2::contextMenuEvent(QContextMenuEvent *event)
 	action->setData(event->globalPos());
 	QList<QGraphicsItem *> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
 	Q_FOREACH(QGraphicsItem * i, itemsAtPos) {
-		EventItem *item = dynamic_cast<EventItem *>(i);
+		DiveEventItem *item = dynamic_cast<DiveEventItem *>(i);
 		if (!item)
 			continue;
 		action = new QAction(&m);
@@ -680,8 +721,5 @@ void ProfileWidget2::changeGas()
 	fixup_dive(d);
 	MainWindow::instance()->information()->updateDiveInfo(selected_dive);
 	mark_divelist_changed(true);
-	// force the redraw of the dive.
-	//TODO: find a way to make this do not need a full redraw
-	dataModel->clear();
-	plotDives(QList<dive *>() << getDiveById(diveId));
+	replot();
 }

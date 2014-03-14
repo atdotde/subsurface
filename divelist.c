@@ -388,10 +388,11 @@ double init_decompression(struct dive *dive)
 	timestamp_t when, lasttime = 0;
 	bool deco_init = false;
 	double tissue_tolerance, surface_pressure;
-	tissue_tolerance = surface_pressure = get_surface_pressure_in_mbar(dive, true) / 1000.0;
 
 	if (!dive)
 		return 0.0;
+
+	tissue_tolerance = surface_pressure = get_surface_pressure_in_mbar(dive, true) / 1000.0;
 	divenr = get_divenr(dive);
 	when = dive->when;
 	i = divenr;
@@ -743,11 +744,8 @@ void delete_single_dive(int idx)
 		free((void *)dive->buddy);
 	if (dive->suit)
 		free((void *)dive->suit);
-	if (dive->tag_list) {
-		taglist_clear(dive->tag_list);
-		/* Remove head of list */
-		free((void *)dive->tag_list);
-	}
+	if (dive->tag_list)
+		taglist_free(dive->tag_list);
 	free(dive);
 }
 
@@ -792,10 +790,12 @@ struct dive *merge_two_dives(struct dive *a, struct dive *b)
 {
 	struct dive *res;
 	int i, j;
-	int id = a->id;
+	int id;
 
 	if (!a || !b)
 		return NULL;
+
+	id = a->id;
 	i = get_divenr(a);
 	j = get_divenr(b);
 	res = merge_dives(a, b, b->when - a->when, false);
