@@ -23,6 +23,7 @@
 #include "starwidget.h"
 
 #include "../dive.h"
+#include "../display.h"
 #include "../divelist.h"
 #include "../pref.h"
 #include "../helpers.h"
@@ -105,6 +106,7 @@ MainWindow *MainWindow::instance()
 // this gets called after we download dives from a divecomputer
 void MainWindow::refreshDisplay(bool recreateDiveList)
 {
+	showError(get_error_string());
 	ui.InfoWidget->reload();
 	TankInfoModel::instance()->update();
 	ui.globe->reload();
@@ -506,14 +508,16 @@ void MainWindow::saveSplitterSizes()
 
 void MainWindow::on_actionPreviousDC_triggered()
 {
-	dc_number--;
+	unsigned nrdc = number_of_computers(current_dive);
+	dc_number = (dc_number + nrdc - 1) % nrdc;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 }
 
 void MainWindow::on_actionNextDC_triggered()
 {
-	dc_number++;
+	unsigned nrdc = number_of_computers(current_dive);
+	dc_number = (dc_number + 1) % nrdc;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 }
@@ -576,7 +580,7 @@ QString MainWindow::filter()
 bool MainWindow::askSaveChanges()
 {
 	QString message;
-	QMessageBox response;
+	QMessageBox response(MainWindow::instance());
 
 	if (existing_filename)
 		message = tr("Do you want to save the changes you made in the file %1?").arg(existing_filename);
@@ -589,6 +593,7 @@ bool MainWindow::askSaveChanges()
 	response.setWindowTitle(tr("Save Changes?")); // Not displayed on MacOSX as described in Qt API
 	response.setInformativeText(tr("Changes will be lost if you don't save them."));
 	response.setIcon(QMessageBox::Warning);
+	response.setWindowModality(Qt::WindowModal);
 	int ret = response.exec();
 
 	switch (ret) {
@@ -882,7 +887,7 @@ void MainWindow::recentFileTriggered(bool checked)
 	loadFiles(QStringList() << filename);
 }
 
-void MainWindow::file_save_as(void)
+int MainWindow::file_save_as(void)
 {
 	QString filename;
 	const char *default_filename;
@@ -893,20 +898,25 @@ void MainWindow::file_save_as(void)
 		default_filename = prefs.default_filename;
 	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), default_filename,
 						tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
-	if (!filename.isNull() && !filename.isEmpty()) {
+	if (filename.isNull() || filename.isEmpty())
+		return report_error("No filename to save into");
 
-		if (ui.InfoWidget->isEditing())
-			ui.InfoWidget->acceptChanges();
+	if (ui.InfoWidget->isEditing())
+		ui.InfoWidget->acceptChanges();
 
-		save_dives(filename.toUtf8().data());
-		set_filename(filename.toUtf8().data(), true);
-		setTitle(MWTF_FILENAME);
-		mark_divelist_changed(false);
-		addRecentFile(QStringList() << filename);
+	if (save_dives(filename.toUtf8().data())) {
+		showError(get_error_string());
+		return -1;
 	}
+
+	set_filename(filename.toUtf8().data(), true);
+	setTitle(MWTF_FILENAME);
+	mark_divelist_changed(false);
+	addRecentFile(QStringList() << filename);
+	return 0;
 }
 
-void MainWindow::file_save(void)
+int MainWindow::file_save(void)
 {
 	const char *current_default;
 
@@ -924,9 +934,13 @@ void MainWindow::file_save(void)
 		if (!current_def_dir.exists())
 			current_def_dir.mkpath(current_def_dir.absolutePath());
 	}
-	save_dives(existing_filename);
+	if (save_dives(existing_filename)) {
+		showError(get_error_string());
+		return -1;
+	}
 	mark_divelist_changed(false);
 	addRecentFile(QStringList() << QString(existing_filename));
+	return 0;
 }
 
 void MainWindow::showError(QString message)
@@ -964,15 +978,10 @@ void MainWindow::importFiles(const QStringList fileNames)
 		return;
 
 	QByteArray fileNamePtr;
-	char *error = NULL;
+
 	for (int i = 0; i < fileNames.size(); ++i) {
 		fileNamePtr = QFile::encodeName(fileNames.at(i));
-		parse_file(fileNamePtr.data(), &error);
-		if (error != NULL) {
-			showError(error);
-			free(error);
-			error = NULL;
-		}
+		parse_file(fileNamePtr.data());
 	}
 	process_dives(true, false);
 	refreshDisplay();
@@ -983,21 +992,19 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	if (fileNames.isEmpty())
 		return;
 
-	char *error = NULL;
 	QByteArray fileNamePtr;
 	QStringList failedParses;
 
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = QFile::encodeName(fileNames.at(i));
-		parse_file(fileNamePtr.data(), &error);
-		set_filename(fileNamePtr.data(), true);
-		setTitle(MWTF_FILENAME);
+		int error;
 
-		if (error != NULL) {
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
+		error = parse_file(fileNamePtr.data());
+		if (!error) {
+			set_filename(fileNamePtr.data(), true);
+			setTitle(MWTF_FILENAME);
+		} else {
 			failedParses.append(fileNames.at(i));
-			showError(error);
-			free(error);
-			error = NULL;
 		}
 	}
 

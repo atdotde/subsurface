@@ -28,6 +28,7 @@ class GlobeGPS;
 class MainTab;
 class ProfileGraphicsView;
 class QWebView;
+class QSettings;
 
 enum MainWindowTitleFormat {
 	MWTF_DEFAULT,
@@ -163,8 +164,8 @@ private:
 	static MainWindow *m_Instance;
 	bool askSaveChanges();
 	void writeSettings();
-	void file_save();
-	void file_save_as();
+	int file_save();
+	int file_save_as();
 	void beginChangeState(CurrentState s);
 	void saveSplitterSizes();
 	QString lastUsedDir();

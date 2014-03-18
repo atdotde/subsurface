@@ -340,16 +340,35 @@ static void create_dive_buffer(struct dive *dive, struct membuffer *b)
 	save_dive_temperature(b, dive);
 }
 
+static struct membuffer error_string_buffer = { 0 };
+
+/*
+ * Note that the act of "getting" the error string
+ * buffer doesn't de-allocate the buffer, but it does
+ * set the buffer length to zero, so that any future
+ * error reports will overwrite the string rather than
+ * append to it.
+ */
+const char *get_error_string(void)
+{
+	const char *str;
+
+	if (!error_string_buffer.len)
+		return "";
+	str = mb_cstring(&error_string_buffer);
+	error_string_buffer.len = 0;
+	return str;
+}
+
 int report_error(const char *fmt, ...)
 {
-	struct membuffer b = { 0 };
-	VA_BUF(&b, fmt);
+	struct membuffer *buf = &error_string_buffer;
 
-	/* We should do some UI element thing describing the failure */
-	put_bytes(&b, "\n", 1);
-	flush_buffer(&b, stderr);
-	free_buffer(&b);
-
+	/* Previous unprinted errors? Add a newline in between */
+	if (buf->len)
+		put_bytes(buf, "\n", 1);
+	VA_BUF(buf, fmt);
+	mb_cstring(buf);
 	return -1;
 }
 
@@ -905,30 +924,45 @@ struct git_repository *is_git_repository(const char *filename, const char **bran
 	if (!flen)
 		return NULL;
 
+	/*
+	 * This is the "point of no return": the name matches
+	 * the git repository name rules, and we will no longer
+	 * return NULL.
+	 *
+	 * We will either return "dummy_git_repository" and the
+	 * branch pointer will have the _whole_ filename in it,
+	 * or we will return a real git repository with the
+	 * branch pointer being filled in with just the branch
+	 * name.
+	 *
+	 * The actual git reading/writing routines can use this
+	 * to generate proper error messages.
+	 */
+	*branchp = filename;
 	loc = malloc(flen+1);
 	if (!loc)
-		return NULL;
+		return dummy_git_repository;
 	memcpy(loc, filename, flen);
 	loc[flen] = 0;
 
 	branch = malloc(blen+1);
 	if (!branch) {
 		free(loc);
-		return NULL;
+		return dummy_git_repository;
 	}
 	memcpy(branch, filename+flen+1, blen);
 	branch[blen] = 0;
 
 	if (stat(loc, &st) < 0 || !S_ISDIR(st.st_mode)) {
 		free(loc);
-		return NULL;
+		return dummy_git_repository;
 	}
 
 	ret = git_repository_open(&repo, loc);
 	free(loc);
 	if (ret < 0) {
 		free(branch);
-		return NULL;
+		return dummy_git_repository;
 	}
 	*branchp = branch;
 	return repo;
@@ -936,7 +970,11 @@ struct git_repository *is_git_repository(const char *filename, const char **bran
 
 int git_save_dives(struct git_repository *repo, const char *branch, bool select_only)
 {
-	int ret = do_git_save(repo, branch, select_only);
+	int ret;
+
+	if (repo == dummy_git_repository)
+		return report_error("Unable to open git repository '%s'", branch);
+	ret = do_git_save(repo, branch, select_only);
 	git_repository_free(repo);
 	free((void *)branch);
 	return ret;

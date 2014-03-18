@@ -229,11 +229,11 @@ void MainTab::displayMessage(QString str)
 void MainTab::updateTextLabels(bool showUnits)
 {
 	if (showUnits && prefs.text_label_with_units) {
-		ui.airTempLabel->setText(QApplication::translate("MainTab", "Air temp [%1]").arg(get_temp_unit()));
-		ui.waterTempLabel->setText(QApplication::translate("MainTab", "Water temp [%1]").arg(get_temp_unit()));
+		ui.airTempLabel->setText(tr("Air temp [%1]").arg(get_temp_unit()));
+		ui.waterTempLabel->setText(tr("Water temp [%1]").arg(get_temp_unit()));
 	} else {
-		ui.airTempLabel->setText(QApplication::translate("MainTab", "Air temp", 0, QApplication::UnicodeUTF8));
-		ui.waterTempLabel->setText(QApplication::translate("MainTab", "Water temp", 0, QApplication::UnicodeUTF8));
+		ui.airTempLabel->setText(tr("Air temp"));
+		ui.waterTempLabel->setText(tr("Water temp"));
 	}
 }
 
@@ -483,7 +483,7 @@ void MainTab::updateDiveInfo(int dive)
 		get_gas_used(d, gases);
 		QString volumes = get_volume_string(gases[0], true);
 		int mean[MAX_CYLINDERS], duration[MAX_CYLINDERS];
-		per_cylinder_mean_depth(d, select_dc(&d->dc), mean, duration);
+		per_cylinder_mean_depth(d, select_dc(d), mean, duration);
 		volume_t sac;
 		QString SACs;
 		if (mean[0] && duration[0]) {
@@ -864,13 +864,13 @@ void MainTab::on_divemaster_textChanged()
 
 void MainTab::on_airtemp_textChanged(const QString &text)
 {
-	EDIT_SELECTED_DIVES(select_dc(&mydive->dc)->airtemp.mkelvin = parseTemperatureToMkelvin(text));
+	EDIT_SELECTED_DIVES(select_dc(mydive)->airtemp.mkelvin = parseTemperatureToMkelvin(text));
 	markChangedWidget(ui.airtemp);
 }
 
 void MainTab::on_watertemp_textChanged(const QString &text)
 {
-	EDIT_SELECTED_DIVES(select_dc(&mydive->dc)->watertemp.mkelvin = parseTemperatureToMkelvin(text));
+	EDIT_SELECTED_DIVES(select_dc(mydive)->watertemp.mkelvin = parseTemperatureToMkelvin(text));
 	markChangedWidget(ui.watertemp);
 }
 
@@ -977,11 +977,15 @@ void MainTab::on_visibility_valueChanged(int value)
 
 void MainTab::editCylinderWidget(const QModelIndex &index)
 {
-	if (editMode == NONE)
+	if (cylindersModel->changed && editMode == NONE) {
 		enableEdition();
-
-	if (index.isValid() && index.column() != CylindersModel::REMOVE)
+		return;
+	}
+	if (index.isValid() && index.column() != CylindersModel::REMOVE) {
+		if (editMode == NONE)
+			enableEdition();
 		ui.cylinders->edit(index);
+	}
 }
 
 void MainTab::editWeightWidget(const QModelIndex &index)
