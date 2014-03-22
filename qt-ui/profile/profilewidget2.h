@@ -16,6 +16,7 @@
 #include "graphicsview-common.h"
 #include "divelineitem.h"
 
+class RulerItem2;
 struct dive;
 struct plot_info;
 class ToolTipItem;
@@ -32,6 +33,7 @@ class DiveCartesianAxis;
 class DiveProfileItem;
 class TimeAxis;
 class DiveTemperatureItem;
+class DiveHeartrateItem;
 class DiveGasPressureItem;
 class DiveCalculatedCeiling;
 class DiveCalculatedTissue;
@@ -42,40 +44,64 @@ class AbstractProfilePolygonItem;
 class ProfileWidget2 : public QGraphicsView {
 	Q_OBJECT
 public:
-	enum State{ EMPTY, PROFILE, EDIT, ADD, PLAN, INVALID };
-	enum Items{BACKGROUND, PROFILE_Y_AXIS, GAS_Y_AXIS, TIME_AXIS, DEPTH_CONTROLLER, TIME_CONTROLLER, COLUMNS};
+	enum State {
+		EMPTY,
+		PROFILE,
+		EDIT,
+		ADD,
+		PLAN,
+		INVALID
+	};
+	enum Items {
+		BACKGROUND,
+		PROFILE_Y_AXIS,
+		GAS_Y_AXIS,
+		TIME_AXIS,
+		DEPTH_CONTROLLER,
+		TIME_CONTROLLER,
+		COLUMNS
+	};
 
-	ProfileWidget2(QWidget *parent);
-	void plotDives(QList<dive*> dives);
-	virtual bool eventFilter(QObject*, QEvent*);
-	void setupItem( AbstractProfilePolygonItem *item, DiveCartesianAxis *hAxis, DiveCartesianAxis *vAxis, DivePlotDataModel *model, int vData, int hData, int zValue);
+	ProfileWidget2(QWidget *parent = 0);
+	void plotDives(QList<dive *> dives);
+	void replot();
+	virtual bool eventFilter(QObject *, QEvent *);
+	void setupItem(AbstractProfilePolygonItem *item, DiveCartesianAxis *hAxis, DiveCartesianAxis *vAxis, DivePlotDataModel *model, int vData, int hData, int zValue);
 
-public slots: // Necessary to call from QAction's signals.
+public
+slots: // Necessary to call from QAction's signals.
 	void settingsChanged();
 	void setEmptyState();
 	void setProfileState();
 	void changeGas();
+	void addBookmark();
+	void hideEvents();
+	void unhideEvents();
+	void removeEvent();
+
 protected:
-	virtual void resizeEvent(QResizeEvent* event);
-	virtual void wheelEvent(QWheelEvent* event);
-	virtual void mouseMoveEvent(QMouseEvent* event);
-	virtual void contextMenuEvent(QContextMenuEvent* event);
+	virtual void resizeEvent(QResizeEvent *event);
+	virtual void wheelEvent(QWheelEvent *event);
+	virtual void mouseMoveEvent(QMouseEvent *event);
+	virtual void contextMenuEvent(QContextMenuEvent *event);
 
 private: /*methods*/
 	void fixBackgroundPos();
-	void scrollViewTo(const QPoint& pos);
+	void scrollViewTo(const QPoint &pos);
 	void setupSceneAndFlags();
 	void setupItemSizes();
 	void addItemsToScene();
 	void setupItemOnScene();
+
 private:
 	DivePlotDataModel *dataModel;
 	State currentState;
 	int zoomLevel;
-	QHash<QString, QPixmap> backgrounds;
+	qreal zoomFactor;
 	DivePixmapItem *background;
 	QString backgroundFile;
 	ToolTipItem *toolTipItem;
+	bool isPlotZoomed;
 	// All those here should probably be merged into one structure,
 	// So it's esyer to replicate for more dives later.
 	// In the meantime, keep it here.
@@ -89,16 +115,17 @@ private:
 	DiveCartesianAxis *cylinderPressureAxis;
 	DiveGasPressureItem *gasPressureItem;
 	MeanDepthLine *meanDepth;
-	QList<DiveEventItem*> eventItems;
+	QList<DiveEventItem *> eventItems;
 	DiveTextItem *diveComputerText;
 	DiveCalculatedCeiling *diveCeiling;
-	QList<DiveCalculatedTissue*> allTissues;
+	QList<DiveCalculatedTissue *> allTissues;
 	DiveReportedCeiling *reportedCeiling;
 	PartialPressureGasItem *pn2GasItem;
 	PartialPressureGasItem *pheGasItem;
 	PartialPressureGasItem *po2GasItem;
 	DiveCartesianAxis *heartBeatAxis;
-	DiveTemperatureItem *heartBeatItem;
+	DiveHeartrateItem *heartBeatItem;
+	RulerItem2 *rulerItem;
 };
 
 #endif // PROFILEWIDGET2_H

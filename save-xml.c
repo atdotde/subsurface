@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "dive.h"
 #include "device.h"
@@ -210,18 +211,6 @@ static void save_overview(struct membuffer *b, struct dive *dive)
 	show_utf8(b, dive->suit, "  <suit>", "</suit>\n", 0);
 }
 
-static int nr_cylinders(struct dive *dive)
-{
-	int nr;
-
-	for (nr = MAX_CYLINDERS; nr; --nr) {
-		cylinder_t *cylinder = dive->cylinder + nr - 1;
-		if (!cylinder_nodata(cylinder))
-			break;
-	}
-	return nr;
-}
-
 static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 {
 	int i, nr;
@@ -249,18 +238,6 @@ static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 		put_pressure(b, cylinder->end, " end='", " bar'");
 		put_format(b, " />\n");
 	}
-}
-
-static int nr_weightsystems(struct dive *dive)
-{
-	int nr;
-
-	for (nr = MAX_WEIGHTSYSTEMS; nr; --nr) {
-		weightsystem_t *ws = dive->weightsystem + nr - 1;
-		if (!weightsystem_none(ws))
-			break;
-	}
-	return nr;
 }
 
 static void save_weightsystem_info(struct membuffer *b, struct dive *dive)
@@ -355,27 +332,18 @@ static void save_events(struct membuffer *b, struct event *ev)
 	}
 }
 
-static void save_tags(struct membuffer *b, struct tag_entry *tag_list)
+static void save_tags(struct membuffer *b, struct tag_entry *entry)
 {
-	int more = 0;
-	struct tag_entry *tmp = tag_list->next;
-
-	/* Only write tag attribute if the list contains at least one item  */
-	if (tmp != NULL) {
-		put_format(b, " tags='");
-
-		while (tmp != NULL) {
-			if (more)
-				put_format(b, ", ");
+	if (entry) {
+		const char *sep = " tags='";
+		do {
+			struct divetag *tag = entry->tag;
+			put_string(b, sep);
 			/* If the tag has been translated, write the source to the xml file */
-			if (tmp->tag->source != NULL)
-				quote(b, tmp->tag->source, 0);
-			else
-				quote(b, tmp->tag->name, 0);
-			tmp = tmp->next;
-			more = 1;
-		}
-		put_format(b, "'");
+			quote(b, tag->source ?: tag->name, 0);
+			sep = ", ";
+		} while ((entry = entry->next) != NULL);
+		put_string(b, "'");
 	}
 }
 
@@ -439,8 +407,7 @@ void save_one_dive(struct membuffer *b, struct dive *dive)
 		put_format(b, " rating='%d'", dive->rating);
 	if (dive->visibility)
 		put_format(b, " visibility='%d'", dive->visibility);
-	if (dive->tag_list != NULL)
-		save_tags(b, dive->tag_list);
+	save_tags(b, dive->tag_list);
 
 	show_date(b, dive->when);
 	put_format(b, " duration='%u:%02u min'>\n",
@@ -459,12 +426,14 @@ void save_one_dive(struct membuffer *b, struct dive *dive)
 	put_format(b, "</dive>\n");
 }
 
-void save_dive(FILE *f, struct dive *dive)
+int save_dive(FILE *f, struct dive *dive)
 {
 	struct membuffer buf = { 0 };
 
 	save_one_dive(&buf, dive);
 	flush_buffer(&buf, f);
+	/* Error handling? */
+	return 0;
 }
 
 static void save_trip(struct membuffer *b, dive_trip_t *trip)
@@ -526,9 +495,9 @@ static void save_one_device(void *_f, const char *model, uint32_t deviceid,
 
 #define VERSION 2
 
-void save_dives(const char *filename)
+int save_dives(const char *filename)
 {
-	save_dives_logic(filename, false);
+	return save_dives_logic(filename, false);
 }
 
 void save_dives_buffer(struct membuffer *b, const bool select_only)
@@ -605,19 +574,16 @@ static void save_backup(const char *name, const char *ext, const char *new_ext)
 	 * maybe no old file existed.  Regardless, we'll write the
 	 * new file.
 	 */
-	subsurface_rename(name, newname);
+	(void) subsurface_rename(name, newname);
 	free(newname);
 }
 
-void save_dives_logic(const char *filename, const bool select_only)
+static void try_to_backup(const char *filename)
 {
-	struct membuffer buf = { 0 };
-	FILE *f;
 	char extension[][5] = { "xml", "ssrf", "" };
 	int i = 0;
 	int flen = strlen(filename);
 
-	save_dives_buffer(&buf, select_only);
 	/* Maybe we might want to make this configurable? */
 	while (extension[i][0] != '\0') {
 		int elen = strlen(extension[i]);
@@ -627,15 +593,38 @@ void save_dives_logic(const char *filename, const bool select_only)
 		}
 		i++;
 	}
+}
+
+int save_dives_logic(const char *filename, const bool select_only)
+{
+	struct membuffer buf = { 0 };
+	FILE *f;
+	void *git;
+	const char *branch;
+	int error;
+
+	git = is_git_repository(filename, &branch);
+	if (git)
+		return git_save_dives(git, branch, select_only);
+
+	try_to_backup(filename);
+
+	save_dives_buffer(&buf, select_only);
+
+	error = -1;
 	f = subsurface_fopen(filename, "w");
 	if (f) {
 		flush_buffer(&buf, f);
-		fclose(f);
+		error = fclose(f);
 	}
+	if (error)
+		report_error("Save failed (%s)", strerror(errno));
+
 	free_buffer(&buf);
+	return error;
 }
 
-void export_dives_uddf(const char *filename, const bool selected)
+int export_dives_uddf(const char *filename, const bool selected)
 {
 	FILE *f;
 	struct membuffer buf = { 0 };
@@ -644,7 +633,7 @@ void export_dives_uddf(const char *filename, const bool selected)
 	xmlDoc *transformed;
 
 	if (!filename)
-		return;
+		return report_error("No filename for UDDF export");
 
 	/* Save XML to file and convert it into a memory buffer */
 	save_dives_buffer(&buf, selected);
@@ -656,26 +645,27 @@ void export_dives_uddf(const char *filename, const bool selected)
 	 */
 	doc = xmlReadMemory(buf.buffer, buf.len, "divelog", NULL, 0);
 	free_buffer(&buf);
-	if (!doc) {
-		fprintf(stderr, "Failed to read XML memory\n");
-		return;
-	}
+	if (!doc)
+		return report_error("Failed to read XML memory");
 
 	/* Convert to UDDF format */
 	xslt = get_stylesheet("uddf-export.xslt");
+	if (!xslt)
+		return report_error("Failed to open UDDF conversion stylesheet");
 
-	if (!xslt) {
-		fprintf(stderr, "Failed to open UDDF conversion stylesheet\n");
-		return;
-	}
 	transformed = xsltApplyStylesheet(xslt, doc, NULL);
 	xsltFreeStylesheet(xslt);
 	xmlFreeDoc(doc);
 
 	/* Write the transformed XML to file */
 	f = subsurface_fopen(filename, "w");
+	if (!f)
+		return report_error("Failed to open %s for writing (%s)", filename, strerror(errno));
+
 	xmlDocFormatDump(f, transformed, 1);
 	xmlFreeDoc(transformed);
 
 	fclose(f);
+	/* Check write errors? */
+	return 0;
 }

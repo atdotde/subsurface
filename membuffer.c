@@ -24,7 +24,7 @@ void flush_buffer(struct membuffer *b, FILE *f)
 
 void strip_mb(struct membuffer *b)
 {
-	while (b->len && isspace(b->buffer[b->len-1]))
+	while (b->len && isspace(b->buffer[b->len - 1]))
 		b->len--;
 }
 
@@ -55,6 +55,13 @@ static void make_room(struct membuffer *b, unsigned int size)
 	}
 }
 
+const char *mb_cstring(struct membuffer *b)
+{
+	make_room(b, 1);
+	b->buffer[b->len] = 0;
+	return b->buffer;
+}
+
 void put_bytes(struct membuffer *b, const char *str, int len)
 {
 	make_room(b, len);
@@ -69,20 +76,28 @@ void put_string(struct membuffer *b, const char *str)
 
 void put_vformat(struct membuffer *b, const char *fmt, va_list args)
 {
-	/* Handle the common case on the stack */
-	char buffer[128], *p;
-	int len;
+	int room = 128;
 
-	len = vsnprintf(buffer, sizeof(buffer), fmt, args);
-	if (len <= sizeof(buffer)) {
-		put_bytes(b, buffer, len);
-		return;
+	for (;;) {
+		int len;
+		va_list copy;
+		char *target;
+
+		make_room(b, room);
+		room = b->alloc - b->len;
+		target = b->buffer + b->len;
+
+		va_copy(copy, args);
+		len = vsnprintf(target, room, fmt, copy);
+		va_end(copy);
+
+		if (len < room) {
+			b->len += len;
+			return;
+		}
+
+		room = len+1;
 	}
-
-	p = malloc(len);
-	len = vsnprintf(p, len, fmt, args);
-	put_bytes(b, p, len);
-	free(p);
 }
 
 void put_format(struct membuffer *b, const char *fmt, ...)
@@ -120,47 +135,32 @@ void put_milli(struct membuffer *b, const char *pre, int value, const char *post
 	put_format(b, "%s%s%u.%s%s", pre, sign, v, buf, post);
 }
 
-int put_temperature(struct membuffer *b, temperature_t temp, const char *pre, const char *post)
+void put_temperature(struct membuffer *b, temperature_t temp, const char *pre, const char *post)
 {
-	if (!temp.mkelvin)
-		return 0;
-
-	put_milli(b, pre, temp.mkelvin - ZERO_C_IN_MKELVIN, post);
-	return 1;
+	if (temp.mkelvin)
+		put_milli(b, pre, temp.mkelvin - ZERO_C_IN_MKELVIN, post);
 }
 
-int put_depth(struct membuffer *b, depth_t depth, const char *pre, const char *post)
+void put_depth(struct membuffer *b, depth_t depth, const char *pre, const char *post)
 {
-	if (!depth.mm)
-		return 0;
-
-	put_milli(b, pre, depth.mm, post);
-	return 1;
+	if (depth.mm)
+		put_milli(b, pre, depth.mm, post);
 }
 
-int put_duration(struct membuffer *b, duration_t duration, const char *pre, const char *post)
+void put_duration(struct membuffer *b, duration_t duration, const char *pre, const char *post)
 {
-	if (!duration.seconds)
-		return 0;
-
-	put_format(b, "%s%u:%02u%s", pre, FRACTION(duration.seconds, 60), post);
-	return 1;
+	if (duration.seconds)
+		put_format(b, "%s%u:%02u%s", pre, FRACTION(duration.seconds, 60), post);
 }
 
-int put_pressure(struct membuffer *b, pressure_t pressure, const char *pre, const char *post)
+void put_pressure(struct membuffer *b, pressure_t pressure, const char *pre, const char *post)
 {
-	if (!pressure.mbar)
-		return 0;
-
-	put_milli(b, pre, pressure.mbar, post);
-	return 1;
+	if (pressure.mbar)
+		put_milli(b, pre, pressure.mbar, post);
 }
 
-int put_salinity(struct membuffer *b, int salinity, const char *pre, const char *post)
+void put_salinity(struct membuffer *b, int salinity, const char *pre, const char *post)
 {
-	if (!salinity)
-		return 0;
-
-	put_format(b, "%s%d%s", pre, salinity / 10, post);
-	return 1;
+	if (salinity)
+		put_format(b, "%s%d%s", pre, salinity / 10, post);
 }

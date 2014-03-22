@@ -5,8 +5,8 @@
 #include <QApplication>
 #include <QTableView>
 #include <QHeaderView>
+#include <QPointer>
 #include "mainwindow.h"
-#include "profilegraphics.h"
 #include "../dive.h"
 #include "../display.h"
 #include "printdialog.h"
@@ -43,7 +43,7 @@ PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct op
 	profilePrintColumnWidths.append(dw - 3);
 	profilePrintColumnWidths.append(dw - 3);
 	profilePrintColumnWidths.append(dw + 6); // fit to 100%
-	const int sr = 12; // smallest row height in pixels
+	const int sr = 12;			 // smallest row height in pixels
 	profilePrintRowHeights.append(sr);
 	profilePrintRowHeights.append(sr + 4);
 	profilePrintRowHeights.append(sr);
@@ -84,8 +84,8 @@ void PrintLayout::setup()
 	printerDpi = printer->resolution();
 	pageRect = printer->pageRect();
 
-	scaleX = (qreal)printerDpi/(qreal)screenDpiX;
-	scaleY = (qreal)printerDpi/(qreal)screenDpiY;
+	scaleX = (qreal)printerDpi / (qreal)screenDpiX;
+	scaleY = (qreal)printerDpi / (qreal)screenDpiY;
 
 	// a printer page scalled to screen DPI
 	scaledPageW = pageRect.width() / scaleX;
@@ -114,7 +114,7 @@ int PrintLayout::estimateTotalDives() const
  * p is the padding between elements
  */
 #define ESTIMATE_DIVE_DIM(S, n, p) \
-	 ((S) - ((n) - 1) * (p)) / (n);
+	((S) - ((n) - 1) * (p)) / (n);
 
 void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 {
@@ -131,18 +131,16 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 	painter.scale(scaleX, scaleY);
 
 	// setup the profile widget
-	ProfileGraphicsView *profile = MainWindow::instance()->graphics();
-	const int profileFrameStyle = profile->frameStyle();
-	profile->setFrameStyle(QFrame::NoFrame);
-	profile->clear();
-	profile->setPrintMode(true, !printOptions->color_selected);
-	QSize originalSize = profile->size();
+	ProfileWidget2 profile;
+	profile.setFrameStyle(QFrame::NoFrame);
+// 	profile->setPrintMode(true, !printOptions->color_selected);
 	// swap rows/col for landscape
 	if (printer->orientation() == QPrinter::Landscape) {
 		int swap = divesPerColumn;
 		divesPerColumn = divesPerRow;
 		divesPerRow = swap;
 	}
+
 	// padding in pixels between two dives. no padding if only one dive per page.
 	const int padDef = 20;
 	const int padW = (divesPerColumn < 2) ? 0 : padDef;
@@ -154,11 +152,11 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 	const int padPT = 5;
 	// create a model and table
 	ProfilePrintModel model;
-	QTableView *table = createProfileTable(&model, scaledW);
+	QPointer<QTableView> table(createProfileTable(&model, scaledW));
 	// profilePrintTableMaxH updates after the table is created
 	const int tableH = profilePrintTableMaxH;
 	// resize the profile widget
-	profile->resize(scaledW, scaledH - tableH - padPT);
+	profile.resize(scaledW, scaledH - tableH - padPT);
 	// offset table or profile on top
 	int yOffsetProfile = 0, yOffsetTable = 0;
 	if (printOptions->notes_up)
@@ -182,8 +180,8 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 
 		// draw a profile
 		painter.translate((scaledW + padW) * col, (scaledH + padH) * row + yOffsetProfile);
-		profile->plot(dive, true);
-		profile->render(&painter, QRect(0, 0, scaledW, scaledH - tableH - padPT));
+		profile.plotDives( QList<struct dive*>() << dive);
+		profile.render(&painter, QRect(0, 0, scaledW, scaledH - tableH - padPT));
 		painter.setTransform(origTransform);
 
 		// draw a table
@@ -195,15 +193,6 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 		printed++;
 		emit signalProgress((printed * 100) / total);
 	}
-
-	// cleanup
-	painter.end();
-	delete table;
-	profile->setFrameStyle(profileFrameStyle);
-	profile->setPrintMode(false);
-	profile->resize(originalSize);
-	profile->clear();
-	profile->plot(current_dive, true);
 }
 
 /* we create a table that has a fixed height, but can stretch to fit certain width */
@@ -220,7 +209,7 @@ QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int 
 	table->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	hHeader->setVisible(false);
 	vHeader->setVisible(false);
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 	hHeader->setResizeMode(QHeaderView::Fixed);
 	vHeader->setResizeMode(QHeaderView::Fixed);
 #else
@@ -269,8 +258,7 @@ QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int 
 	table->setShowGrid(false);
 	table->setStyleSheet(
 		"QTableView { border: none }"
-		"QTableView::item { border: 0px; padding-left: 2px; padding-right: 2px; }"
-	);
+		"QTableView::item { border: 0px; padding-left: 2px; padding-right: 2px; }");
 	// return
 	return table;
 }
@@ -290,7 +278,7 @@ void PrintLayout::printTable()
 	table.setFocusPolicy(Qt::NoFocus);
 	table.horizontalHeader()->setVisible(false);
 	table.verticalHeader()->setVisible(false);
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 	table.horizontalHeader()->setResizeMode(QHeaderView::Fixed);
 	table.verticalHeader()->setResizeMode(QHeaderView::ResizeToContents);
 #else
@@ -300,12 +288,11 @@ void PrintLayout::printTable()
 	table.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	table.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	// fit table to one page initially
-	table.resize(scaledPageW,  scaledPageH);
+	table.resize(scaledPageW, scaledPageH);
 
 	// don't show border
 	table.setStyleSheet(
-		"QTableView { border: none }"
-	);
+		"QTableView { border: none }");
 
 	// create and fill a table model
 	TablePrintModel model;

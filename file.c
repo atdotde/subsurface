@@ -37,7 +37,7 @@ int readfile(const char *filename, struct memblock *mem)
 	ret = 0;
 	if (!st.st_size)
 		goto out;
-	buf = malloc(st.st_size+1);
+	buf = malloc(st.st_size + 1);
 	ret = -1;
 	errno = ENOMEM;
 	if (!buf)
@@ -62,22 +62,22 @@ out:
 }
 
 
-static void zip_read(struct zip_file *file, char **error, const char *filename)
+static void zip_read(struct zip_file *file, const char *filename)
 {
 	int size = 1024, n, read = 0;
 	char *mem = malloc(size);
 
-	while ((n = zip_fread(file, mem+read, size-read)) > 0) {
+	while ((n = zip_fread(file, mem + read, size - read)) > 0) {
 		read += n;
 		size = read * 3 / 2;
 		mem = realloc(mem, size);
 	}
 	mem[read] = 0;
-	parse_xml_buffer(filename, mem, read, &dive_table, NULL, error);
+	parse_xml_buffer(filename, mem, read, &dive_table, NULL);
 	free(mem);
 }
 
-static int try_to_open_zip(const char *filename, struct memblock *mem, char **error)
+static int try_to_open_zip(const char *filename, struct memblock *mem)
 {
 	int success = 0;
 	/* Grr. libzip needs to re-open the file, it can't take a buffer */
@@ -85,11 +85,11 @@ static int try_to_open_zip(const char *filename, struct memblock *mem, char **er
 
 	if (zip) {
 		int index;
-		for (index = 0; ;index++) {
+		for (index = 0;; index++) {
 			struct zip_file *file = zip_fopen_index(zip, index, 0);
 			if (!file)
 				break;
-			zip_read(file, error, filename);
+			zip_read(file, filename);
 			zip_fclose(file);
 			success++;
 		}
@@ -98,19 +98,12 @@ static int try_to_open_zip(const char *filename, struct memblock *mem, char **er
 	return success;
 }
 
-static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char **error, const char *tag)
+static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, const char *tag)
 {
 	char *buf;
 
-	if (readfile(filename, mem) < 0) {
-		if (error) {
-			int len = strlen(translate("gettextFromC","Failed to read '%s'")) + strlen(filename);
-			*error = malloc(len);
-			snprintf(*error, len, translate("gettextFromC","Failed to read '%s'"), filename);
-		}
-
-		return 1;
-	}
+	if (readfile(filename, mem) < 0)
+		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);
 
 	/* Surround the CSV file content with XML tags to enable XSLT
 	 * parsing
@@ -126,8 +119,13 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char
 		endtag = malloc(4 + strlen(tag));
 
 		if (starttag == NULL || endtag == NULL) {
-			*error = strdup("Memory allocation failed in __func__\n");
-			return 1;
+			/* this is fairly silly - so the malloc fails, but we strdup the error?
+			 * let's complete the silliness by freeing the two pointers in case one malloc succeeded
+			 *  and the other one failed - this will make static analysis tools happy */
+			free(starttag);
+			free(endtag);
+			free(buf);
+			return report_error("Memory allocation failed in %s", __func__);
 		}
 
 		sprintf(starttag, "<%s>", tag);
@@ -142,10 +140,8 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, char
 		free(starttag);
 		free(endtag);
 	} else {
-		/* we can atleast try to strdup a error... */
-		*error = strdup("realloc failed in __func__\n");
 		free(mem->buffer);
-		return 1;
+		return report_error("realloc failed in %s", __func__);
 	}
 
 	return 0;
@@ -157,7 +153,7 @@ int db_test_func(void *param, int columns, char **data, char **column)
 }
 
 
-static int try_to_open_db(const char *filename, struct memblock *mem, char **error)
+static int try_to_open_db(const char *filename, struct memblock *mem)
 {
 	sqlite3 *handle;
 	char dm4_test[] = "select count(*) from sqlite_master where type='table' and name='Dive' and sql like '%ProfileBlob%'";
@@ -167,14 +163,14 @@ static int try_to_open_db(const char *filename, struct memblock *mem, char **err
 	retval = sqlite3_open(filename, &handle);
 
 	if (retval) {
-		fprintf(stderr, translate("gettextFromC","Database connection failed '%s'.\n"), filename);
+		fprintf(stderr, translate("gettextFromC", "Database connection failed '%s'.\n"), filename);
 		return 1;
 	}
 
 	/* Testing if DB schema resembles Suunto DM4 database format */
 	retval = sqlite3_exec(handle, dm4_test, &db_test_func, 0, NULL);
 	if (!retval) {
-		retval = parse_dm4_buffer(handle, filename, mem->buffer, mem->size, &dive_table, error);
+		retval = parse_dm4_buffer(handle, filename, mem->buffer, mem->size, &dive_table);
 		sqlite3_close(handle);
 		return retval;
 	}
@@ -182,7 +178,7 @@ static int try_to_open_db(const char *filename, struct memblock *mem, char **err
 	/* Testing if DB schema resembles Shearwater database format */
 	retval = sqlite3_exec(handle, shearwater_test, &db_test_func, 0, NULL);
 	if (!retval) {
-		retval = parse_shearwater_buffer(handle, filename, mem->buffer, mem->size, &dive_table, error);
+		retval = parse_shearwater_buffer(handle, filename, mem->buffer, mem->size, &dive_table);
 		sqlite3_close(handle);
 		return retval;
 	}
@@ -208,7 +204,7 @@ timestamp_t parse_date(const char *date)
 	}
 	if (tm.tm_mon > 11)
 		return 0;
-	date = p+3;
+	date = p + 3;
 	tm.tm_year = strtol(date, &p, 10);
 	if (date == p)
 		return 0;
@@ -225,7 +221,9 @@ timestamp_t parse_date(const char *date)
 }
 
 enum csv_format {
-	CSV_DEPTH, CSV_TEMP, CSV_PRESSURE
+	CSV_DEPTH,
+	CSV_TEMP,
+	CSV_PRESSURE
 };
 
 static void add_sample_data(struct sample *sample, enum csv_format type, double val)
@@ -238,7 +236,7 @@ static void add_sample_data(struct sample *sample, enum csv_format type, double 
 		sample->temperature.mkelvin = F_to_mkelvin(val);
 		break;
 	case CSV_PRESSURE:
-		sample->cylinderpressure.mbar = psi_to_mbar(val*4);
+		sample->cylinderpressure.mbar = psi_to_mbar(val * 4);
 		break;
 	}
 }
@@ -292,7 +290,7 @@ static int try_to_open_csv(const char *filename, struct memblock *mem, enum csv_
 		struct sample *sample;
 
 		errno = 0;
-		val = strtod(p,&end); // FIXME == localization issue
+		val = strtod(p, &end); // FIXME == localization issue
 		if (end == p)
 			break;
 		if (errno)
@@ -307,17 +305,17 @@ static int try_to_open_csv(const char *filename, struct memblock *mem, enum csv_
 		dc->duration.seconds = time;
 		if (*end != ',')
 			break;
-		p = end+1;
+		p = end + 1;
 	}
 	record_dive(dive);
 	return 1;
 }
 
-static int open_by_filename(const char *filename, const char *fmt, struct memblock *mem, char **error)
+static int open_by_filename(const char *filename, const char *fmt, struct memblock *mem)
 {
 	/* Suunto Dive Manager files: SDE, ZIP; divelogs.de files: DLD */
 	if (!strcasecmp(fmt, "SDE") || !strcasecmp(fmt, "ZIP") || !strcasecmp(fmt, "DLD"))
-		return try_to_open_zip(filename, mem, error);
+		return try_to_open_zip(filename, mem);
 
 	/* CSV files */
 	if (!strcasecmp(fmt, "CSV"))
@@ -326,7 +324,7 @@ static int open_by_filename(const char *filename, const char *fmt, struct memblo
 #if ONCE_COCHRAN_IS_SUPPORTED
 	/* Truly nasty intentionally obfuscated Cochran Anal software */
 	if (!strcasecmp(fmt, "CAN"))
-		return try_to_open_cochran(filename, mem, error);
+		return try_to_open_cochran(filename, mem);
 #endif
 
 	/* Cochran export comma-separated-value files */
@@ -340,55 +338,56 @@ static int open_by_filename(const char *filename, const char *fmt, struct memblo
 	return 0;
 }
 
-static void parse_file_buffer(const char *filename, struct memblock *mem, char **error)
+static void parse_file_buffer(const char *filename, struct memblock *mem)
 {
 	char *fmt = strrchr(filename, '.');
-	if (fmt && open_by_filename(filename, fmt+1, mem, error))
+	if (fmt && open_by_filename(filename, fmt + 1, mem))
 		return;
 
 	if (!mem->size || !mem->buffer)
 		return;
 
-	parse_xml_buffer(filename, mem->buffer, mem->size, &dive_table, NULL, error);
+	parse_xml_buffer(filename, mem->buffer, mem->size, &dive_table, NULL);
 }
 
-void parse_file(const char *filename, char **error)
+int parse_file(const char *filename)
 {
+	struct git_repository *git;
+	const char *branch;
 	struct memblock mem;
 	char *fmt;
 
+	git = is_git_repository(filename, &branch);
+	if (git && !git_load_dives(git, branch))
+		return 0;
+
 	if (readfile(filename, &mem) < 0) {
 		/* we don't want to display an error if this was the default file */
-		if (prefs.default_filename && ! strcmp(filename, prefs.default_filename))
-			return;
+		if (prefs.default_filename && !strcmp(filename, prefs.default_filename))
+			return 0;
 
-		if (error) {
-			int len = strlen(translate("gettextFromC","Failed to read '%s'")) + strlen(filename);
-			*error = malloc(len);
-			snprintf(*error, len, translate("gettextFromC","Failed to read '%s'"), filename);
-		}
-
-		return;
+		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);
 	}
 
 	fmt = strrchr(filename, '.');
 	if (fmt && (!strcasecmp(fmt + 1, "DB") || !strcasecmp(fmt + 1, "BAK"))) {
-		if (!try_to_open_db(filename, &mem, error)) {
+		if (!try_to_open_db(filename, &mem)) {
 			free(mem.buffer);
-			return;
+			return 0;
 		}
 	}
 
-	parse_file_buffer(filename, &mem, error);
+	parse_file_buffer(filename, &mem);
 	free(mem.buffer);
+	return 0;
 }
 
 #define MAXCOLDIGITS 3
 #define MAXCOLS 100
-void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int unitidx, char **error)
+int parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int unitidx)
 {
 	struct memblock mem;
-	int pnr=0;
+	int pnr = 0;
 	char *params[21];
 	char timebuf[MAXCOLDIGITS];
 	char depthbuf[MAXCOLDIGITS];
@@ -403,13 +402,9 @@ void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int 
 	char curdate[9];
 	char curtime[6];
 
-	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS ) {
-		int len = strlen(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d")) + MAXCOLDIGITS;
-		*error = malloc(len);
-		snprintf(*error, len, translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
+	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS)
+		return report_error(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
 
-		return;
-	}
 	snprintf(timebuf, MAXCOLDIGITS, "%d", timef);
 	snprintf(depthbuf, MAXCOLDIGITS, "%d", depthf);
 	snprintf(tempbuf, MAXCOLDIGITS, "%d", tempf);
@@ -449,19 +444,20 @@ void parse_csv_file(const char *filename, int timef, int depthf, int tempf, int 
 	params[pnr++] = NULL;
 
 	if (filename == NULL)
-		return;
+		return report_error("No CSV filename");
 
-	if (try_to_xslt_open_csv(filename, &mem, error, csvtemplate))
-		return;
+	if (try_to_xslt_open_csv(filename, &mem, csvtemplate))
+		return -1;
 
-	parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params, error);
+	parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params);
 	free(mem.buffer);
+	return 0;
 }
 
-void parse_manual_file(const char *filename, int sepidx, int units, int numberf, int datef, int timef, int durationf, int locationf, int gpsf, int maxdepthf, int meandepthf, int buddyf, int notesf, int weightf, int tagsf, char **error)
+int parse_manual_file(const char *filename, int sepidx, int units, int numberf, int datef, int timef, int durationf, int locationf, int gpsf, int maxdepthf, int meandepthf, int buddyf, int notesf, int weightf, int tagsf)
 {
 	struct memblock mem;
-	int pnr=0;
+	int pnr = 0;
 	char *params[33];
 	char numberbuf[MAXCOLDIGITS];
 	char datebuf[MAXCOLDIGITS];
@@ -482,13 +478,9 @@ void parse_manual_file(const char *filename, int sepidx, int units, int numberf,
 	char curdate[9];
 	char curtime[6];
 
-	if ( numberf >= MAXCOLS || datef >= MAXCOLS || timef >= MAXCOLS || durationf >= MAXCOLS || locationf >= MAXCOLS || gpsf >= MAXCOLS || maxdepthf >= MAXCOLS || meandepthf >= MAXCOLS || buddyf >= MAXCOLS || notesf >= MAXCOLS || weightf >= MAXCOLS || tagsf >= MAXCOLS ) {
-		int len = strlen(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d")) + MAXCOLDIGITS;
-		*error = malloc(len);
-		snprintf(*error, len, translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
+	if (numberf >= MAXCOLS || datef >= MAXCOLS || timef >= MAXCOLS || durationf >= MAXCOLS || locationf >= MAXCOLS || gpsf >= MAXCOLS || maxdepthf >= MAXCOLS || meandepthf >= MAXCOLS || buddyf >= MAXCOLS || notesf >= MAXCOLS || weightf >= MAXCOLS || tagsf >= MAXCOLS)
+		return report_error(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
 
-		return;
-	}
 	snprintf(numberbuf, MAXCOLDIGITS, "%d", numberf);
 	snprintf(datebuf, MAXCOLDIGITS, "%d", datef);
 	snprintf(timebuf, MAXCOLDIGITS, "%d", timef);
@@ -546,11 +538,12 @@ void parse_manual_file(const char *filename, int sepidx, int units, int numberf,
 	params[pnr++] = NULL;
 
 	if (filename == NULL)
-		return;
+		return report_error("No manual CSV filename");
 
-	if (try_to_xslt_open_csv(filename, &mem, error, "manualCSV"))
-		return;
+	if (try_to_xslt_open_csv(filename, &mem, "manualCSV"))
+		return -1;
 
-	parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params, error);
+	parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params);
 	free(mem.buffer);
+	return 0;
 }

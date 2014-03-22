@@ -5,15 +5,14 @@
 #include "ui_divelogimportdialog.h"
 
 const DiveLogImportDialog::CSVAppConfig DiveLogImportDialog::CSVApps[CSVAPPS] = {
-		{"", },
-		{"APD Log Viewer", 1, 2, 16, 7, 18, 19, "Tab"},
-		{"XP5", 1, 2, 10, -1, -1, -1, "Tab"},
-		{"SensusCSV", 10, 11, -1, -1, -1, -1, ","},
-		{NULL,}
+	{ "", },
+	{ "APD Log Viewer", 1, 2, 16, 7, 18, 19, "Tab" },
+	{ "XP5", 1, 2, 10, -1, -1, -1, "Tab" },
+	{ "SensusCSV", 10, 11, -1, -1, -1, -1, "," },
+	{ NULL, }
 };
 
-DiveLogImportDialog::DiveLogImportDialog(QStringList *fn, QWidget *parent) :
-	QDialog(parent),
+DiveLogImportDialog::DiveLogImportDialog(QStringList *fn, QWidget *parent) : QDialog(parent),
 	selector(true),
 	ui(new Ui::DiveLogImportDialog)
 {
@@ -52,46 +51,32 @@ DiveLogImportDialog::~DiveLogImportDialog()
 	delete ui;
 }
 
-#define VALUE_IF_CHECKED(x) (ui->x->isEnabled() ? ui->x->value() - 1: -1)
+#define VALUE_IF_CHECKED(x) (ui->x->isEnabled() ? ui->x->value() - 1 : -1)
 void DiveLogImportDialog::on_buttonBox_accepted()
 {
-	char *error = NULL;
-
 	if (ui->tabWidget->currentIndex() == 0) {
 		for (int i = 0; i < fileNames.size(); ++i) {
 			parse_csv_file(fileNames[i].toUtf8().data(), ui->CSVTime->value() - 1,
-			               ui->CSVDepth->value() - 1, VALUE_IF_CHECKED(CSVTemperature),
-			               VALUE_IF_CHECKED(CSVpo2),
-			               VALUE_IF_CHECKED(CSVcns),
-			               VALUE_IF_CHECKED(CSVstopdepth),
-			               ui->CSVSeparator->currentIndex(),
-			               specialCSV.contains(ui->knownImports->currentIndex()) ? CSVApps[ui->knownImports->currentIndex()].name.toUtf8().data() : "csv",
-			               ui->CSVUnits->currentIndex(),
-			               &error);
-			if (error != NULL) {
-				MainWindow::instance()->showError(error);
-				free(error);
-				error = NULL;
-			}
+				       ui->CSVDepth->value() - 1, VALUE_IF_CHECKED(CSVTemperature),
+				       VALUE_IF_CHECKED(CSVpo2),
+				       VALUE_IF_CHECKED(CSVcns),
+				       VALUE_IF_CHECKED(CSVstopdepth),
+				       ui->CSVSeparator->currentIndex(),
+				       specialCSV.contains(ui->knownImports->currentIndex()) ? CSVApps[ui->knownImports->currentIndex()].name.toUtf8().data() : "csv",
+				       ui->CSVUnits->currentIndex());
 		}
 	} else {
 		for (int i = 0; i < fileNames.size(); ++i) {
 			parse_manual_file(fileNames[i].toUtf8().data(),
-			               ui->ManualSeparator->currentIndex(),
-			               ui->Units->currentIndex(),
-			               VALUE_IF_CHECKED(DiveNumber),
-			               VALUE_IF_CHECKED(Date), VALUE_IF_CHECKED(Time),
-			               VALUE_IF_CHECKED(Duration), VALUE_IF_CHECKED(Location),
-			               VALUE_IF_CHECKED(Gps), VALUE_IF_CHECKED(MaxDepth),
-			               VALUE_IF_CHECKED(MeanDepth), VALUE_IF_CHECKED(Buddy),
-			               VALUE_IF_CHECKED(Notes), VALUE_IF_CHECKED(Weight),
-			               VALUE_IF_CHECKED(Tags),
-			               &error);
-			if (error != NULL) {
-				MainWindow::instance()->showError(error);
-				free(error);
-				error = NULL;
-			}
+					  ui->ManualSeparator->currentIndex(),
+					  ui->Units->currentIndex(),
+					  VALUE_IF_CHECKED(DiveNumber),
+					  VALUE_IF_CHECKED(Date), VALUE_IF_CHECKED(Time),
+					  VALUE_IF_CHECKED(Duration), VALUE_IF_CHECKED(Location),
+					  VALUE_IF_CHECKED(Gps), VALUE_IF_CHECKED(MaxDepth),
+					  VALUE_IF_CHECKED(MeanDepth), VALUE_IF_CHECKED(Buddy),
+					  VALUE_IF_CHECKED(Notes), VALUE_IF_CHECKED(Weight),
+					  VALUE_IF_CHECKED(Tags));
 		}
 	}
 	process_dives(true, false);
@@ -104,8 +89,7 @@ void DiveLogImportDialog::on_buttonBox_accepted()
 		ui->CSV->setValue(VAL);\
 		ui->CSV->setEnabled(VAL >= 0);\
 		ui->BOX->setChecked(VAL >= 0);\
-		ui->CSV->blockSignals(false);\
-		})
+		ui->CSV->blockSignals(false); })
 void DiveLogImportDialog::on_knownImports_currentIndexChanged(int index)
 {
 	if (specialCSV.contains(index)) {

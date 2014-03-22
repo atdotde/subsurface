@@ -22,7 +22,6 @@ HEADERS = \
 	dive.h \
 	divelist.h \
 	file.h \
-	flag.h \
 	gettextfromc.h \
 	gettext.h \
 	helpers.h \
@@ -49,7 +48,6 @@ HEADERS = \
 	qt-ui/printdialog.h \
 	qt-ui/printlayout.h \
 	qt-ui/printoptions.h \
-	qt-ui/profilegraphics.h \
 	qt-ui/simplewidgets.h \
 	qt-ui/starwidget.h \
 	qt-ui/subsurfacewebservices.h \
@@ -57,7 +55,6 @@ HEADERS = \
 	qt-ui/exif.h \
 	sha1.h \
 	statistics.h \
-	subsurface-icon.h \
 	subsurfacestartup.h \
 	uemis.h \
 	webservice.h \
@@ -75,7 +72,8 @@ HEADERS = \
 	qt-ui/profile/diveplotdatamodel.h \
 	qt-ui/profile/diveprofileitem.h \
 	qt-ui/profile/diveeventitem.h \
-	qt-ui/profile/divetooltipitem.h
+	qt-ui/profile/divetooltipitem.h \
+	qt-ui/profile/ruleritem.h
 
 SOURCES =  \
 	deco.c \
@@ -86,6 +84,7 @@ SOURCES =  \
 	file.c \
 	gettextfromc.cpp \
 	libdivecomputer.c \
+	load-git.c \
 	main.cpp \
 	membuffer.c \
 	parse-xml.c \
@@ -110,12 +109,12 @@ SOURCES =  \
 	qt-ui/printdialog.cpp \
 	qt-ui/printlayout.cpp \
 	qt-ui/printoptions.cpp \
-	qt-ui/profilegraphics.cpp \
 	qt-ui/simplewidgets.cpp \
 	qt-ui/starwidget.cpp \
 	qt-ui/subsurfacewebservices.cpp \
 	qt-ui/tableview.cpp \
 	qt-ui/exif.cpp \
+	save-git.c \
 	save-xml.c \
 	sha1.c \
 	statistics.c \
@@ -138,7 +137,8 @@ SOURCES =  \
 	qt-ui/profile/diveplotdatamodel.cpp \
 	qt-ui/profile/diveprofileitem.cpp \
 	qt-ui/profile/diveeventitem.cpp \
-	qt-ui/profile/divetooltipitem.cpp
+	qt-ui/profile/divetooltipitem.cpp \
+	qt-ui/profile/ruleritem.cpp
 
 linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
@@ -169,36 +169,48 @@ TRANSLATIONS = \
 	translations/subsurface_da_DK.ts \
 	translations/subsurface_de_CH.ts \
 	translations/subsurface_de_DE.ts \
+	translations/subsurface_el_GR.ts \
 	translations/subsurface_es_ES.ts \
 	translations/subsurface_et_EE.ts \
 	translations/subsurface_fi_FI.ts \
 	translations/subsurface_fr_FR.ts \
+	translations/subsurface_he.ts \
+	translations/subsurface_hu.ts \
 	translations/subsurface_it_IT.ts \
+	translations/subsurface_lv_LV.ts \
 	translations/subsurface_nb_NO.ts \
 	translations/subsurface_nl_NL.ts \
 	translations/subsurface_pl_PL.ts \
 	translations/subsurface_pt_BR.ts \
 	translations/subsurface_pt_PT.ts \
+	translations/subsurface_ro_RO.ts \
 	translations/subsurface_ru_RU.ts \
 	translations/subsurface_sk_SK.ts \
 	translations/subsurface_sv_SE.ts \
-	translations/subsurface_zh_TW.ts \
-	translations/subsurface_he.ts
+	translations/subsurface_tr.ts \
+	translations/subsurface_zh_TW.ts
 
 QTTRANSLATIONS = \
 	qt_da.qm \
 	qt_de.qm \
 	qt_es.qm \
 	qt_fr.qm \
+	qt_he.qm \
+	qt_hu.qm \
 	qt_pl.qm \
 	qt_pt.qm \
 	qt_ru.qm \
 	qt_sk.qm \
-	qt_sv.qm
+	qt_sv.qm \
+	qt_zh_TW.qm
 
-doc.commands += $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
+doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation || $(MKDIR) $$OUT_PWD/Documentation $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
 all.depends += doc
 QMAKE_EXTRA_TARGETS += doc all
+
+marbledata.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/marbledata || $(COPY_DIR) $$PWD/marbledata $$OUT_PWD
+all.depends += marbledata
+QMAKE_EXTRA_TARGETS += marbledata
 
 DESKTOP_FILE = subsurface.desktop
 mac: ICON = packaging/macosx/Subsurface.icns

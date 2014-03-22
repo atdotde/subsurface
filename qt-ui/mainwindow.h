@@ -28,25 +28,43 @@ class GlobeGPS;
 class MainTab;
 class ProfileGraphicsView;
 class QWebView;
+class QSettings;
 
-enum MainWindowTitleFormat { MWTF_DEFAULT, MWTF_FILENAME };
+enum MainWindowTitleFormat {
+	MWTF_DEFAULT,
+	MWTF_FILENAME
+};
 
-class MainWindow : public QMainWindow
-{
-Q_OBJECT
+class MainWindow : public QMainWindow {
+	Q_OBJECT
 public:
-	enum {COLLAPSED, EXPANDED};
-	enum StackWidgetIndexes{ PROFILE, PLANNERPROFILE};
-	enum InfoWidgetIndexes{ MAINTAB, PLANNERWIDGET};
-	enum CurrentState{ VIEWALL, GLOBE_MAXIMIZED, INFO_MAXIMIZED, PROFILE_MAXIMIZED, LIST_MAXIMIZED};
+	enum {
+		COLLAPSED,
+		EXPANDED
+	};
+	enum StackWidgetIndexes {
+		PROFILE,
+		PLANNERPROFILE
+	};
+	enum InfoWidgetIndexes {
+		MAINTAB,
+		PLANNERWIDGET
+	};
+	enum CurrentState {
+		VIEWALL,
+		GLOBE_MAXIMIZED,
+		INFO_MAXIMIZED,
+		PROFILE_MAXIMIZED,
+		LIST_MAXIMIZED
+	};
 
 	MainWindow();
 	virtual ~MainWindow();
 	static MainWindow *instance();
-	ProfileGraphicsView *graphics();
 	MainTab *information();
 	void loadRecentFiles(QSettings *s);
 	void addRecentFile(const QStringList &newFiles);
+	void removeRecentFile(QStringList failedFiles);
 	DiveListView *dive_list();
 	GlobeGPS *globe();
 	void showError(QString message);
@@ -59,8 +77,12 @@ public:
 	void loadFiles(const QStringList files);
 	void importFiles(const QStringList importFiles);
 	void cleanUpEmpty();
-	QTabWidget *tabWidget();
-private slots:
+	void setToolButtonsEnabled(bool enabled);
+	ProfileWidget2 *graphics() const;
+	void setLoadedWithFiles(bool filesFromCommandLine);
+	bool filesFromCommandLine() const;
+private
+slots:
 	/* file menu action */
 	void recentFileTriggered(bool checked);
 	void on_actionNew_triggered();
@@ -81,7 +103,6 @@ private slots:
 	void on_actionAddDive_triggered();
 	void on_actionRenumber_triggered();
 	void on_actionAutoGroup_triggered();
-	void on_actionToggleZoom_triggered();
 	void on_actionYearlyStatistics_triggered();
 
 	/* view menu actions */
@@ -101,10 +122,6 @@ private slots:
 	void on_actionUserManual_triggered();
 	void on_actionDivePlanner_triggered();
 
-	/* monitor resize of the info-profile splitter */
-	void on_mainSplitter_splitterMoved(int pos, int idx);
-	void on_infoProfileSplitter_splitterMoved(int pos, int idx);
-
 	void current_dive_changed(int divenr);
 	void initialUiSetup();
 
@@ -117,17 +134,19 @@ private slots:
 	void on_profEad_clicked(bool triggered);
 	void on_profIncrement3m_clicked(bool triggered);
 	void on_profMod_clicked(bool triggered);
-	void on_profNtl_tts_clicked(bool triggered);
+	void on_profNdl_tts_clicked(bool triggered);
 	void on_profPO2_clicked(bool triggered);
 	void on_profPhe_clicked(bool triggered);
 	void on_profPn2_clicked(bool triggered);
 	void on_profRuler_clicked(bool triggered);
 	void on_profSAC_clicked(bool triggered);
+	void on_profScaled_clicked(bool triggered);
 
 protected:
 	void closeEvent(QCloseEvent *);
 
-public slots:
+public
+slots:
 	void readSettings();
 	void refreshDisplay(bool recreateDiveList = true);
 	void showProfile();
@@ -138,18 +157,20 @@ private:
 	QAction *actionNextDive;
 	QAction *actionPreviousDive;
 	UserManual *helpView;
+	QTreeView *yearlyStats;
+	QAbstractItemModel *yearlyStatsModel;
 	CurrentState state;
 	QString filter();
 	static MainWindow *m_Instance;
 	bool askSaveChanges();
 	void writeSettings();
-	void redrawProfile();
-	void file_save();
-	void file_save_as();
+	int file_save();
+	int file_save_as();
 	void beginChangeState(CurrentState s);
 	void saveSplitterSizes();
 	QString lastUsedDir();
-	void updateLastUsedDir(const QString& s);
+	void updateLastUsedDir(const QString &s);
+	bool filesAsArguments;
 };
 
 MainWindow *mainWindow();

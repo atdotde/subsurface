@@ -5,7 +5,7 @@
 #  - calling implicit functions
 #  - casting from integers to pointers or vice-versa without an explicit cast
 # Also turn on C99 mode with GNU extensions
-*-g++*: QMAKE_CFLAGS += -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast -Werror=implicit-int 
+*-g++*: QMAKE_CFLAGS += -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast -Werror=implicit-int
 
 # these warnings are in general just wrong and annoying - but should be
 # turned on every once in a while in case they do show the occasional
@@ -128,6 +128,13 @@ LIBS *= $$XSLT_LIBS $$XML2_LIBS
 #  sqlite3
 link_pkgconfig: PKGCONFIG += libzip sqlite3
 
+isEmpty(LIBGIT2DEVEL) {
+	PKGCONFIG += libgit2
+} else {
+	INCLUDEPATH += $$LIBGIT2DEVEL/include
+	LIBS += -L$$LIBGIT2DEVEL/build -lgit2 -lz -lcrypto
+}
+
 # Add libiconv if needed
 link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
 
@@ -140,6 +147,9 @@ link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
 win32: CONFIG(debug, debug|release): LIBS += -lmarblewidgetd
 else: LIBS += -lmarblewidget
 
+libgit21-api {
+	DEFINES += USE_LIBGIT21_API
+}
 #
 # Platform-specific changes
 #

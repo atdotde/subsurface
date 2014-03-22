@@ -6,7 +6,7 @@
 #include <QMessageBox>
 #include <QSortFilterProxyModel>
 
-PreferencesDialog* PreferencesDialog::instance()
+PreferencesDialog *PreferencesDialog::instance()
 {
 	static PreferencesDialog *dialog = new PreferencesDialog(MainWindow::instance());
 	dialog->setAttribute(Qt::WA_QuitOnClose, false);
@@ -14,10 +14,10 @@ PreferencesDialog* PreferencesDialog::instance()
 	return dialog;
 }
 
-PreferencesDialog::PreferencesDialog(QWidget* parent, Qt::WindowFlags f) : QDialog(parent, f)
+PreferencesDialog::PreferencesDialog(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f)
 {
 	ui.setupUi(this);
-	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton *)), this, SLOT(buttonClicked(QAbstractButton *)));
 	connect(ui.gflow, SIGNAL(valueChanged(int)), this, SLOT(gflowChanged(int)));
 	connect(ui.gfhigh, SIGNAL(valueChanged(int)), this, SLOT(gfhighChanged(int)));
 	loadSettings();
@@ -25,7 +25,7 @@ PreferencesDialog::PreferencesDialog(QWidget* parent, Qt::WindowFlags f) : QDial
 	rememberPrefs();
 }
 
-#define DANGER_GF ( gf > 100 ) ? "* { color: red; }" : ""
+#define DANGER_GF (gf > 100) ? "* { color: red; }" : ""
 void PreferencesDialog::gflowChanged(int gf)
 {
 	ui.gflow->setStyleSheet(DANGER_GF);
@@ -75,12 +75,13 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.cuft->setChecked(prefs.units.volume == units::CUFT);
 	ui.kg->setChecked(prefs.units.weight == units::KG);
 	ui.lbs->setChecked(prefs.units.weight == units::LBS);
+	ui.text_label_with_units->setChecked(prefs.text_label_with_units);
 
 	ui.font->setCurrentFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
 	ui.defaultfilename->setText(prefs.default_filename);
 	ui.default_cylinder->clear();
-	for(int i=0; tank_info[i].name != NULL; i++) {
+	for (int i = 0; tank_info[i].name != NULL; i++) {
 		ui.default_cylinder->addItem(tank_info[i].name);
 		if (prefs.default_cylinder && strcmp(tank_info[i].name, prefs.default_cylinder) == 0)
 			ui.default_cylinder->setCurrentIndex(i);
@@ -101,9 +102,14 @@ void PreferencesDialog::setUiFromPrefs()
 	s.beginGroup("Language");
 	ui.languageSystemDefault->setChecked(s.value("UseSystemLanguage", true).toBool());
 	QAbstractItemModel *m = ui.languageView->model();
-	QModelIndexList languages = m->match( m->index(0,0), Qt::UserRole, s.value("UiLanguage").toString());
+	QModelIndexList languages = m->match(m->index(0, 0), Qt::UserRole, s.value("UiLanguage").toString());
 	if (languages.count())
 		ui.languageView->setCurrentIndex(languages.first());
+
+	s.endGroup();
+	s.beginGroup("Animations");
+	int animVelocity = s.value("animation_speed",500).toInt();
+	ui.velocitySlider->setValue(animVelocity);
 }
 
 void PreferencesDialog::restorePrefs()
@@ -120,47 +126,47 @@ void PreferencesDialog::rememberPrefs()
 #define SB(V, B) s.setValue(V, (int)(B->isChecked() ? 1 : 0))
 
 
-#define GET_UNIT(name, field, f, t)				\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
+#define GET_UNIT(name, field, f, t)                                 \
+	v = s.value(QString(name));                                 \
+	if (v.isValid())                                            \
 		prefs.units.field = (v.toInt() == (t)) ? (t) : (f); \
-	else							\
-		prefs.units.field = default_prefs.units.field
+	else                                                        \
+	prefs.units.field = default_prefs.units.field
 
-#define GET_BOOL(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toInt() ? true : false;		\
-	else							\
-		prefs.field = default_prefs.field
+#define GET_BOOL(name, field)                           \
+	v = s.value(QString(name));                     \
+	if (v.isValid())                                \
+		prefs.field = v.toInt() ? true : false; \
+	else                                            \
+	prefs.field = default_prefs.field
 
-#define GET_DOUBLE(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toDouble();			\
-	else							\
-		prefs.field = default_prefs.field
+#define GET_DOUBLE(name, field)             \
+	v = s.value(QString(name));         \
+	if (v.isValid())                    \
+		prefs.field = v.toDouble(); \
+	else                                \
+	prefs.field = default_prefs.field
 
-#define GET_INT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = v.toInt();			\
-	else							\
-		prefs.field = default_prefs.field
+#define GET_INT(name, field)             \
+	v = s.value(QString(name));      \
+	if (v.isValid())                 \
+		prefs.field = v.toInt(); \
+	else                             \
+	prefs.field = default_prefs.field
 
-#define GET_TXT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = strdup(v.toString().toUtf8().constData());			\
-	else							\
-		prefs.field = default_prefs.field
+#define GET_TXT(name, field)                                             \
+	v = s.value(QString(name));                                      \
+	if (v.isValid())                                                 \
+		prefs.field = strdup(v.toString().toUtf8().constData()); \
+	else                                                             \
+	prefs.field = default_prefs.field
 
-#define GET_TXT(name, field)					\
-	v = s.value(QString(name));				\
-	if (v.isValid())					\
-		prefs.field = strdup(v.toString().toUtf8().constData());			\
-	else							\
-		prefs.field = default_prefs.field
+#define GET_TXT(name, field)                                             \
+	v = s.value(QString(name));                                      \
+	if (v.isValid())                                                 \
+		prefs.field = strdup(v.toString().toUtf8().constData()); \
+	else                                                             \
+	prefs.field = default_prefs.field
 
 void PreferencesDialog::syncSettings()
 {
@@ -190,6 +196,7 @@ void PreferencesDialog::syncSettings()
 	s.setValue("volume", ui.cuft->isChecked() ? units::CUFT : units::LITER);
 	s.setValue("weight", ui.lbs->isChecked() ? units::LBS : units::KG);
 	s.setValue("vertical_speed_time", ui.vertical_speed_minutes->isChecked() ? units::MINUTES : units::SECONDS);
+	SB("text_label_with_units", ui.text_label_with_units);
 	s.endGroup();
 	// Defaults
 	s.beginGroup("GeneralSettings");
@@ -216,6 +223,8 @@ void PreferencesDialog::syncSettings()
 	s.setValue("UiLanguage", ui.languageView->currentIndex().data(Qt::UserRole));
 	s.endGroup();
 
+	s.beginGroup("Animations");
+	s.setValue("animation_speed",ui.velocitySlider->value());
 	loadSettings();
 	emit settingsChanged();
 }
@@ -244,6 +253,7 @@ void PreferencesDialog::loadSettings()
 		GET_UNIT("weight", weight, units::LBS, units::KG);
 	}
 	GET_UNIT("vertical_speed_time", vertical_speed_time, units::MINUTES, units::SECONDS);
+	GET_BOOL("text_label_with_units", text_label_with_units);
 	s.endGroup();
 	s.beginGroup("TecDetails");
 	GET_BOOL("po2graph", pp_graphs.po2);
@@ -264,6 +274,7 @@ void PreferencesDialog::loadSettings()
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
 	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
+	GET_BOOL("zoomed_plot", zoomed_plot);
 	set_gf(prefs.gflow, prefs.gfhigh, prefs.gf_low_at_maxdepth);
 	GET_BOOL("show_sac", show_sac);
 	GET_BOOL("display_unused_tanks", display_unused_tanks);
@@ -278,13 +289,20 @@ void PreferencesDialog::loadSettings()
 	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
 	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
 	qApp->setFont(defaultFont);
+
 	GET_TXT("divelist_font", divelist_font);
 	GET_INT("font_size", font_size);
+	if (prefs.font_size < 0)
+		prefs.font_size = defaultFont.pointSizeF();
 	GET_INT("displayinvalid", display_invalid_dives);
 	s.endGroup();
+
+	s.beginGroup("Animations");
+	int animVelocity = s.value("animation_speed",500).toInt();
+	ui.velocitySlider->setValue(animVelocity);
 }
 
-void PreferencesDialog::buttonClicked(QAbstractButton* button)
+void PreferencesDialog::buttonClicked(QAbstractButton *button)
 {
 	switch (ui.buttonBox->standardButton(button)) {
 	case QDialogButtonBox::Discard:
@@ -309,7 +327,7 @@ void PreferencesDialog::on_chooseFile_clicked()
 	QFileInfo fi(system_default_filename());
 	QString choosenFileName = QFileDialog::getOpenFileName(this, tr("Open Default Log File"), fi.absolutePath(), tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
 
-	if(!choosenFileName.isEmpty())
+	if (!choosenFileName.isEmpty())
 		ui.defaultfilename->setText(choosenFileName);
 }
 

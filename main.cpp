@@ -19,13 +19,7 @@ int main(int argc, char **argv)
 	int i;
 	bool no_filenames = true;
 
-	setup_system_prefs();
-	prefs = default_prefs;
-
-	init_ui(&argc, &argv);
-	parse_xml_init();
-	taglist_init_global();
-
+	init_qt(&argc, &argv);
 	QStringList files;
 	QStringList importedFiles;
 	QStringList arguments = QCoreApplication::arguments();
@@ -42,16 +36,25 @@ int main(int argc, char **argv)
 			files.push_back(a);
 		}
 	}
+	setup_system_prefs();
+	prefs = default_prefs;
+	fill_profile_color();
+	parse_xml_init();
+	taglist_init_global();
+	init_ui();
 	if (no_filenames) {
 		QString defaultFile(prefs.default_filename);
 		if (!defaultFile.isEmpty())
-			files.push_back( QString(prefs.default_filename) );
+			files.push_back(QString(prefs.default_filename));
 	}
-	parse_xml_exit();
-	MainWindow::instance()->loadFiles(files);
-	MainWindow::instance()->importFiles(importedFiles);
+
+	MainWindow *m = MainWindow::instance();
+	m->setLoadedWithFiles(!files.isEmpty() || !importedFiles.isEmpty());
+	m->loadFiles(files);
+	m->importFiles(importedFiles);
 	if (!quit)
 		run_ui();
 	exit_ui();
+	parse_xml_exit();
 	return 0;
 }

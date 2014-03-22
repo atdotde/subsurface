@@ -20,35 +20,12 @@
 int verbose, quit;
 int metric = 1;
 
-static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **error);
+static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params);
 
 /* the dive table holds the overall dive list; target table points at
  * the table we are currently filling */
 struct dive_table dive_table;
 struct dive_table *target_table = NULL;
-
-static void parser_error(char **error, const char *fmt, ...)
-{
-	va_list args;
-	char *tmp;
-
-	if (!error)
-		return;
-
-	tmp = malloc(1024);
-	va_start(args, fmt);
-	vsnprintf(tmp, 1024, fmt, args);
-	va_end(args);
-
-	if (*error) {
-		int len = strlen(*error) + strlen(tmp) + 1;
-		*error = realloc(*error, len);
-		strncat(*error, tmp, strlen(tmp));
-		free(tmp);
-	} else {
-		*error = tmp;
-	}
-}
 
 /*
  * Add a dive into the dive_table array
@@ -221,7 +198,7 @@ enum ParseState {
 };
 static void divetags(char *buffer, void *_tags)
 {
-	struct tag_entry *tags = _tags;
+	struct tag_entry **tags = _tags;
 	int i = 0, start = 0, end = 0;
 	enum ParseState state = FINDEND;
 	int len = buffer ? strlen(buffer) : 0;
@@ -534,7 +511,7 @@ static void utf8_string(char *buffer, void *_res)
 }
 
 #define MATCH(pattern, fn, dest) \
-    match(pattern, strlen(pattern), name, fn, buf, dest)
+	match(pattern, strlen(pattern), name, fn, buf, dest)
 
 static void get_index(char *buffer, void *_i)
 {
@@ -999,7 +976,7 @@ static int uddf_dive_match(struct dive *dive, const char *name, char *buf)
  * We don't do exponentials etc, if somebody does
  * gps locations in that format, they are insane.
  */
-static degrees_t parse_degrees(char *buf, char **end)
+degrees_t parse_degrees(char *buf, char **end)
 {
 	int sign = 1, decimals = 6, value = 0;
 	degrees_t ret;
@@ -1089,7 +1066,7 @@ static void try_to_fill_dive(struct dive *dive, const char *name, char *buf)
 
 	if (MATCH("number", get_index, &dive->number))
 		return;
-	if (MATCH("tags", divetags, dive->tag_list))
+	if (MATCH("tags", divetags, &dive->tag_list))
 		return;
 	if (MATCH("tripflag", get_tripflag, &dive->tripflag))
 		return;
@@ -1611,7 +1588,7 @@ const char *preprocess_divelog_de(const char *buffer)
 }
 
 void parse_xml_buffer(const char *url, const char *buffer, int size,
-		      struct dive_table *table, const char **params, char **error)
+		      struct dive_table *table, const char **params)
 {
 	xmlDoc *doc;
 	const char *res = preprocess_divelog_de(buffer);
@@ -1622,13 +1599,12 @@ void parse_xml_buffer(const char *url, const char *buffer, int size,
 		free((char *)res);
 
 	if (!doc) {
-		fprintf(stderr, translate("gettextFromC", "Failed to parse '%s'.\n"), url);
-		parser_error(error, translate("gettextFromC", "Failed to parse '%s'"), url);
+		report_error(translate("gettextFromC", "Failed to parse '%s'"), url);
 		return;
 	}
 	reset_all();
 	dive_start();
-	doc = test_xslt_transforms(doc, params, error);
+	doc = test_xslt_transforms(doc, params);
 	traverse(xmlDocGetRootElement(doc));
 	dive_end();
 	xmlFreeDoc(doc);
@@ -1738,7 +1714,7 @@ extern int dm4_events(void *handle, int columns, char **data, char **column)
 extern int dm4_tags(void *handle, int columns, char **data, char **column)
 {
 	if (data[0])
-		taglist_add_tag(cur_dive->tag_list, data[0]);
+		taglist_add_tag(&cur_dive->tag_list, data[0]);
 
 	return 0;
 }
@@ -1870,7 +1846,7 @@ extern int dm4_dive(void *param, int columns, char **data, char **column)
 }
 
 int parse_dm4_buffer(sqlite3 *handle, const char *url, const char *buffer, int size,
-		     struct dive_table *table, char **error)
+		     struct dive_table *table)
 {
 	int retval;
 	char *err = NULL;
@@ -2019,7 +1995,7 @@ extern int shearwater_dive(void *param, int columns, char **data, char **column)
 
 
 int parse_shearwater_buffer(sqlite3 *handle, const char *url, const char *buffer, int size,
-			    struct dive_table *table, char **error)
+			    struct dive_table *table)
 {
 	int retval;
 	char *err = NULL;
@@ -2068,7 +2044,7 @@ static struct xslt_files {
 	  { NULL, }
   };
 
-static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **error)
+static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params)
 {
 	struct xslt_files *info = xslt_files;
 	xmlDoc *transformed;
@@ -2099,7 +2075,7 @@ static xmlDoc *test_xslt_transforms(xmlDoc *doc, const char **params, char **err
 		xmlSubstituteEntitiesDefault(1);
 		xslt = get_stylesheet(info->file);
 		if (xslt == NULL) {
-			parser_error(error, translate("gettextFromC", "Can't open stylesheet %s"), info->file);
+			report_error(translate("gettextFromC", "Can't open stylesheet %s"), info->file);
 			return doc;
 		}
 		transformed = xsltApplyStylesheet(xslt, doc, params);

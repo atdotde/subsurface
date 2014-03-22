@@ -17,13 +17,14 @@
 
 #include "../dive.h"
 #include "../divelist.h"
+#include "../display.h"
 
 #ifdef Q_OS_UNIX
-#  include <unistd.h> // for dup(2)
+#include <unistd.h> // for dup(2)
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
-#   include <QUrlQuery>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QUrlQuery>
 #endif
 
 struct dive_table gps_location_table;
@@ -32,13 +33,13 @@ static bool merge_locations_into_dives(void);
 static bool is_automatic_fix(struct dive *gpsfix)
 {
 	if (gpsfix && gpsfix->location &&
-			(!strcmp(gpsfix->location, "automatic fix") ||
-			 !strcmp(gpsfix->location, "Auto-created dive")))
+	    (!strcmp(gpsfix->location, "automatic fix") ||
+	     !strcmp(gpsfix->location, "Auto-created dive")))
 		return true;
 	return false;
 }
 
-#define SAME_GROUP 6 * 3600   // six hours
+#define SAME_GROUP 6 * 3600 // six hours
 
 static bool merge_locations_into_dives(void)
 {
@@ -56,7 +57,7 @@ static bool merge_locations_into_dives(void)
 				utc_mkdate(gpsfix->when, &tm);
 				printf("found dive named %s @ %04d-%02d-%02d %02d:%02d:%02d\n",
 				       gpsfix->location,
-				       tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
+				       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 				       tm.tm_hour, tm.tm_min, tm.tm_sec);
 #endif
 				changed++;
@@ -85,7 +86,7 @@ static bool merge_locations_into_dives(void)
 #if DEBUG_WEBSERVICE
 				printf("didn't find dive matching gps fix named %s @ %04d-%02d-%02d %02d:%02d:%02d\n",
 				       gpsfix->location,
-				       tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
+				       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 				       tm.tm_hour, tm.tm_min, tm.tm_sec);
 #endif
 			}
@@ -102,11 +103,11 @@ static void clear_table(struct dive_table *table)
 	table->nr = 0;
 }
 
-bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, const bool selected, QString *errorMsg)
+bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, const bool selected)
 {
 	static const char errPrefix[] = "divelog.de-upload:";
 	if (!amount_selected) {
-		*errorMsg = tr("no dives were selected");
+		report_error(tr("no dives were selected").toUtf8());
 		return false;
 	}
 
@@ -125,8 +126,7 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 	if (!zip) {
 		char buffer[1024];
 		zip_error_to_str(buffer, sizeof buffer, error_code, errno);
-		*errorMsg = tr("failed to create zip file for upload: %1")
-			    .arg(QString::fromLocal8Bit(buffer));
+		report_error(tr("failed to create zip file for upload: %s").toUtf8(), buffer);
 		return false;
 	}
 
@@ -150,7 +150,7 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 			continue;
 		f = tmpfile();
 		if (!f) {
-			*errorMsg = tr("cannot create temporary file: %1").arg(qt_error_string());
+			report_error(tr("cannot create temporary file: %s").toUtf8(), qt_error_string().toUtf8().data());
 			goto error_close_zip;
 		}
 		save_dive(f, dive);
@@ -159,8 +159,8 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 		rewind(f);
 
 		membuf = (char *)malloc(streamsize + 1);
-		if (!membuf || !fread(membuf, streamsize, 1, f)) {
-			*errorMsg = tr("internal error: %1").arg(qt_error_string());
+		if (!membuf || (streamsize = fread(membuf, streamsize, 1, f)) == 0) {
+			report_error(tr("internal error: %s").toUtf8(), qt_error_string().toUtf8().data());
 			fclose(f);
 			free((void *)membuf);
 			goto error_close_zip;
@@ -176,14 +176,14 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 		xmlDoc *doc = xmlReadMemory(membuf, streamsize, "divelog", NULL, 0);
 		if (!doc) {
 			qWarning() << errPrefix << "could not parse back into memory the XML file we've just created!";
-			*errorMsg = tr("internal error");
+			report_error(tr("internal error").toUtf8());
 			free((void *)membuf);
 			goto error_close_zip;
 		}
 		free((void *)membuf);
 
 		transformed = xsltApplyStylesheet(xslt, doc, NULL);
-		xmlDocDumpMemory(transformed, (xmlChar **) &membuf, &streamsize);
+		xmlDocDumpMemory(transformed, (xmlChar **)&membuf, &streamsize);
 		xmlFreeDoc(doc);
 		xmlFreeDoc(transformed);
 
@@ -209,11 +209,10 @@ error_close_zip:
 	return false;
 }
 
-WebServices::WebServices(QWidget* parent, Qt::WindowFlags f): QDialog(parent, f)
-, reply(0)
+WebServices::WebServices(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f), reply(0)
 {
 	ui.setupUi(this);
-	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(buttonClicked(QAbstractButton*)));
+	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton *)), this, SLOT(buttonClicked(QAbstractButton *)));
 	connect(ui.download, SIGNAL(clicked(bool)), this, SLOT(startDownload()));
 	connect(ui.upload, SIGNAL(clicked(bool)), this, SLOT(startUpload()));
 	connect(&timeout, SIGNAL(timeout()), this, SLOT(downloadTimedOut()));
@@ -286,8 +285,8 @@ void WebServices::connectSignalsForDownload(QNetworkReply *reply)
 	connect(reply, SIGNAL(finished()), this, SLOT(downloadFinished()));
 	connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
 		this, SLOT(downloadError(QNetworkReply::NetworkError)));
-	connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this,
-		SLOT(updateProgress(qint64,qint64)));
+	connect(reply, SIGNAL(downloadProgress(qint64, qint64)), this,
+		SLOT(updateProgress(qint64, qint64)));
 
 	timeout.start(30000); // 30s
 }
@@ -299,7 +298,7 @@ void WebServices::resetState()
 	ui.userID->setEnabled(true);
 	ui.password->setEnabled(true);
 	ui.progressBar->reset();
-	ui.progressBar->setRange(0,1);
+	ui.progressBar->setRange(0, 1);
 	ui.status->setText(QString());
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setText(defaultApplyText);
 }
@@ -310,25 +309,25 @@ void WebServices::resetState()
 // #
 // #
 
-SubsurfaceWebServices::SubsurfaceWebServices(QWidget* parent, Qt::WindowFlags f) : WebServices(parent, f)
+SubsurfaceWebServices::SubsurfaceWebServices(QWidget *parent, Qt::WindowFlags f) : WebServices(parent, f)
 {
 	QSettings s;
 	ui.userID->setText(s.value("subsurface_webservice_uid").toString().toUpper());
 	hidePassword();
 	hideUpload();
 	ui.progressBar->setFormat("Enter User ID and click Download");
-	ui.progressBar->setRange(0,1);
+	ui.progressBar->setRange(0, 1);
 	ui.progressBar->setValue(-1);
 }
 
-void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
+void SubsurfaceWebServices::buttonClicked(QAbstractButton *button)
 {
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 	switch (ui.buttonBox->buttonRole(button)) {
 	case QDialogButtonBox::ApplyRole: {
 		clear_table(&gps_location_table);
 		QByteArray url = tr("Webservice").toLocal8Bit();
-		parse_xml_buffer(url.data(), downloadedData.data(), downloadedData.length(), &gps_location_table, NULL, NULL);
+		parse_xml_buffer(url.data(), downloadedData.data(), downloadedData.length(), &gps_location_table, NULL);
 
 		/* now merge the data in the gps_location table into the dive_table */
 		if (merge_locations_into_dives()) {
@@ -345,8 +344,7 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 		hide();
 		close();
 		resetState();
-	}
-		break;
+	} break;
 	case QDialogButtonBox::RejectRole:
 		if (reply != NULL && reply->isOpen()) {
 			reply->abort();
@@ -366,7 +364,7 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton* button)
 void SubsurfaceWebServices::startDownload()
 {
 	QUrl url("http://api.hohndel.org/api/dive/get/");
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 	url.addQueryItem("login", ui.userID->text().toUpper());
 #else
 	QUrlQuery query;
@@ -380,7 +378,7 @@ void SubsurfaceWebServices::startDownload()
 	reply = manager()->get(request);
 	ui.status->setText(tr("Connecting..."));
 	ui.progressBar->setEnabled(true);
-	ui.progressBar->setRange(0,0); // this makes the progressbar do an 'infinite spin'
+	ui.progressBar->setRange(0, 0); // this makes the progressbar do an 'infinite spin'
 	ui.download->setEnabled(false);
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 	connectSignalsForDownload(reply);
@@ -391,7 +389,7 @@ void SubsurfaceWebServices::downloadFinished()
 	if (!reply)
 		return;
 
-	ui.progressBar->setRange(0,1);
+	ui.progressBar->setRange(0, 1);
 	ui.progressBar->setValue(1);
 	ui.progressBar->setFormat("%p%");
 	downloadedData = reply->readAll();
@@ -420,10 +418,18 @@ void SubsurfaceWebServices::setStatusText(int status)
 {
 	QString text;
 	switch (status) {
-	case DD_STATUS_ERROR_CONNECT:	text = tr("Connection Error: ");	break;
-	case DD_STATUS_ERROR_ID:	text = tr("Invalid user identifier!");	break;
-	case DD_STATUS_ERROR_PARSE:	text = tr("Cannot parse response!");	break;
-	case DD_STATUS_OK:		text = tr("Download Success!");		break;
+	case DD_STATUS_ERROR_CONNECT:
+		text = tr("Connection Error: ");
+		break;
+	case DD_STATUS_ERROR_ID:
+		text = tr("Invalid user identifier!");
+		break;
+	case DD_STATUS_ERROR_PARSE:
+		text = tr("Cannot parse response!");
+		break;
+	case DD_STATUS_OK:
+		text = tr("Download Success!");
+		break;
 	}
 	ui.status->setText(text);
 }
@@ -434,17 +440,17 @@ void SubsurfaceWebServices::download_dialog_traverse_xml(xmlNodePtr node, unsign
 	xmlNodePtr cur_node;
 	for (cur_node = node; cur_node; cur_node = cur_node->next) {
 		if ((!strcmp((const char *)cur_node->name, (const char *)"download")) &&
-				(!strcmp((const char *)xmlNodeGetContent(cur_node), (const char *)"ok"))) {
+		    (!strcmp((const char *)xmlNodeGetContent(cur_node), (const char *)"ok"))) {
 			*download_status = DD_STATUS_OK;
 			return;
-		}	else if (!strcmp((const char *)cur_node->name, (const char *)"error")) {
+		} else if (!strcmp((const char *)cur_node->name, (const char *)"error")) {
 			*download_status = DD_STATUS_ERROR_ID;
 			return;
 		}
 	}
 }
 
-unsigned int SubsurfaceWebServices::download_dialog_parse_response(const QByteArray& xml)
+unsigned int SubsurfaceWebServices::download_dialog_parse_response(const QByteArray &xml)
 {
 	xmlNodePtr root;
 	xmlDocPtr doc = xmlParseMemory(xml.data(), xml.length());
@@ -470,8 +476,7 @@ end:
 // #
 // #
 
-struct DiveListResult
-{
+struct DiveListResult {
 	QString errorCondition;
 	QString errorDetails;
 	QByteArray idList; // comma-separated, suitable to be sent in the fetch request
@@ -497,8 +502,8 @@ static DiveListResult parseDiveLogsDeDiveList(const QByteArray &xmlData)
 	if (reader.readNextStartElement() && reader.name() != "DiveDateReader") {
 		result.errorCondition = invalidXmlError;
 		result.errorDetails =
-				DivelogsDeWebServices::tr("Expected XML tag 'DiveDateReader', got instead '%1")
-				.arg(reader.name().toString());
+		    DivelogsDeWebServices::tr("Expected XML tag 'DiveDateReader', got instead '%1")
+			.arg(reader.name().toString());
 		goto out;
 	}
 
@@ -551,12 +556,13 @@ out:
 		// if there was an XML error, overwrite the result or other error conditions
 		result.errorCondition = invalidXmlError;
 		result.errorDetails = DivelogsDeWebServices::tr("Malformed XML response. Line %1: %2")
-				.arg(reader.lineNumber()).arg(reader.errorString());
+					  .arg(reader.lineNumber())
+					  .arg(reader.errorString());
 	}
 	return result;
 }
 
-DivelogsDeWebServices* DivelogsDeWebServices::instance()
+DivelogsDeWebServices *DivelogsDeWebServices::instance()
 {
 	static DivelogsDeWebServices *self = new DivelogsDeWebServices(MainWindow::instance());
 	self->setAttribute(Qt::WA_QuitOnClose, false);
@@ -573,11 +579,9 @@ void DivelogsDeWebServices::downloadDives()
 
 void DivelogsDeWebServices::prepareDivesForUpload()
 {
-	QString errorText;
-
 	/* generate a random filename and create/open that file with zip_open */
 	QString filename = QDir::tempPath() + "/import-" + QString::number(qrand() % 99999999) + ".dld";
-	if (prepare_dives_for_divelogs(filename, true, &errorText)) {
+	if (prepare_dives_for_divelogs(filename, true)) {
 		QFile f(filename);
 		if (f.open(QIODevice::ReadOnly)) {
 			uploadDives((QIODevice *)&f);
@@ -586,7 +590,7 @@ void DivelogsDeWebServices::prepareDivesForUpload()
 			return;
 		}
 	}
-	MainWindow::instance()->showError(errorText);
+	MainWindow::instance()->showError(get_error_string());
 }
 
 void DivelogsDeWebServices::uploadDives(QIODevice *dldContent)
@@ -617,7 +621,7 @@ void DivelogsDeWebServices::uploadDives(QIODevice *dldContent)
 	}
 }
 
-DivelogsDeWebServices::DivelogsDeWebServices(QWidget* parent, Qt::WindowFlags f) : WebServices(parent, f), uploadMode(false)
+DivelogsDeWebServices::DivelogsDeWebServices(QWidget *parent, Qt::WindowFlags f) : WebServices(parent, f), uploadMode(false)
 {
 	QSettings s;
 	ui.userID->setText(s.value("divelogde_user").toString());
@@ -633,7 +637,7 @@ void DivelogsDeWebServices::startUpload()
 	s.sync();
 
 	ui.status->setText(tr("Uploading dive list..."));
-	ui.progressBar->setRange(0,0); // this makes the progressbar do an 'infinite spin'
+	ui.progressBar->setRange(0, 0); // this makes the progressbar do an 'infinite spin'
 	ui.upload->setEnabled(false);
 	ui.userID->setEnabled(false);
 	ui.password->setEnabled(false);
@@ -655,8 +659,8 @@ void DivelogsDeWebServices::startUpload()
 	connect(reply, SIGNAL(finished()), this, SLOT(uploadFinished()));
 	connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this,
 		SLOT(uploadError(QNetworkReply::NetworkError)));
-	connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this,
-		SLOT(updateProgress(qint64,qint64)));
+	connect(reply, SIGNAL(uploadProgress(qint64, qint64)), this,
+		SLOT(updateProgress(qint64, qint64)));
 
 	timeout.start(30000); // 30s
 }
@@ -664,7 +668,7 @@ void DivelogsDeWebServices::startUpload()
 void DivelogsDeWebServices::startDownload()
 {
 	ui.status->setText(tr("Downloading dive list..."));
-	ui.progressBar->setRange(0,0); // this makes the progressbar do an 'infinite spin'
+	ui.progressBar->setRange(0, 0); // this makes the progressbar do an 'infinite spin'
 	ui.download->setEnabled(false);
 	ui.userID->setEnabled(false);
 	ui.password->setEnabled(false);
@@ -674,7 +678,7 @@ void DivelogsDeWebServices::startDownload()
 	request.setRawHeader("Accept", "text/xml, application/xml");
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 	QUrl body;
 	body.addQueryItem("user", ui.userID->text());
 	body.addQueryItem("pass", ui.password->text());
@@ -718,7 +722,7 @@ void DivelogsDeWebServices::listDownloadFinished()
 	request.setRawHeader("Accept", "application/zip, */*");
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 	QUrl body;
 	body.addQueryItem("user", ui.userID->text());
 	body.addQueryItem("pass", ui.password->text());
@@ -781,6 +785,9 @@ void DivelogsDeWebServices::downloadFinished()
 
 	zip_close(zip);
 	zipFile.close();
+#if defined(Q_OS_UNIX) && defined(LIBZIP_VERSION_MAJOR)
+	::close(duppedfd);
+#endif
 }
 
 void DivelogsDeWebServices::uploadFinished()
@@ -788,7 +795,7 @@ void DivelogsDeWebServices::uploadFinished()
 	if (!reply)
 		return;
 
-	ui.progressBar->setRange(0,1);
+	ui.progressBar->setRange(0, 1);
 	ui.upload->setEnabled(true);
 	ui.userID->setEnabled(true);
 	ui.password->setEnabled(true);
@@ -823,7 +830,6 @@ void DivelogsDeWebServices::uploadFinished()
 
 void DivelogsDeWebServices::setStatusText(int status)
 {
-
 }
 
 void DivelogsDeWebServices::downloadError(QNetworkReply::NetworkError)
@@ -839,7 +845,7 @@ void DivelogsDeWebServices::uploadError(QNetworkReply::NetworkError error)
 	downloadError(error);
 }
 
-void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
+void DivelogsDeWebServices::buttonClicked(QAbstractButton *button)
 {
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 	switch (ui.buttonBox->buttonRole(button)) {
@@ -852,12 +858,7 @@ void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 			break;
 		}
 		/* parse file and import dives */
-		char *error = NULL;
-		parse_file(QFile::encodeName(zipFile.fileName()), &error);
-		if (error != NULL) {
-			MainWindow::instance()->showError(error);
-			free(error);
-		}
+		parse_file(QFile::encodeName(zipFile.fileName()));
 		process_dives(true, false);
 		MainWindow::instance()->refreshDisplay();
 
@@ -869,8 +870,7 @@ void DivelogsDeWebServices::buttonClicked(QAbstractButton* button)
 		hide();
 		close();
 		resetState();
-	}
-		break;
+	} break;
 	case QDialogButtonBox::RejectRole:
 		// these two seem to be causing a crash:
 		// reply->deleteLater();
