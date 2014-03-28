@@ -3,8 +3,6 @@
 #include "display.h"
 #include "profile.h"
 #include "graphicsview-common.h"
-#include "dive.h"
-#include "display.h"
 #include "divelist.h"
 #include <QDebug>
 
@@ -153,7 +151,7 @@ int DivePlotDataModel::id() const
 	return diveId;
 }
 
-int DivePlotDataModel::dcShown() const
+unsigned int DivePlotDataModel::dcShown() const
 {
 	return dcNr;
 }
@@ -183,7 +181,7 @@ void DivePlotDataModel::calculateDecompression()
 	struct dive *d = getDiveById(id());
 	if (!d)
 		return;
-	struct divecomputer *dc = select_dc(&d->dc);
+	struct divecomputer *dc = select_dc(d);
 	init_decompression(d);
 	calculate_deco_information(d, dc, &pInfo, false);
 	dataChanged(index(0, CEILING), index(pInfo.nr - 1, TISSUE_16));

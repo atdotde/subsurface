@@ -23,6 +23,7 @@
 #include "starwidget.h"
 
 #include "../dive.h"
+#include "../display.h"
 #include "../divelist.h"
 #include "../pref.h"
 #include "../helpers.h"
@@ -35,8 +36,13 @@
 #include "simplewidgets.h"
 #include "diveplanner.h"
 #include "about.h"
+#ifndef NO_PRINTING
 #include "printdialog.h"
+#endif
 #include "divelogimportdialog.h"
+#ifndef NO_USERMANUAL
+#include "usermanual.h"
+#endif
 
 MainWindow *MainWindow::m_Instance = NULL;
 
@@ -44,6 +50,8 @@ MainWindow::MainWindow() : QMainWindow(),
 	actionNextDive(0),
 	actionPreviousDive(0),
 	helpView(0),
+	yearlyStats(0),
+	yearlyStatsModel(0),
 	state(VIEWALL)
 {
 	Q_ASSERT_X(m_Instance == NULL, "MainWindow", "MainWindow recreated!");
@@ -78,6 +86,16 @@ MainWindow::MainWindow() : QMainWindow(),
 #ifndef ENABLE_PLANNER
 //	ui.menuLog->removeAction(ui.actionDivePlanner);
 #endif
+#ifdef NO_MARBLE
+	ui.layoutWidget->hide();
+	ui.menuView->removeAction(ui.actionViewGlobe);
+#endif
+#ifdef NO_USERMANUAL
+	ui.menuHelp->removeAction(ui.actionUserManual);
+#endif
+#ifdef NO_PRINTING
+	ui.menuFile->removeAction(ui.actionPrint);
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -103,6 +121,7 @@ MainWindow *MainWindow::instance()
 // this gets called after we download dives from a divecomputer
 void MainWindow::refreshDisplay(bool recreateDiveList)
 {
+	showError(get_error_string());
 	ui.InfoWidget->reload();
 	TankInfoModel::instance()->update();
 	ui.globe->reload();
@@ -110,6 +129,13 @@ void MainWindow::refreshDisplay(bool recreateDiveList)
 		ui.ListWidget->reload(DiveTripModel::CURRENT);
 	ui.ListWidget->setFocus();
 	WSInfoModel::instance()->updateInfo();
+	// refresh the yearly stats if the window has an instance
+	if (yearlyStats) {
+		if (yearlyStatsModel)
+			delete yearlyStatsModel;
+		yearlyStatsModel = new YearlyStatisticsModel();
+		yearlyStats->setModel(yearlyStatsModel);
+	}
 }
 
 void MainWindow::current_dive_changed(int divenr)
@@ -205,6 +231,7 @@ void MainWindow::on_actionClose_triggered()
 
 	ui.newProfile->setEmptyState();
 	/* free the dives and trips */
+	clear_git_id();
 	while (dive_table.nr)
 		delete_single_dive(0);
 
@@ -252,9 +279,11 @@ void MainWindow::on_actionExportUDDF_triggered()
 
 void MainWindow::on_actionPrint_triggered()
 {
+#ifndef NO_PRINTING
 	PrintDialog dlg(this);
 
 	dlg.exec();
+#endif
 }
 
 void MainWindow::disableDcShortcuts()
@@ -386,15 +415,23 @@ void MainWindow::on_actionAutoGroup_triggered()
 
 void MainWindow::on_actionYearlyStatistics_triggered()
 {
-	QTreeView *view = new QTreeView();
-	QAbstractItemModel *model = new YearlyStatisticsModel();
-	view->setModel(model);
-	view->setWindowModality(Qt::NonModal);
-	view->setMinimumWidth(600);
-	view->setAttribute(Qt::WA_QuitOnClose, false);
-	view->setWindowTitle(tr("Yearly Statistics"));
-	view->setWindowIcon(QIcon(":subsurface-icon"));
-	view->show();
+	// create the widget only once
+	if (!yearlyStats) {
+		yearlyStats = new QTreeView();
+		yearlyStats->setWindowModality(Qt::NonModal);
+		yearlyStats->setMinimumWidth(600);
+		yearlyStats->setWindowTitle(tr("Yearly Statistics"));
+		yearlyStats->setWindowIcon(QIcon(":subsurface-icon"));
+	}
+	/* problem here is that without more MainWindow variables or a separate YearlyStatistics
+	 * class the user needs to close the window/widget and re-open it for it to update.
+	 */
+	if (yearlyStatsModel)
+		delete yearlyStatsModel;
+	yearlyStatsModel = new YearlyStatisticsModel();
+	yearlyStats->setModel(yearlyStatsModel);
+	yearlyStats->raise();
+	yearlyStats->show();
 }
 
 #define BEHAVIOR QList<int>()
@@ -488,14 +525,16 @@ void MainWindow::saveSplitterSizes()
 
 void MainWindow::on_actionPreviousDC_triggered()
 {
-	dc_number--;
+	unsigned nrdc = number_of_computers(current_dive);
+	dc_number = (dc_number + nrdc - 1) % nrdc;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 }
 
 void MainWindow::on_actionNextDC_triggered()
 {
-	dc_number++;
+	unsigned nrdc = number_of_computers(current_dive);
+	dc_number = (dc_number + 1) % nrdc;
 	ui.InfoWidget->updateDiveInfo(selected_dive);
 	ui.newProfile->plotDives(QList<struct dive *>() << (current_dive));
 }
@@ -528,10 +567,12 @@ void MainWindow::on_actionAboutSubsurface_triggered()
 
 void MainWindow::on_actionUserManual_triggered()
 {
+#ifndef NO_USERMANUAL
 	if (!helpView) {
 		helpView = new UserManual();
 	}
 	helpView->show();
+#endif
 }
 
 QString MainWindow::filter()
@@ -558,7 +599,7 @@ QString MainWindow::filter()
 bool MainWindow::askSaveChanges()
 {
 	QString message;
-	QMessageBox response;
+	QMessageBox response(MainWindow::instance());
 
 	if (existing_filename)
 		message = tr("Do you want to save the changes you made in the file %1?").arg(existing_filename);
@@ -571,6 +612,7 @@ bool MainWindow::askSaveChanges()
 	response.setWindowTitle(tr("Save Changes?")); // Not displayed on MacOSX as described in Qt API
 	response.setInformativeText(tr("Changes will be lost if you don't save them."));
 	response.setIcon(QMessageBox::Warning);
+	response.setWindowModality(Qt::WindowModal);
 	int ret = response.exec();
 
 	switch (ret) {
@@ -622,8 +664,9 @@ void MainWindow::readSettings()
 {
 	QSettings s;
 	s.beginGroup("Display");
-	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
-	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
+	QFont defaultFont = QFont(default_prefs.divelist_font);
+	defaultFont = s.value("divelist_font", defaultFont).value<QFont>();
+	defaultFont.setPointSizeF(s.value("font_size", default_prefs.font_size).toFloat());
 	qApp->setFont(defaultFont);
 	s.endGroup();
 
@@ -670,6 +713,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	if (helpView && helpView->isVisible()) {
 		helpView->close();
 		helpView->deleteLater();
+	}
+
+	if (yearlyStats && yearlyStats->isVisible()) {
+		yearlyStats->close();
+		yearlyStats->deleteLater();
+		yearlyStatsModel->deleteLater();
 	}
 
 	if (unsaved_changes() && (askSaveChanges() == false)) {
@@ -858,7 +907,7 @@ void MainWindow::recentFileTriggered(bool checked)
 	loadFiles(QStringList() << filename);
 }
 
-void MainWindow::file_save_as(void)
+int MainWindow::file_save_as(void)
 {
 	QString filename;
 	const char *default_filename;
@@ -869,20 +918,26 @@ void MainWindow::file_save_as(void)
 		default_filename = prefs.default_filename;
 	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), default_filename,
 						tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
-	if (!filename.isNull() && !filename.isEmpty()) {
+	if (filename.isNull() || filename.isEmpty())
+		return report_error("No filename to save into");
 
-		if (ui.InfoWidget->isEditing())
-			ui.InfoWidget->acceptChanges();
+	if (ui.InfoWidget->isEditing())
+		ui.InfoWidget->acceptChanges();
 
-		save_dives(filename.toUtf8().data());
-		set_filename(filename.toUtf8().data(), true);
-		setTitle(MWTF_FILENAME);
-		mark_divelist_changed(false);
-		addRecentFile(QStringList() << filename);
+	if (save_dives(filename.toUtf8().data())) {
+		showError(get_error_string());
+		return -1;
 	}
+
+	showError(get_error_string());
+	set_filename(filename.toUtf8().data(), true);
+	setTitle(MWTF_FILENAME);
+	mark_divelist_changed(false);
+	addRecentFile(QStringList() << filename);
+	return 0;
 }
 
-void MainWindow::file_save(void)
+int MainWindow::file_save(void)
 {
 	const char *current_default;
 
@@ -900,9 +955,14 @@ void MainWindow::file_save(void)
 		if (!current_def_dir.exists())
 			current_def_dir.mkpath(current_def_dir.absolutePath());
 	}
-	save_dives(existing_filename);
+	if (save_dives(existing_filename)) {
+		showError(get_error_string());
+		return -1;
+	}
+	showError(get_error_string());
 	mark_divelist_changed(false);
 	addRecentFile(QStringList() << QString(existing_filename));
+	return 0;
 }
 
 void MainWindow::showError(QString message)
@@ -940,15 +1000,10 @@ void MainWindow::importFiles(const QStringList fileNames)
 		return;
 
 	QByteArray fileNamePtr;
-	char *error = NULL;
+
 	for (int i = 0; i < fileNames.size(); ++i) {
 		fileNamePtr = QFile::encodeName(fileNames.at(i));
-		parse_file(fileNamePtr.data(), &error);
-		if (error != NULL) {
-			showError(error);
-			free(error);
-			error = NULL;
-		}
+		parse_file(fileNamePtr.data());
 	}
 	process_dives(true, false);
 	refreshDisplay();
@@ -959,21 +1014,19 @@ void MainWindow::loadFiles(const QStringList fileNames)
 	if (fileNames.isEmpty())
 		return;
 
-	char *error = NULL;
 	QByteArray fileNamePtr;
 	QStringList failedParses;
 
 	for (int i = 0; i < fileNames.size(); ++i) {
-		fileNamePtr = QFile::encodeName(fileNames.at(i));
-		parse_file(fileNamePtr.data(), &error);
-		set_filename(fileNamePtr.data(), true);
-		setTitle(MWTF_FILENAME);
+		int error;
 
-		if (error != NULL) {
+		fileNamePtr = QFile::encodeName(fileNames.at(i));
+		error = parse_file(fileNamePtr.data());
+		if (!error) {
+			set_filename(fileNamePtr.data(), true);
+			setTitle(MWTF_FILENAME);
+		} else {
 			failedParses.append(fileNames.at(i));
-			showError(error);
-			free(error);
-			error = NULL;
 		}
 	}
 

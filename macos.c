@@ -25,7 +25,8 @@
 #define ICON_NAME "Subsurface.icns"
 #define UI_FONT "Arial 12"
 
-const char system_divelist_default_font[] = "Arial 10";
+const char system_divelist_default_font[] = "Arial";
+const int system_divelist_default_font_size = 10;
 
 const char *system_default_filename(void)
 {
@@ -110,4 +111,15 @@ struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *error
 int subsurface_zip_close(struct zip *zip)
 {
 	return zip_close(zip);
+}
+
+/* win32 console */
+void subsurface_console_init(bool dedicated)
+{
+	/* NOP */
+}
+
+void subsurface_console_exit(void)
+{
+	/* NOP */
 }

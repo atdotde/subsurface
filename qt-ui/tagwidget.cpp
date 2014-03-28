@@ -35,7 +35,7 @@ void TagWidget::setCompleter(QCompleter *completer)
 	m_completer = completer;
 	m_completer->setWidget(this);
 	connect(m_completer, SIGNAL(activated(QString)), this, SLOT(completionSelected(QString)));
-	connect(m_completer, SIGNAL(highlighted(QString)), this, SLOT(completionSelected(QString)));
+	connect(m_completer, SIGNAL(highlighted(QString)), this, SLOT(completionHighlighted(QString)));
 }
 
 QPair<int, int> TagWidget::getCursorTagPosition()
@@ -120,8 +120,7 @@ void TagWidget::reparse()
 	QString currentText;
 	if (pos.first >= 0 && pos.second > 0)
 		currentText = text().mid(pos.first, pos.second - pos.first).trimmed();
-	else
-		currentText = "";
+
 	if (m_completer) {
 		m_completer->setCompletionPrefix(currentText);
 		if (m_completer->completionCount() == 1) {
@@ -138,18 +137,22 @@ void TagWidget::reparse()
 	}
 }
 
-void TagWidget::completionSelected(QString completion)
+void TagWidget::completionSelected(const QString& completion)
 {
-	QPair<int, int> pos;
-	pos = getCursorTagPosition();
+	completionHighlighted(completion);
+	emit textChanged();
+}
+
+void TagWidget::completionHighlighted(const QString& completion)
+{
+	QPair<int, int> pos = getCursorTagPosition();
 	if (pos.first >= 0 && pos.second > 0) {
 		setText(text().remove(pos.first, pos.second - pos.first).insert(pos.first, completion));
 		setCursorPosition(pos.first + completion.length());
 	} else {
-		setText(completion.append(", "));
+		setText(completion + QString(", "));
 		setCursorPosition(text().length());
 	}
-	emit(textChanged());
 }
 
 void TagWidget::setCursorPosition(int position)
@@ -159,7 +162,7 @@ void TagWidget::setCursorPosition(int position)
 	blockSignals(false);
 }
 
-void TagWidget::setText(QString text)
+void TagWidget::setText(const QString& text)
 {
 	blockSignals(true);
 	GroupedLineEdit::setText(text);
@@ -176,7 +179,19 @@ void TagWidget::clear()
 
 void TagWidget::keyPressEvent(QKeyEvent *e)
 {
+	QPair<int, int> pos;
+	QAbstractItemView *popup;
 	switch (e->key()) {
+	case Qt::Key_Escape:
+		pos = getCursorTagPosition();
+		if (pos.first >= 0 && pos.second > 0) {
+			setText(text().remove(pos.first, pos.second - pos.first));
+			setCursorPosition(pos.first);
+		}
+		popup= m_completer->popup();
+		if (popup)
+			popup->hide();
+		return;
 	case Qt::Key_Return:
 	case Qt::Key_Enter:
 	case Qt::Key_Tab:
@@ -185,12 +200,12 @@ void TagWidget::keyPressEvent(QKeyEvent *e)
 		 * closing the QAbstractViewitem
 		 */
 		if (m_completer) {
-			QAbstractItemView *popup = m_completer->popup();
+			popup = m_completer->popup();
 			if (popup)
 				popup->hide();
 		}
 	}
-	if (e->key() == Qt::Key_Tab) { // let's pretend this is a comma instead
+	if (e->key() == Qt::Key_Tab || e->key() == Qt::Key_Return) { // let's pretend this is a comma instead
 		QKeyEvent fakeEvent(e->type(), Qt::Key_Comma, e->modifiers(), QString(","));
 		GroupedLineEdit::keyPressEvent(&fakeEvent);
 	} else {

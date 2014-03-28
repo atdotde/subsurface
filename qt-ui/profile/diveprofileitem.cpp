@@ -636,17 +636,29 @@ void PartialPressureGasItem::modelDataChanged(const QModelIndex &topLeft, const 
 
 	plot_data *entry = dataModel->data().entry;
 	QPolygonF poly;
-	alertPoly.clear();
+	QPolygonF alertpoly;
+	alertPolygons.clear();
 	QSettings s;
 	s.beginGroup("TecDetails");
 	double threshould = s.value(threshouldKey).toDouble();
+	bool inAlertFragment = false;
 	for (int i = 0; i < dataModel->rowCount(); i++, entry++) {
 		double value = dataModel->index(i, vDataColumn).data().toDouble();
 		int time = dataModel->index(i, hDataColumn).data().toInt();
 		QPointF point(hAxis->posAtValue(time), vAxis->posAtValue(value));
 		poly.push_back(point);
-		if (value >= threshould)
-			alertPoly.push_back(point);
+		if (value >= threshould) {
+			if (inAlertFragment) {
+				alertPolygons.back().push_back(point);
+			} else {
+				alertpoly.clear();
+				alertpoly.push_back(point);
+				alertPolygons.append(alertpoly);
+				inAlertFragment = true;
+			}
+		} else {
+			inAlertFragment = false;
+		}
 	}
 	setPolygon(poly);
 	/*
@@ -656,10 +668,15 @@ void PartialPressureGasItem::modelDataChanged(const QModelIndex &topLeft, const 
 
 void PartialPressureGasItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
-	painter->setPen(normalColor);
+	const qreal pWidth = 0.0;
+	painter->setPen(QPen(normalColor, pWidth));
 	painter->drawPolyline(polygon());
-	painter->setPen(alertColor);
-	painter->drawPolyline(alertPoly);
+
+	QPolygonF poly;
+	painter->setPen(QPen(alertColor, pWidth));
+	Q_FOREACH(const QPolygonF & poly, alertPolygons)
+		painter->drawPolyline(poly);
+
 }
 
 void PartialPressureGasItem::setThreshouldSettingsKey(const QString &threshouldSettingsKey)

@@ -94,7 +94,8 @@ static void print_help()
 	printf("\n --help|-h             This help text");
 	printf("\n --import logfile ...  Logs before this option is treated as base, everything after is imported");
 	printf("\n --verbose|-v          Verbose debug (repeat to increase verbosity)");
-	printf("\n --version             Prints current version\n\n");
+	printf("\n --version             Prints current version");
+	printf("\n --win32console        Create a dedicated console if needed (Windows only). Add option before everything else\n\n");
 }
 
 void parse_argument(const char *arg)
@@ -130,6 +131,8 @@ void parse_argument(const char *arg)
 				print_version();
 				exit(0);
 			}
+			if (strcmp(arg, "--win32console") == 0)
+				return;
 		/* fallthrough */
 		case 'p':
 			/* ignore process serial number argument when run as native macosx app */
@@ -170,6 +173,7 @@ void setup_system_prefs(void)
 	const char *env;
 
 	default_prefs.divelist_font = strdup(system_divelist_default_font);
+	default_prefs.font_size = system_divelist_default_font_size;
 	default_prefs.default_filename = system_default_filename();
 
 	env = getenv("LC_MEASUREMENT");

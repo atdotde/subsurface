@@ -14,6 +14,8 @@
 #include "device.h"
 #include "membuffer.h"
 
+const char *saved_git_id = NULL;
+
 struct keyword_action {
 	const char *keyword;
 	void (*fn)(char *, struct membuffer *, void *);
@@ -1198,48 +1200,56 @@ static int load_dives_from_tree(git_repository *repo, git_tree *tree)
 	return 0;
 }
 
+void clear_git_id(void)
+{
+	saved_git_id = NULL;
+}
+
+void set_git_id(const struct git_oid * id)
+{
+	static char git_id_buffer[GIT_OID_HEXSZ+1];
+
+	git_oid_tostr(git_id_buffer, sizeof(git_id_buffer), id);
+	saved_git_id = git_id_buffer;
+}
+
 static int do_git_load(git_repository *repo, const char *branch)
 {
 	int ret;
-	git_reference *ref;
-	git_object *tree;
+	git_object *object;
+	git_commit *commit;
+	git_tree *tree;
 
-	ret = git_branch_lookup(&ref, repo, branch, GIT_BRANCH_LOCAL);
-	if (ret)
-		return report_error("Unable to look up branch '%s'", branch);
-	if (git_reference_peel(&tree, ref, GIT_OBJ_TREE))
-		return report_error("Could not look up tree of branch '%s'", branch);
-	ret = load_dives_from_tree(repo, (git_tree *) tree);
-	git_object_free(tree);
+	if (git_revparse_single(&object, repo, branch))
+		return report_error("Unable to look up revision '%s'", branch);
+	if (git_object_peel((git_object **)&commit, object, GIT_OBJ_COMMIT))
+		return report_error("Revision '%s' is not a valid commit", branch);
+	if (git_commit_tree(&tree, commit))
+		return report_error("Could not look up tree of commit in branch '%s'", branch);
+	ret = load_dives_from_tree(repo, tree);
+	if (!ret)
+		set_git_id(git_commit_id(commit));
+	git_object_free((git_object *)tree);
 	return ret;
 }
 
-int git_load_dives(char *where)
+/*
+ * Like git_save_dives(), this silently returns a negative
+ * value if it's not a git repository at all (so that you
+ * can try to load it some other way.
+ *
+ * If it is a git repository, we return zero for success,
+ * or report an error and return 1 if the load failed.
+ */
+int git_load_dives(struct git_repository *repo, const char *branch)
 {
-	int ret, len;
-	git_repository *repo;
-	char *loc, *branch;
+	int ret;
 
-	/* Jump over the "git" marker */
-	loc = where + 3;
-	while (isspace(*loc))
-		loc++;
-
-	/* Trim whitespace from the end */
-	len = strlen(loc);
-	while (len && isspace(loc[len-1]))
-		loc[--len] = 0;
-
-	/* Find a branch name if there is any */
-	branch = strrchr(loc, ':');
-	if (branch)
-		*branch++ = 0;
-
-	if (git_repository_open(&repo, loc))
-		return report_error("Unable to open git repository at '%s' (branch '%s')", loc, branch);
-
+	if (repo == dummy_git_repository)
+		return report_error("Unable to open git repository at '%s'", branch);
 	ret = do_git_load(repo, branch);
 	git_repository_free(repo);
+	free((void *)branch);
 	finish_active_dive();
 	finish_active_trip();
 	return ret;

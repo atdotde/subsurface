@@ -4,7 +4,8 @@ QT = core gui network svg
 lessThan(QT_MAJOR_VERSION, 5) {
 	QT += webkit
 } else {
-	QT += webkitwidgets
+	!android: QT += webkitwidgets
+	android: QT += androidextras
 }
 INCLUDEPATH += qt-ui $$PWD
 DEPENDPATH += qt-ui
@@ -75,6 +76,12 @@ HEADERS = \
 	qt-ui/profile/divetooltipitem.h \
 	qt-ui/profile/ruleritem.h
 
+android: HEADERS -= \
+	qt-ui/usermanual.h \
+	qt-ui/printdialog.h \
+	qt-ui/printlayout.h \
+	qt-ui/printoptions.h
+
 SOURCES =  \
 	deco.c \
 	device.c \
@@ -140,9 +147,16 @@ SOURCES =  \
 	qt-ui/profile/divetooltipitem.cpp \
 	qt-ui/profile/ruleritem.cpp
 
-linux*: SOURCES += linux.c
+android: SOURCES += android.cpp
+else: linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
 win32: SOURCES += windows.c
+
+android: SOURCES -= \
+	qt-ui/usermanual.cpp \
+	qt-ui/printdialog.cpp \
+	qt-ui/printlayout.cpp \
+	qt-ui/printoptions.cpp
 
 FORMS = \
 	qt-ui/about.ui \
@@ -161,6 +175,9 @@ FORMS = \
 	qt-ui/divelogimportdialog.ui \
 	qt-ui/usermanual.ui
 
+# Nether usermanual or printing is supported on android right now
+android: FORMS -= qt-ui/usermanual.ui qt-ui/printoptions.ui
+
 RESOURCES = subsurface.qrc
 
 TRANSLATIONS = \
@@ -169,36 +186,48 @@ TRANSLATIONS = \
 	translations/subsurface_da_DK.ts \
 	translations/subsurface_de_CH.ts \
 	translations/subsurface_de_DE.ts \
+	translations/subsurface_el_GR.ts \
 	translations/subsurface_es_ES.ts \
 	translations/subsurface_et_EE.ts \
 	translations/subsurface_fi_FI.ts \
 	translations/subsurface_fr_FR.ts \
+	translations/subsurface_he.ts \
+	translations/subsurface_hu.ts \
 	translations/subsurface_it_IT.ts \
+	translations/subsurface_lv_LV.ts \
 	translations/subsurface_nb_NO.ts \
 	translations/subsurface_nl_NL.ts \
 	translations/subsurface_pl_PL.ts \
 	translations/subsurface_pt_BR.ts \
 	translations/subsurface_pt_PT.ts \
+	translations/subsurface_ro_RO.ts \
 	translations/subsurface_ru_RU.ts \
 	translations/subsurface_sk_SK.ts \
 	translations/subsurface_sv_SE.ts \
-	translations/subsurface_zh_TW.ts \
-	translations/subsurface_he.ts
+	translations/subsurface_tr.ts \
+	translations/subsurface_zh_TW.ts
 
 QTTRANSLATIONS = \
 	qt_da.qm \
 	qt_de.qm \
 	qt_es.qm \
 	qt_fr.qm \
+	qt_he.qm \
+	qt_hu.qm \
 	qt_pl.qm \
 	qt_pt.qm \
 	qt_ru.qm \
 	qt_sk.qm \
-	qt_sv.qm
+	qt_sv.qm \
+	qt_zh_TW.qm
 
-doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation$$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
+doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation || $(MKDIR) $$OUT_PWD/Documentation $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
 all.depends += doc
 QMAKE_EXTRA_TARGETS += doc all
+
+marbledata.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/marbledata || $(COPY_DIR) $$PWD/marbledata $$OUT_PWD
+all.depends += marbledata
+QMAKE_EXTRA_TARGETS += marbledata
 
 DESKTOP_FILE = subsurface.desktop
 mac: ICON = packaging/macosx/Subsurface.icns

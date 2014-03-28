@@ -138,17 +138,26 @@ isEmpty(LIBGIT2DEVEL) {
 # Add libiconv if needed
 link_pkgconfig: packagesExist(libiconv): PKGCONFIG += libiconv
 
+# disable things when were on android
+contains(QMAKE_PLATFORM, android): DEFINES += NO_MARBLE NO_USERMANUAL NO_PRINTING
+
 #
 # Find libmarble
 #
 # Before Marble 4.9, the GeoDataTreeModel.h header wasn't installed
 # Check if it's present by trying to compile
 # ### FIXME: implement that
-win32: CONFIG(debug, debug|release): LIBS += -lmarblewidgetd
-else: LIBS += -lmarblewidget
+!contains(DEFINES, NO_MARBLE) {
+	win32: CONFIG(debug, debug|release): LIBS += -lmarblewidgetd
+	else: LIBS += -lmarblewidget
+}
 
 libgit21-api {
 	DEFINES += USE_LIBGIT21_API
+}
+
+win32: console {
+	DEFINES += WIN32_CONSOLE_APP
 }
 #
 # Platform-specific changes

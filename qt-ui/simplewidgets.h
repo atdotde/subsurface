@@ -6,6 +6,7 @@ class QAbstractButton;
 
 #include <QWidget>
 #include <QDialog>
+#include <stdint.h>
 
 #include "ui_renumber.h"
 #include "ui_shifttimes.h"
@@ -52,12 +53,15 @@ class ShiftTimesDialog : public QDialog {
 	Q_OBJECT
 public:
 	static ShiftTimesDialog *instance();
+	void showEvent ( QShowEvent * event );
 private
 slots:
 	void buttonClicked(QAbstractButton *button);
+	void changeTime ();
 
 private:
 	explicit ShiftTimesDialog(QWidget *parent);
+	int64_t when;
 	Ui::ShiftTimesDialog ui;
 };
 

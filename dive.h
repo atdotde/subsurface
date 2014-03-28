@@ -600,13 +600,30 @@ static inline struct dive *get_dive(int nr)
 	return dive_table.dives[nr];
 }
 
+static inline unsigned int number_of_computers(struct dive *dive)
+{
+	unsigned int total_number = 0;
+	struct divecomputer *dc = &dive->dc;
+
+	if (!dive)
+		return 1;
+
+	do {
+		total_number++;
+		dc = dc->next;
+	} while (dc);
+	return total_number;
+}
+
 static inline struct divecomputer *get_dive_dc(struct dive *dive, int nr)
 {
-	struct divecomputer *dc = NULL;
-	if (nr >= 0)
-		dc = &dive->dc;
-	while (nr-- > 0)
+	struct divecomputer *dc = &dive->dc;
+
+	while (nr-- > 0) {
 		dc = dc->next;
+		if (!dc)
+			return &dive->dc;
+	}
 	return dc;
 }
 
@@ -661,6 +678,7 @@ extern "C" {
 #endif
 
 extern int report_error(const char *fmt, ...);
+extern const char *get_error_string(void);
 
 extern struct dive *find_dive_including(timestamp_t when);
 extern bool dive_within_time_range(struct dive *dive, timestamp_t when, timestamp_t offset);
@@ -670,23 +688,31 @@ struct dive *find_dive_n_near(timestamp_t when, int n, timestamp_t offset);
 extern int match_one_dc(struct divecomputer *a, struct divecomputer *b);
 
 extern void parse_xml_init(void);
-extern void parse_xml_buffer(const char *url, const char *buf, int size, struct dive_table *table, const char **params, char **error);
+extern void parse_xml_buffer(const char *url, const char *buf, int size, struct dive_table *table, const char **params);
 extern void parse_xml_exit(void);
 extern void set_filename(const char *filename, bool force);
 
-extern int parse_dm4_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table, char **error);
-extern int parse_shearwater_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table, char **error);
+extern int parse_dm4_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table);
+extern int parse_shearwater_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table);
 
-extern void parse_file(const char *filename, char **error);
-extern void parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int units, char **error);
-extern void parse_manual_file(const char *filename, int separator_index, int units, int number, int date, int time, int duration, int location, int gps, int maxdepth, int meandepth, int buddy, int notes, int weight, int tags, char **error);
+extern int parse_file(const char *filename);
+extern int parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int units);
+extern int parse_manual_file(const char *filename, int separator_index, int units, int number, int date, int time, int duration, int location, int gps, int maxdepth, int meandepth, int buddy, int notes, int weight, int tags);
 
-extern void save_dives(const char *filename);
-extern void save_dives_logic(const char *filename, bool select_only);
-extern void save_dive(FILE *f, struct dive *dive);
-extern void export_dives_uddf(const char *filename, const bool selected);
-extern int git_save_dives(int fd, bool select_only);
-extern int git_load_dives(char *where);
+extern int save_dives(const char *filename);
+extern int save_dives_logic(const char *filename, bool select_only);
+extern int save_dive(FILE *f, struct dive *dive);
+extern int export_dives_uddf(const char *filename, const bool selected);
+
+struct git_oid;
+struct git_repository;
+#define dummy_git_repository ((git_repository *) 3ul) /* Random bogus pointer, not NULL */
+extern struct git_repository *is_git_repository(const char *filename, const char **branchp);
+extern int git_save_dives(struct git_repository *, const char *, bool select_only);
+extern int git_load_dives(struct git_repository *, const char *);
+extern const char *saved_git_id;
+extern void clear_git_id(void);
+extern void set_git_id(const struct git_oid *);
 
 extern int subsurface_rename(const char *path, const char *newpath);
 extern int subsurface_open(const char *path, int oflags, mode_t mode);
@@ -694,8 +720,11 @@ extern FILE *subsurface_fopen(const char *path, const char *mode);
 extern void *subsurface_opendir(const char *path);
 extern struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *errorp);
 extern int subsurface_zip_close(struct zip *zip);
+extern void subsurface_console_init(bool dedicated);
+extern void subsurface_console_exit(void);
 
 extern void shift_times(const timestamp_t amount);
+extern timestamp_t get_times();
 
 extern xsltStylesheetPtr get_stylesheet(const char *name);
 
@@ -812,7 +841,7 @@ struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, 
 void get_gas_string(int o2, int he, char *buf, int len);
 struct divedatapoint *create_dp(int time_incr, int depth, int o2, int he, int po2);
 void dump_plan(struct diveplan *diveplan);
-void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco, const char **error_string_p);
+void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco);
 void delete_single_dive(int idx);
 
 struct event *get_next_event(struct event *event, char *name);

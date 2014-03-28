@@ -12,7 +12,6 @@
 #include <QUrl>
 
 #include "ui_mainwindow.h"
-#include "usermanual.h"
 
 struct DiveList;
 class QSortFilterProxyModel;
@@ -28,6 +27,7 @@ class GlobeGPS;
 class MainTab;
 class ProfileGraphicsView;
 class QWebView;
+class QSettings;
 
 enum MainWindowTitleFormat {
 	MWTF_DEFAULT,
@@ -155,14 +155,16 @@ private:
 	Ui::MainWindow ui;
 	QAction *actionNextDive;
 	QAction *actionPreviousDive;
-	UserManual *helpView;
+	QMainWindow *helpView;
+	QTreeView *yearlyStats;
+	QAbstractItemModel *yearlyStatsModel;
 	CurrentState state;
 	QString filter();
 	static MainWindow *m_Instance;
 	bool askSaveChanges();
 	void writeSettings();
-	void file_save();
-	void file_save_as();
+	int file_save();
+	int file_save_as();
 	void beginChangeState(CurrentState s);
 	void saveSplitterSizes();
 	QString lastUsedDir();

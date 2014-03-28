@@ -15,6 +15,18 @@
 #include "membuffer.h"
 #include "ssrf-version.h"
 
+/*
+ * handle libgit2 revision 0.20 and earlier
+ */
+#if !LIBGIT2_VER_MAJOR && LIBGIT2_VER_MINOR <= 20 && !defined(USE_LIBGIT21_API)
+  #define GIT_CHECKOUT_OPTIONS_INIT GIT_CHECKOUT_OPTS_INIT
+  #define git_checkout_options git_checkout_opts
+  #define git_branch_create(out,repo,branch_name,target,force,sig,msg) \
+	git_branch_create(out,repo,branch_name,target,force)
+  #define git_reference_set_target(out,ref,target,signature,log_message) \
+	git_reference_set_target(out,ref,target)
+#endif
+
 #define VA_BUF(b, fmt) do { va_list args; va_start(args, fmt); put_vformat(b, fmt, args); va_end(args); } while (0)
 
 static void cond_put_format(int cond, struct membuffer *b, const char *fmt, ...)
@@ -340,16 +352,35 @@ static void create_dive_buffer(struct dive *dive, struct membuffer *b)
 	save_dive_temperature(b, dive);
 }
 
+static struct membuffer error_string_buffer = { 0 };
+
+/*
+ * Note that the act of "getting" the error string
+ * buffer doesn't de-allocate the buffer, but it does
+ * set the buffer length to zero, so that any future
+ * error reports will overwrite the string rather than
+ * append to it.
+ */
+const char *get_error_string(void)
+{
+	const char *str;
+
+	if (!error_string_buffer.len)
+		return "";
+	str = mb_cstring(&error_string_buffer);
+	error_string_buffer.len = 0;
+	return str;
+}
+
 int report_error(const char *fmt, ...)
 {
-	struct membuffer b = { 0 };
-	VA_BUF(&b, fmt);
+	struct membuffer *buf = &error_string_buffer;
 
-	/* We should do some UI element thing describing the failure */
-	put_bytes(&b, "\n", 1);
-	flush_buffer(&b, stderr);
-	free_buffer(&b);
-
+	/* Previous unprinted errors? Add a newline in between */
+	if (buf->len)
+		put_bytes(buf, "\n", 1);
+	VA_BUF(buf, fmt);
+	mb_cstring(buf);
 	return -1;
 }
 
@@ -741,15 +772,53 @@ static int create_git_tree(git_repository *repo, struct dir *root, bool select_o
 }
 
 /*
- * libgit2 revision 0.20 and earlier do not have the signature and
- * message log arguments.
+ * See if we can find the parent ID that the git data came from
  */
-#if !LIBGIT2_VER_MAJOR && LIBGIT2_VER_MINOR <= 20 && !defined(USE_LIBGIT21_API)
-  #define git_branch_create(out,repo,branch_name,target,force,sig,msg) \
-	git_branch_create(out,repo,branch_name,target,force)
-  #define git_reference_set_target(out,ref,target,signature,log_message) \
-	git_reference_set_target(out,ref,target)
-#endif
+static git_object *try_to_find_parent(const char *hex_id, git_repository *repo)
+{
+	git_oid object_id;
+	git_commit *commit;
+
+	if (!hex_id)
+		return NULL;
+	if (git_oid_fromstr(&object_id, hex_id))
+		return NULL;
+	if (git_commit_lookup(&commit, repo, &object_id))
+		return NULL;
+	return (git_object *)commit;
+}
+
+static int notify_cb(git_checkout_notify_t why,
+	const char *path,
+	const git_diff_file *baseline,
+	const git_diff_file *target,
+	const git_diff_file *workdir,
+	void *payload)
+{
+	report_error("File '%s' does not match in working tree", path);
+	return 0; /* Continue with checkout */
+}
+
+static git_tree *get_git_tree(git_repository *repo, git_object *parent)
+{
+	git_tree *tree;
+	if (!parent)
+		return NULL;
+	if (git_tree_lookup(&tree, repo, git_commit_tree_id((const git_commit *) parent)))
+		return NULL;
+	return tree;
+}
+
+static int update_git_checkout(git_repository *repo, git_object *parent, git_tree *tree)
+{
+	git_checkout_options opts = GIT_CHECKOUT_OPTIONS_INIT;
+
+	opts.checkout_strategy = GIT_CHECKOUT_SAFE;
+	opts.notify_flags = GIT_CHECKOUT_NOTIFY_CONFLICT | GIT_CHECKOUT_NOTIFY_DIRTY;
+	opts.notify_cb = notify_cb;
+	opts.baseline = get_git_tree(repo, parent);
+	return git_checkout_tree(repo, (git_object *) tree, &opts);
+}
 
 static int create_new_commit(git_repository *repo, const char *branch, git_oid *tree_id)
 {
@@ -769,15 +838,18 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 	case GIT_EINVALIDSPEC:
 		return report_error("Invalid branch name '%s'", branch);
 	case GIT_ENOTFOUND: /* We'll happily create it */
-		ref = NULL; parent = NULL;
+		ref = NULL;
+		parent = try_to_find_parent(saved_git_id, repo);
 		break;
 	case 0:
 		if (git_reference_peel(&parent, ref, GIT_OBJ_COMMIT))
 			return report_error("Unable to look up parent in branch '%s'", branch);
 
-		/* If the parent commit has the same tree ID, do nothing */
-		if (git_oid_equal(tree_id, git_commit_tree_id((const git_commit *) parent)))
-			return 0;
+		if (saved_git_id) {
+			const git_oid *id = git_commit_id((const git_commit *) parent);
+			if (git_oid_strcmp(id, saved_git_id))
+				return report_error("The git branch does not match the git parent of the source");
+		}
 
 		/* all good */
 		break;
@@ -790,19 +862,45 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 	if (git_signature_now(&author, "Subsurface", "subsurface@hohndel.org"))
 		return report_error("No user name configuration in git repo");
 
-	put_format(&commit_msg, "Created by subsurface %s\n", VERSION_STRING);
-	if (git_commit_create_v(&commit_id, repo, NULL, author, author, NULL, mb_cstring(&commit_msg), tree, parent != NULL, parent))
-		return report_error("Git commit create failed (%s)", strerror(errno));
+	/* If the parent commit has the same tree ID, do not create a new commit */
+	if (parent && git_oid_equal(tree_id, git_commit_tree_id((const git_commit *) parent))) {
+		/* If the parent already came from the ref, the commit is already there */
+		if (ref)
+			return 0;
+		/* Else we do want to create the new branch, but with the old commit */
+		commit = (git_commit *) parent;
+	} else {
+		put_format(&commit_msg, "Created by subsurface %s\n", VERSION_STRING);
+		if (git_commit_create_v(&commit_id, repo, NULL, author, author, NULL, mb_cstring(&commit_msg), tree, parent != NULL, parent))
+			return report_error("Git commit create failed (%s)", strerror(errno));
 
-	if (git_commit_lookup(&commit, repo, &commit_id))
-		return report_error("Could not look up newly created commit");
+		if (git_commit_lookup(&commit, repo, &commit_id))
+			return report_error("Could not look up newly created commit");
+	}
 
 	if (!ref) {
 		if (git_branch_create(&ref, repo, branch, commit, 0, author, "Create branch"))
 			return report_error("Failed to create branch '%s'", branch);
 	}
+	/*
+	 * If it's a checked-out branch, try to also update the working
+	 * tree and index. If that fails (dirty working tree or whatever),
+	 * this is not technically a save error (we did save things in
+	 * the object database), but it can cause extreme confusion, so
+	 * warn about it.
+	 */
+	if (git_branch_is_head(ref) && !git_repository_is_bare(repo)) {
+		if (update_git_checkout(repo, parent, tree)) {
+			const git_error *err = giterr_last();
+			const char *errstr = err ? err->message : strerror(errno);
+			report_error("Git branch '%s' is checked out, but worktree is dirty (%s)",
+				branch, errstr);
+		}
+	}
+
 	if (git_reference_set_target(&ref, ref, &commit_id, author, "Subsurface save event"))
 		return report_error("Failed to update branch '%s'", branch);
+	set_git_id(&commit_id);
 
 	return 0;
 }
@@ -850,61 +948,83 @@ static int do_git_save(git_repository *repo, const char *branch, bool select_onl
 		return report_error("git tree write failed");
 
 	/* And save the tree! */
-	create_new_commit(repo, branch, &id);
-	return 0;
+	return create_new_commit(repo, branch, &id);
 }
 
-int git_save_dives(int fd, bool select_only)
+/*
+ * If it's not a git repo, return NULL. Be very conservative.
+ */
+struct git_repository *is_git_repository(const char *filename, const char **branchp)
 {
-	int len, ret;
+	int flen, blen, ret;
 	struct stat st;
-	static char buffer[2048];
 	git_repository *repo;
 	char *loc, *branch;
 
-	if (fstat(fd, &st) < 0)
-		return 0;
-	if (st.st_size >= sizeof(buffer))
-		return 0;
-	len = st.st_size;
-	if (read(fd, buffer, len) != len)
-		return 0;
-	buffer[len] = 0;
-	if (len < 4)
-		return 0;
-	if (memcmp(buffer, "git ", 4))
-		return 0;
+	flen = strlen(filename);
+	if (!flen || filename[--flen] != ']')
+		return NULL;
 
-	/* Ok, it's a git pointer, we're going to follow it */
-	close(fd);
+	/* Find the matching '[' */
+	blen = 0;
+	while (flen && filename[--flen] != '[')
+		blen++;
 
-	/* Trim any whitespace at the end */
-	while (isspace(buffer[len-1]))
-		buffer[--len] = 0;
-
-	/* skip the "git" part and any whitespace from the beginning */
-	loc = buffer+3;
-	len -= 3;
-	while (isspace(*loc)) {
-		loc++;
-		len--;
-	}
-
-	if (!len)
-		return report_error("Invalid git pointer");
+	if (!flen)
+		return NULL;
 
 	/*
-	 * The result should be a git directory and branch name, like
-	 *  "/home/torvalds/scuba:linus"
+	 * This is the "point of no return": the name matches
+	 * the git repository name rules, and we will no longer
+	 * return NULL.
+	 *
+	 * We will either return "dummy_git_repository" and the
+	 * branch pointer will have the _whole_ filename in it,
+	 * or we will return a real git repository with the
+	 * branch pointer being filled in with just the branch
+	 * name.
+	 *
+	 * The actual git reading/writing routines can use this
+	 * to generate proper error messages.
 	 */
-	branch = strrchr(loc, ':');
-	if (branch)
-		*branch++ = 0;
+	*branchp = filename;
+	loc = malloc(flen+1);
+	if (!loc)
+		return dummy_git_repository;
+	memcpy(loc, filename, flen);
+	loc[flen] = 0;
 
-	if (git_repository_open(&repo, loc))
-		return report_error("Unable to open git repository at '%s' (branch '%s')", loc, branch);
+	branch = malloc(blen+1);
+	if (!branch) {
+		free(loc);
+		return dummy_git_repository;
+	}
+	memcpy(branch, filename+flen+1, blen);
+	branch[blen] = 0;
 
+	if (stat(loc, &st) < 0 || !S_ISDIR(st.st_mode)) {
+		free(loc);
+		return dummy_git_repository;
+	}
+
+	ret = git_repository_open(&repo, loc);
+	free(loc);
+	if (ret < 0) {
+		free(branch);
+		return dummy_git_repository;
+	}
+	*branchp = branch;
+	return repo;
+}
+
+int git_save_dives(struct git_repository *repo, const char *branch, bool select_only)
+{
+	int ret;
+
+	if (repo == dummy_git_repository)
+		return report_error("Unable to open git repository '%s'", branch);
 	ret = do_git_save(repo, branch, select_only);
 	git_repository_free(repo);
-	return ret < 0 ? ret : 1;
+	free((void *)branch);
+	return ret;
 }

@@ -13,6 +13,7 @@
 #include "planner.h"
 #include "device.h"
 #include "ruleritem.h"
+#include <libdivecomputer/parser.h>
 #include <QSignalTransition>
 #include <QPropertyAnimation>
 #include <QMenu>
@@ -21,6 +22,7 @@
 #include <QSettings>
 #include <QScrollBar>
 #include <QtCore/qmath.h>
+#include <QMessageBox>
 
 #ifndef QT_NO_DEBUG
 #include <QTableView>
@@ -81,7 +83,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) : QGraphicsView(parent),
 	po2GasItem(new PartialPressureGasItem()),
 	heartBeatAxis(new DiveCartesianAxis()),
 	heartBeatItem(new DiveHeartrateItem()),
-	rulerItem(new RulerItem2())
+	rulerItem(new RulerItem2()),
+	isGrayscale(false),
+	printMode(false)
 {
 	memset(&plotInfo, 0, sizeof(plotInfo));
 
@@ -132,15 +136,18 @@ void ProfileWidget2::addItemsToScene()
 void ProfileWidget2::setupItemOnScene()
 {
 	background->setZValue(9999);
+	toolTipItem->setZValue(9998);
 	toolTipItem->setTimeAxis(timeAxis);
+	rulerItem->setZValue(9997);
 
 	profileYAxis->setOrientation(DiveCartesianAxis::TopToBottom);
 	profileYAxis->setMinimum(0);
 	profileYAxis->setTickInterval(M_OR_FT(10, 30));
-	profileYAxis->setTickSize(1);
+	profileYAxis->setTickSize(0.5);
 	profileYAxis->setLineSize(96);
 
 	timeAxis->setLineSize(92);
+	timeAxis->setTickSize(-0.5);
 
 	gasYAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	gasYAxis->setTickInterval(1);
@@ -171,7 +178,7 @@ void ProfileWidget2::setupItemOnScene()
 	meanDepth->setAxis(profileYAxis);
 
 	diveComputerText->setAlignment(Qt::AlignRight | Qt::AlignTop);
-	diveComputerText->setBrush(getColor(TIME_TEXT));
+	diveComputerText->setBrush(getColor(TIME_TEXT, isGrayscale));
 
 	rulerItem->setAxis(timeAxis, profileYAxis);
 
@@ -191,7 +198,7 @@ void ProfileWidget2::setupItemOnScene()
 	setupItem(ITEM, timeAxis, gasYAxis, dataModel, DivePlotDataModel::VERTICAL_COLUMN, DivePlotDataModel::TIME, 0); \
 	ITEM->setThreshouldSettingsKey(THRESHOULD_SETTINGS);                                                            \
 	ITEM->setVisibilitySettingsKey(VISIBILITY_SETTINGS);                                                            \
-	ITEM->setColors(getColor(COLOR), getColor(COLOR_ALERT));                                                        \
+	ITEM->setColors(getColor(COLOR, isGrayscale), getColor(COLOR_ALERT, isGrayscale));                              \
 	ITEM->preferencesChanged();                                                                                     \
 	ITEM->setZValue(99);
 
@@ -333,13 +340,21 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 		firstCall = false;
 	}
 
-	// restore default zoom level and tooltip position
+	// restore default zoom level
 	if (zoomLevel) {
 		const qreal defScale = 1.0 / qPow(zoomFactor, (qreal)zoomLevel);
 		scale(defScale, defScale);
 		zoomLevel = 0;
 	}
-	toolTipItem->setPos(0, 0);
+
+	// reset some item visibility on printMode changes
+	toolTipItem->setVisible(!printMode);
+	QSettings s;
+	s.beginGroup("TecDetails");
+	const bool rulerVisible = s.value("rulergraph", false).toBool() && !printMode;
+	rulerItem->setVisible(rulerVisible);
+	rulerItem->sourceNode()->setVisible(rulerVisible);
+	rulerItem->destNode()->setVisible(rulerVisible);
 
 	// No need to do this again if we are already showing the same dive
 	// computer of the same dive, so we check the unique id of the dive
@@ -355,7 +370,7 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 	// next get the dive computer structure - if there are no samples
 	// let's create a fake profile that's somewhat reasonable for the
 	// data that we have
-	struct divecomputer *currentdc = select_dc(&d->dc);
+	struct divecomputer *currentdc = select_dc(d);
 	Q_ASSERT(currentdc);
 	if (!currentdc || !currentdc->samples) {
 		currentdc = fake_dc(currentdc);
@@ -436,10 +451,10 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 		eventItems.push_back(item);
 		event = event->next;
 	}
-	// Only set visible the ones that should be visible, but how?
+	// Only set visible the events that should be visible
 	Q_FOREACH(DiveEventItem * event, eventItems) {
-		event->setVisible(true);
-		// qDebug() << event->getEvent()->name << "@" << event->getEvent()->time.seconds;
+		event->setVisible(!event->shouldBeHidden());
+		// qDebug() << event->getEvent()->name << "@" << event->getEvent()->time.seconds << "is hidden:" << event->isHidden();
 	}
 	diveComputerText->setText(currentdc->model);
 	if (MainWindow::instance()->filesFromCommandLine() && animSpeedBackup != -1){
@@ -472,6 +487,7 @@ void ProfileWidget2::settingsChanged()
 		rulerItem->setVisible(rulerVisible);
 		rulerItem->destNode()->setVisible(rulerVisible);
 		rulerItem->sourceNode()->setVisible(rulerVisible);
+		replot();
 	} else {
 		rulerItem->setVisible(false);
 		rulerItem->destNode()->setVisible(false);
@@ -579,6 +595,9 @@ void ProfileWidget2::setEmptyState()
 	rulerItem->setVisible(false);
 	rulerItem->destNode()->setVisible(false);
 	rulerItem->sourceNode()->setVisible(false);
+	pn2GasItem->setVisible(false);
+	po2GasItem->setVisible(false);
+	pheGasItem->setVisible(false);
 	Q_FOREACH(DiveCalculatedTissue * tissue, allTissues) {
 		tissue->setVisible(false);
 	}
@@ -596,7 +615,7 @@ void ProfileWidget2::setProfileState()
 	currentState = PROFILE;
 	MainWindow::instance()->setToolButtonsEnabled(true);
 	toolTipItem->readPos();
-	setBackgroundBrush(getColor(::BACKGROUND));
+	setBackgroundBrush(getColor(::BACKGROUND, isGrayscale));
 
 	background->setVisible(false);
 	toolTipItem->setVisible(true);
@@ -618,6 +637,9 @@ void ProfileWidget2::setProfileState()
 		temperatureAxis->setLine(itemPos.temperature.expanded);
 		cylinderPressureAxis->setLine(itemPos.cylinder.expanded);
 	}
+	pn2GasItem->setVisible(s.value("pn2graph").toBool());
+	po2GasItem->setVisible(s.value("po2graph").toBool());
+	pheGasItem->setVisible(s.value("phegraph").toBool());
 
 	gasYAxis->setPos(itemPos.partialPressure.pos.on);
 	gasYAxis->setLine(itemPos.partialPressure.expanded);
@@ -671,11 +693,8 @@ void ProfileWidget2::contextMenuEvent(QContextMenuEvent *event)
 	}
 	QAction *action = m.addAction(tr("Add Bookmark"), this, SLOT(addBookmark()));
 	action->setData(event->globalPos());
-	QList<QGraphicsItem *> itemsAtPos = scene()->items(mapToScene(mapFromGlobal(event->globalPos())));
-	Q_FOREACH(QGraphicsItem * i, itemsAtPos) {
-		DiveEventItem *item = dynamic_cast<DiveEventItem *>(i);
-		if (!item)
-			continue;
+	QGraphicsItem *sceneItem = itemAt(mapFromGlobal(event->globalPos()));
+	if (DiveEventItem *item = dynamic_cast<DiveEventItem *>(sceneItem)) {
 		action = new QAction(&m);
 		action->setText(tr("Remove Event"));
 		action->setData(QVariant::fromValue<void *>(item)); // so we know what to remove.
@@ -686,7 +705,6 @@ void ProfileWidget2::contextMenuEvent(QContextMenuEvent *event)
 		action->setData(QVariant::fromValue<void *>(item));
 		connect(action, SIGNAL(triggered(bool)), this, SLOT(hideEvents()));
 		m.addAction(action);
-		break;
 	}
 	bool some_hidden = false;
 	for (int i = 0; i < evn_used; i++) {
@@ -702,13 +720,73 @@ void ProfileWidget2::contextMenuEvent(QContextMenuEvent *event)
 	m.exec(event->globalPos());
 }
 
+void ProfileWidget2::hideEvents()
+{
+	QAction *action = qobject_cast<QAction *>(sender());
+	DiveEventItem *item = static_cast<DiveEventItem *>(action->data().value<void *>());
+	struct event *event = item->getEvent();
+
+	if (QMessageBox::question(MainWindow::instance(),
+				  TITLE_OR_TEXT(tr("Hide events"), tr("Hide all %1 events?").arg(event->name)),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok) {
+		if (event->name) {
+			for (int i = 0; i < evn_used; i++) {
+				if (!strcmp(event->name, ev_namelist[i].ev_name)) {
+					ev_namelist[i].plot_ev = false;
+					break;
+				}
+			}
+		}
+		item->hide();
+		replot();
+	}
+}
+
+void ProfileWidget2::unhideEvents()
+{
+	for (int i = 0; i < evn_used; i++) {
+		ev_namelist[i].plot_ev = true;
+	}
+	replot();
+}
+
+void ProfileWidget2::removeEvent()
+{
+	QAction *action = qobject_cast<QAction *>(sender());
+	DiveEventItem *item = static_cast<DiveEventItem *>(action->data().value<void *>());
+	struct event *event = item->getEvent();
+
+	if (QMessageBox::question(MainWindow::instance(), TITLE_OR_TEXT(
+					  tr("Remove the selected event?"),
+					  tr("%1 @ %2:%3").arg(event->name).arg(event->time.seconds / 60).arg(event->time.seconds % 60, 2, 10, QChar('0'))),
+				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok) {
+		struct event **ep = &current_dc->events;
+		while (ep && *ep != event)
+			ep = &(*ep)->next;
+		if (ep) {
+			*ep = event->next;
+			free(event);
+		}
+		mark_divelist_changed(true);
+		replot();
+	}
+}
+
+void ProfileWidget2::addBookmark()
+{
+	QAction *action = qobject_cast<QAction *>(sender());
+	QPointF scenePos = mapToScene(mapFromGlobal(action->data().toPoint()));
+	add_event(current_dc, timeAxis->valueAt(scenePos), SAMPLE_EVENT_BOOKMARK, 0, 0, "bookmark");
+	replot();
+}
+
 void ProfileWidget2::changeGas()
 {
 	QAction *action = qobject_cast<QAction *>(sender());
 	QPointF scenePos = mapToScene(mapFromGlobal(action->data().toPoint()));
 	QString gas = action->text();
 	// backup the things on the dataModel, since we will clear that out.
-	int diveComputer = dataModel->dcShown();
+	unsigned int diveComputer = dataModel->dcShown();
 	int diveId = dataModel->id();
 	int o2, he;
 	int seconds = timeAxis->valueAt(scenePos);
@@ -721,4 +799,10 @@ void ProfileWidget2::changeGas()
 	MainWindow::instance()->information()->updateDiveInfo(selected_dive);
 	mark_divelist_changed(true);
 	replot();
+}
+
+void ProfileWidget2::setPrintMode(bool mode, bool grayscale)
+{
+	printMode = mode;
+	isGrayscale = mode ? grayscale : false;
 }
