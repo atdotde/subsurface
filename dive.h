@@ -837,12 +837,19 @@ struct diveplan {
 	struct divedatapoint *dp;
 };
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, int depth, int o2, int he, int po2, bool entered);
 void get_gas_string(int o2, int he, char *buf, int len);
 struct divedatapoint *create_dp(int time_incr, int depth, int o2, int he, int po2);
 void dump_plan(struct diveplan *diveplan);
 void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco);
 void delete_single_dive(int idx);
+#ifdef __cplusplus
+}
+#endif
 
 struct event *get_next_event(struct event *event, char *name);
 

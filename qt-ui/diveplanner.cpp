@@ -461,6 +461,7 @@ void DivePlannerGraphics::drawProfile()
 
 	plannerModel->createTemporaryPlan();
 	struct diveplan diveplan = plannerModel->getDiveplan();
+	dump_plan(&diveplan);
 	struct divedatapoint *dp = diveplan.dp;
 	unsigned int max_depth = 0;
 
@@ -520,8 +521,10 @@ void DivePlannerGraphics::drawProfile()
 			item->setPen(QPen(QBrush(Qt::red), 0));
 			scene()->addItem(item);
 			lines << item;
-			if (dp->depth)
+			if (dp->depth){
 				qDebug() << "Time: " << dp->time / 60 << " depth: " << dp->depth / 1000;
+				plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
+			}
 		}
 		lastx = xpos;
 		lasty = ypos;
@@ -1260,7 +1263,9 @@ int DivePlannerPointsModel::addStop(int milimeters, int seconds, int o2, int he,
 	point.entered = entered;
 	divepoints.append(point);
 	std::sort(divepoints.begin(), divepoints.end(), divePointsLessThan);
+	qDebug() << "But HERE";
 	endInsertRows();
+	qDebug() << "Here";
 	return row;
 }
 
@@ -1415,6 +1420,8 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		divedatapoint p = at(i);
 		int deltaT = lastIndex != -1 ? p.time - at(lastIndex).time : p.time;
 		lastIndex = i;
+		if (!p.entered)
+			continue;
 		p.entered = true;
 		plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2, true);
 	}

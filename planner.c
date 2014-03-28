@@ -13,6 +13,8 @@
 #include "planner.h"
 #include "gettext.h"
 
+#define DEBUG_PLAN 1
+
 unsigned int decostoplevels[] = { 0, 3000, 6000, 9000, 12000, 15000, 18000, 21000, 24000, 27000,
 				  30000, 33000, 36000, 39000, 42000, 45000, 48000, 51000, 54000, 57000,
 				  60000, 63000, 66000, 69000, 72000, 75000, 78000, 81000, 84000, 87000,
@@ -40,7 +42,7 @@ void dump_plan(struct diveplan *diveplan)
 	       diveplan->surface_pressure);
 	dp = diveplan->dp;
 	while (dp) {
-		printf("\t%3u:%02u: %dmm gas: %d o2 %d h2\n", FRACTION(dp->time, 60), dp->depth, dp->o2, dp->he);
+		printf("\t%3u:%02u: %dmm gas: %d o2 %d h2 %s\n", FRACTION(dp->time, 60), dp->depth, dp->o2, dp->he, dp->entered ? "entered" : "computed");
 		dp = dp->next;
 	}
 }
@@ -598,6 +600,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	int gaschangenr;
 	unsigned int *stoplevels = NULL;
 
+	dump_plan(diveplan);
 	set_gf(diveplan->gflow, diveplan->gfhigh, default_prefs.gf_low_at_maxdepth);
 	if (!diveplan->surface_pressure)
 		diveplan->surface_pressure = SURFACE_PRESSURE;
