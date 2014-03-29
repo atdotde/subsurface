@@ -83,7 +83,9 @@ ProfileWidget2::ProfileWidget2(QWidget *parent) : QGraphicsView(parent),
 	po2GasItem(new PartialPressureGasItem()),
 	heartBeatAxis(new DiveCartesianAxis()),
 	heartBeatItem(new DiveHeartrateItem()),
-	rulerItem(new RulerItem2())
+	rulerItem(new RulerItem2()),
+	isGrayscale(false),
+	printMode(false)
 {
 	memset(&plotInfo, 0, sizeof(plotInfo));
 
@@ -141,10 +143,11 @@ void ProfileWidget2::setupItemOnScene()
 	profileYAxis->setOrientation(DiveCartesianAxis::TopToBottom);
 	profileYAxis->setMinimum(0);
 	profileYAxis->setTickInterval(M_OR_FT(10, 30));
-	profileYAxis->setTickSize(1);
+	profileYAxis->setTickSize(0.5);
 	profileYAxis->setLineSize(96);
 
 	timeAxis->setLineSize(92);
+	timeAxis->setTickSize(-0.5);
 
 	gasYAxis->setOrientation(DiveCartesianAxis::BottomToTop);
 	gasYAxis->setTickInterval(1);
@@ -175,7 +178,7 @@ void ProfileWidget2::setupItemOnScene()
 	meanDepth->setAxis(profileYAxis);
 
 	diveComputerText->setAlignment(Qt::AlignRight | Qt::AlignTop);
-	diveComputerText->setBrush(getColor(TIME_TEXT));
+	diveComputerText->setBrush(getColor(TIME_TEXT, isGrayscale));
 
 	rulerItem->setAxis(timeAxis, profileYAxis);
 
@@ -195,7 +198,7 @@ void ProfileWidget2::setupItemOnScene()
 	setupItem(ITEM, timeAxis, gasYAxis, dataModel, DivePlotDataModel::VERTICAL_COLUMN, DivePlotDataModel::TIME, 0); \
 	ITEM->setThreshouldSettingsKey(THRESHOULD_SETTINGS);                                                            \
 	ITEM->setVisibilitySettingsKey(VISIBILITY_SETTINGS);                                                            \
-	ITEM->setColors(getColor(COLOR), getColor(COLOR_ALERT));                                                        \
+	ITEM->setColors(getColor(COLOR, isGrayscale), getColor(COLOR_ALERT, isGrayscale));                              \
 	ITEM->preferencesChanged();                                                                                     \
 	ITEM->setZValue(99);
 
@@ -344,6 +347,15 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 		zoomLevel = 0;
 	}
 
+	// reset some item visibility on printMode changes
+	toolTipItem->setVisible(!printMode);
+	QSettings s;
+	s.beginGroup("TecDetails");
+	const bool rulerVisible = s.value("rulergraph", false).toBool() && !printMode;
+	rulerItem->setVisible(rulerVisible);
+	rulerItem->sourceNode()->setVisible(rulerVisible);
+	rulerItem->destNode()->setVisible(rulerVisible);
+
 	// No need to do this again if we are already showing the same dive
 	// computer of the same dive, so we check the unique id of the dive
 	// and the selected dive computer number against the ones we are
@@ -417,6 +429,10 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 	cylinderPressureAxis->setMaximum(pInfo.maxpressure);
 
 	rulerItem->setPlotInfo(pInfo);
+	if (prefs.show_average_depth)
+		meanDepth->setVisible(true);
+	else
+		meanDepth->setVisible(false);
 	meanDepth->setMeanDepth(pInfo.meandepth);
 	meanDepth->setLine(0, 0, timeAxis->posAtValue(d->duration.seconds), 0);
 	meanDepth->animateMoveTo(3, profileYAxis->posAtValue(pInfo.meandepth));
@@ -475,6 +491,7 @@ void ProfileWidget2::settingsChanged()
 		rulerItem->setVisible(rulerVisible);
 		rulerItem->destNode()->setVisible(rulerVisible);
 		rulerItem->sourceNode()->setVisible(rulerVisible);
+		replot();
 	} else {
 		rulerItem->setVisible(false);
 		rulerItem->destNode()->setVisible(false);
@@ -602,7 +619,7 @@ void ProfileWidget2::setProfileState()
 	currentState = PROFILE;
 	MainWindow::instance()->setToolButtonsEnabled(true);
 	toolTipItem->readPos();
-	setBackgroundBrush(getColor(::BACKGROUND));
+	setBackgroundBrush(getColor(::BACKGROUND, isGrayscale));
 
 	background->setVisible(false);
 	toolTipItem->setVisible(true);
@@ -624,6 +641,9 @@ void ProfileWidget2::setProfileState()
 		temperatureAxis->setLine(itemPos.temperature.expanded);
 		cylinderPressureAxis->setLine(itemPos.cylinder.expanded);
 	}
+	pn2GasItem->setVisible(s.value("pn2graph").toBool());
+	po2GasItem->setVisible(s.value("po2graph").toBool());
+	pheGasItem->setVisible(s.value("phegraph").toBool());
 
 	gasYAxis->setPos(itemPos.partialPressure.pos.on);
 	gasYAxis->setLine(itemPos.partialPressure.expanded);
@@ -783,4 +803,10 @@ void ProfileWidget2::changeGas()
 	MainWindow::instance()->information()->updateDiveInfo(selected_dive);
 	mark_divelist_changed(true);
 	replot();
+}
+
+void ProfileWidget2::setPrintMode(bool mode, bool grayscale)
+{
+	printMode = mode;
+	isGrayscale = mode ? grayscale : false;
 }

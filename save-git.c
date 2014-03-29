@@ -15,6 +15,18 @@
 #include "membuffer.h"
 #include "ssrf-version.h"
 
+/*
+ * handle libgit2 revision 0.20 and earlier
+ */
+#if !LIBGIT2_VER_MAJOR && LIBGIT2_VER_MINOR <= 20 && !defined(USE_LIBGIT21_API)
+  #define GIT_CHECKOUT_OPTIONS_INIT GIT_CHECKOUT_OPTS_INIT
+  #define git_checkout_options git_checkout_opts
+  #define git_branch_create(out,repo,branch_name,target,force,sig,msg) \
+	git_branch_create(out,repo,branch_name,target,force)
+  #define git_reference_set_target(out,ref,target,signature,log_message) \
+	git_reference_set_target(out,ref,target)
+#endif
+
 #define VA_BUF(b, fmt) do { va_list args; va_start(args, fmt); put_vformat(b, fmt, args); va_end(args); } while (0)
 
 static void cond_put_format(int cond, struct membuffer *b, const char *fmt, ...)
@@ -776,16 +788,37 @@ static git_object *try_to_find_parent(const char *hex_id, git_repository *repo)
 	return (git_object *)commit;
 }
 
-/*
- * libgit2 revision 0.20 and earlier do not have the signature and
- * message log arguments.
- */
-#if !LIBGIT2_VER_MAJOR && LIBGIT2_VER_MINOR <= 20 && !defined(USE_LIBGIT21_API)
-  #define git_branch_create(out,repo,branch_name,target,force,sig,msg) \
-	git_branch_create(out,repo,branch_name,target,force)
-  #define git_reference_set_target(out,ref,target,signature,log_message) \
-	git_reference_set_target(out,ref,target)
-#endif
+static int notify_cb(git_checkout_notify_t why,
+	const char *path,
+	const git_diff_file *baseline,
+	const git_diff_file *target,
+	const git_diff_file *workdir,
+	void *payload)
+{
+	report_error("File '%s' does not match in working tree", path);
+	return 0; /* Continue with checkout */
+}
+
+static git_tree *get_git_tree(git_repository *repo, git_object *parent)
+{
+	git_tree *tree;
+	if (!parent)
+		return NULL;
+	if (git_tree_lookup(&tree, repo, git_commit_tree_id((const git_commit *) parent)))
+		return NULL;
+	return tree;
+}
+
+static int update_git_checkout(git_repository *repo, git_object *parent, git_tree *tree)
+{
+	git_checkout_options opts = GIT_CHECKOUT_OPTIONS_INIT;
+
+	opts.checkout_strategy = GIT_CHECKOUT_SAFE;
+	opts.notify_flags = GIT_CHECKOUT_NOTIFY_CONFLICT | GIT_CHECKOUT_NOTIFY_DIRTY;
+	opts.notify_cb = notify_cb;
+	opts.baseline = get_git_tree(repo, parent);
+	return git_checkout_tree(repo, (git_object *) tree, &opts);
+}
 
 static int create_new_commit(git_repository *repo, const char *branch, git_oid *tree_id)
 {
@@ -849,6 +882,22 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 		if (git_branch_create(&ref, repo, branch, commit, 0, author, "Create branch"))
 			return report_error("Failed to create branch '%s'", branch);
 	}
+	/*
+	 * If it's a checked-out branch, try to also update the working
+	 * tree and index. If that fails (dirty working tree or whatever),
+	 * this is not technically a save error (we did save things in
+	 * the object database), but it can cause extreme confusion, so
+	 * warn about it.
+	 */
+	if (git_branch_is_head(ref) && !git_repository_is_bare(repo)) {
+		if (update_git_checkout(repo, parent, tree)) {
+			const git_error *err = giterr_last();
+			const char *errstr = err ? err->message : strerror(errno);
+			report_error("Git branch '%s' is checked out, but worktree is dirty (%s)",
+				branch, errstr);
+		}
+	}
+
 	if (git_reference_set_target(&ref, ref, &commit_id, author, "Subsurface save event"))
 		return report_error("Failed to update branch '%s'", branch);
 	set_git_id(&commit_id);

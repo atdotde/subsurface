@@ -36,8 +36,13 @@
 #include "simplewidgets.h"
 #include "diveplanner.h"
 #include "about.h"
+#ifndef NO_PRINTING
 #include "printdialog.h"
+#endif
 #include "divelogimportdialog.h"
+#ifndef NO_USERMANUAL
+#include "usermanual.h"
+#endif
 
 MainWindow *MainWindow::m_Instance = NULL;
 
@@ -80,6 +85,16 @@ MainWindow::MainWindow() : QMainWindow(),
 
 #ifndef ENABLE_PLANNER
 	ui.menuLog->removeAction(ui.actionDivePlanner);
+#endif
+#ifdef NO_MARBLE
+	ui.layoutWidget->hide();
+	ui.menuView->removeAction(ui.actionViewGlobe);
+#endif
+#ifdef NO_USERMANUAL
+	ui.menuHelp->removeAction(ui.actionUserManual);
+#endif
+#ifdef NO_PRINTING
+	ui.menuFile->removeAction(ui.actionPrint);
 #endif
 }
 
@@ -264,9 +279,11 @@ void MainWindow::on_actionExportUDDF_triggered()
 
 void MainWindow::on_actionPrint_triggered()
 {
+#ifndef NO_PRINTING
 	PrintDialog dlg(this);
 
 	dlg.exec();
+#endif
 }
 
 void MainWindow::disableDcShortcuts()
@@ -550,10 +567,12 @@ void MainWindow::on_actionAboutSubsurface_triggered()
 
 void MainWindow::on_actionUserManual_triggered()
 {
+#ifndef NO_USERMANUAL
 	if (!helpView) {
 		helpView = new UserManual();
 	}
 	helpView->show();
+#endif
 }
 
 QString MainWindow::filter()
@@ -645,8 +664,9 @@ void MainWindow::readSettings()
 {
 	QSettings s;
 	s.beginGroup("Display");
-	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
-	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
+	QFont defaultFont = QFont(default_prefs.divelist_font);
+	defaultFont = s.value("divelist_font", defaultFont).value<QFont>();
+	defaultFont.setPointSizeF(s.value("font_size", default_prefs.font_size).toFloat());
 	qApp->setFont(defaultFont);
 	s.endGroup();
 
@@ -909,6 +929,7 @@ int MainWindow::file_save_as(void)
 		return -1;
 	}
 
+	showError(get_error_string());
 	set_filename(filename.toUtf8().data(), true);
 	setTitle(MWTF_FILENAME);
 	mark_divelist_changed(false);
@@ -938,6 +959,7 @@ int MainWindow::file_save(void)
 		showError(get_error_string());
 		return -1;
 	}
+	showError(get_error_string());
 	mark_divelist_changed(false);
 	addRecentFile(QStringList() << QString(existing_filename));
 	return 0;

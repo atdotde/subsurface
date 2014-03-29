@@ -39,6 +39,7 @@ struct preferences {
 	struct units units;
 	short show_sac;
 	bool display_unused_tanks;
+	bool show_average_depth;
 	bool zoomed_plot;
 	bool text_label_with_units;
 };
@@ -64,6 +65,7 @@ extern void subsurface_flush_conf(void);
 extern void subsurface_close_conf(void);
 
 extern const char system_divelist_default_font[];
+extern const int system_divelist_default_font_size;
 extern const char *system_default_filename();
 
 extern void load_preferences(void);

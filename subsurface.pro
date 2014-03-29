@@ -4,7 +4,8 @@ QT = core gui network svg
 lessThan(QT_MAJOR_VERSION, 5) {
 	QT += webkit
 } else {
-	QT += webkitwidgets
+	!android: QT += webkitwidgets
+	android: QT += androidextras
 }
 INCLUDEPATH += qt-ui $$PWD
 DEPENDPATH += qt-ui
@@ -75,6 +76,12 @@ HEADERS = \
 	qt-ui/profile/divetooltipitem.h \
 	qt-ui/profile/ruleritem.h
 
+android: HEADERS -= \
+	qt-ui/usermanual.h \
+	qt-ui/printdialog.h \
+	qt-ui/printlayout.h \
+	qt-ui/printoptions.h
+
 SOURCES =  \
 	deco.c \
 	device.c \
@@ -140,9 +147,16 @@ SOURCES =  \
 	qt-ui/profile/divetooltipitem.cpp \
 	qt-ui/profile/ruleritem.cpp
 
-linux*: SOURCES += linux.c
+android: SOURCES += android.cpp
+else: linux*: SOURCES += linux.c
 mac: SOURCES += macos.c
 win32: SOURCES += windows.c
+
+android: SOURCES -= \
+	qt-ui/usermanual.cpp \
+	qt-ui/printdialog.cpp \
+	qt-ui/printlayout.cpp \
+	qt-ui/printoptions.cpp
 
 FORMS = \
 	qt-ui/about.ui \
@@ -160,6 +174,9 @@ FORMS = \
 	qt-ui/tableview.ui \
 	qt-ui/divelogimportdialog.ui \
 	qt-ui/usermanual.ui
+
+# Nether usermanual or printing is supported on android right now
+android: FORMS -= qt-ui/usermanual.ui qt-ui/printoptions.ui
 
 RESOURCES = subsurface.qrc
 
@@ -207,6 +224,10 @@ QTTRANSLATIONS = \
 doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation || $(MKDIR) $$OUT_PWD/Documentation $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
 all.depends += doc
 QMAKE_EXTRA_TARGETS += doc all
+
+marbledata.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/marbledata || $(COPY_DIR) $$PWD/marbledata $$OUT_PWD
+all.depends += marbledata
+QMAKE_EXTRA_TARGETS += marbledata
 
 DESKTOP_FILE = subsurface.desktop
 mac: ICON = packaging/macosx/Subsurface.icns
