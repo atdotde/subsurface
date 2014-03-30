@@ -36,8 +36,13 @@
 #include "simplewidgets.h"
 #include "diveplanner.h"
 #include "about.h"
+#ifndef NO_PRINTING
 #include "printdialog.h"
+#endif
 #include "divelogimportdialog.h"
+#ifndef NO_USERMANUAL
+#include "usermanual.h"
+#endif
 
 MainWindow *MainWindow::m_Instance = NULL;
 
@@ -80,6 +85,16 @@ MainWindow::MainWindow() : QMainWindow(),
 
 #ifndef ENABLE_PLANNER
 	ui.menuLog->removeAction(ui.actionDivePlanner);
+#endif
+#ifdef NO_MARBLE
+	ui.layoutWidget->hide();
+	ui.menuView->removeAction(ui.actionViewGlobe);
+#endif
+#ifdef NO_USERMANUAL
+	ui.menuHelp->removeAction(ui.actionUserManual);
+#endif
+#ifdef NO_PRINTING
+	ui.menuFile->removeAction(ui.actionPrint);
 #endif
 }
 
@@ -264,9 +279,11 @@ void MainWindow::on_actionExportUDDF_triggered()
 
 void MainWindow::on_actionPrint_triggered()
 {
+#ifndef NO_PRINTING
 	PrintDialog dlg(this);
 
 	dlg.exec();
+#endif
 }
 
 void MainWindow::disableDcShortcuts()
@@ -550,10 +567,12 @@ void MainWindow::on_actionAboutSubsurface_triggered()
 
 void MainWindow::on_actionUserManual_triggered()
 {
+#ifndef NO_USERMANUAL
 	if (!helpView) {
 		helpView = new UserManual();
 	}
 	helpView->show();
+#endif
 }
 
 QString MainWindow::filter()

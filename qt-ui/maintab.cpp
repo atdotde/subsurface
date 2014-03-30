@@ -88,8 +88,9 @@ MainTab::MainTab(QWidget *parent) : QTabWidget(parent),
 
 	ui.cylinders->view()->setItemDelegateForColumn(CylindersModel::TYPE, new TankInfoDelegate(this));
 	ui.weights->view()->setItemDelegateForColumn(WeightModel::TYPE, new WSInfoDelegate(this));
-	// disabled as this column is pointless outside the disabled planner
-	// ui.cylinders->view()->setColumnHidden(CylindersModel::DEPTH, true);
+#ifdef ENABLE_PLANNER
+	ui.cylinders->view()->setColumnHidden(CylindersModel::DEPTH, true);
+#endif
 	completers.buddy = new QCompleter(&buddyModel, ui.buddy);
 	completers.divemaster = new QCompleter(&diveMasterModel, ui.divemaster);
 	completers.location = new QCompleter(&locationModel, ui.location);
@@ -633,6 +634,7 @@ void MainTab::acceptChanges()
 						d->cylinder[i] = multiEditEquipmentPlaceholder.cylinder[i];
 				}
 			}
+			MainWindow::instance()->graphics()->replot();
 		}
 
 		if (weightModel->changed) {
@@ -851,14 +853,20 @@ void markChangedWidget(QWidget *w)
 
 void MainTab::on_buddy_textChanged()
 {
-	QString text = ui.buddy->toPlainText().split(",", QString::SkipEmptyParts).join(", ");
+	QStringList text_list = ui.buddy->toPlainText().split(",", QString::SkipEmptyParts);
+	for (int i = 0; i < text_list.size(); i++)
+		text_list[i] = text_list[i].trimmed();
+	QString text = text_list.join(", ");
 	EDIT_SELECTED_DIVES(EDIT_TEXT(mydive->buddy, text));
 	markChangedWidget(ui.buddy);
 }
 
 void MainTab::on_divemaster_textChanged()
 {
-	QString text = ui.divemaster->toPlainText().split(",", QString::SkipEmptyParts).join(", ");
+	QStringList text_list = ui.divemaster->toPlainText().split(",", QString::SkipEmptyParts);
+	for (int i = 0; i < text_list.size(); i++)
+		text_list[i] = text_list[i].trimmed();
+	QString text = text_list.join(", ");
 	EDIT_SELECTED_DIVES(EDIT_TEXT(mydive->divemaster, text));
 	markChangedWidget(ui.divemaster);
 }
