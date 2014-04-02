@@ -176,6 +176,7 @@ class DivePlannerGraphics : public QGraphicsView {
 	Q_OBJECT
 public:
 	DivePlannerGraphics(QWidget *parent = 0);
+	bool addingDeco;
 
 protected:
 	virtual void mouseDoubleClickEvent(QMouseEvent *event);

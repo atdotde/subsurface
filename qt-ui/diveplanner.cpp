@@ -57,6 +57,7 @@ DivePlannerGraphics::DivePlannerGraphics(QWidget *parent) : QGraphicsView(parent
 	minDepth(M_OR_FT(40, 120)),
 	dpMaxTime(0)
 {
+	addingDeco = false;
 	setBackgroundBrush(profile_color[BACKGROUND].at(0));
 	setMouseTracking(true);
 	setScene(new QGraphicsScene());
@@ -182,7 +183,8 @@ void DivePlannerGraphics::pointInserted(const QModelIndex &parent, int start, in
 	gasChooseBtn->setZValue(10);
 	gasChooseBtn->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 	gases << gasChooseBtn;
-	drawProfile();
+	if(!addingDeco)
+		drawProfile();
 }
 
 void DivePlannerGraphics::keyDownAction()
@@ -520,8 +522,14 @@ void DivePlannerGraphics::drawProfile()
 			item->setPen(QPen(QBrush(Qt::red), 0));
 			scene()->addItem(item);
 			lines << item;
-			if (dp->depth)
+			if (dp->depth) {
 				qDebug() << "Time: " << dp->time / 60 << " depth: " << dp->depth / 1000;
+				addingDeco = true;
+				plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
+				addingDeco = false;
+				qDebug() << "Point added";
+
+			}	
 		}
 		lastx = xpos;
 		lasty = ypos;
@@ -1415,8 +1423,8 @@ void DivePlannerPointsModel::createTemporaryPlan()
 		divedatapoint p = at(i);
 		int deltaT = lastIndex != -1 ? p.time - at(lastIndex).time : p.time;
 		lastIndex = i;
-		p.entered = true;
-		plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2, true);
+		if (p.entered)
+			plan_add_segment(&diveplan, deltaT, p.depth, p.o2, p.he, p.po2, true);
 	}
 	char *cache = NULL;
 	tempDive = NULL;
