@@ -28,6 +28,7 @@ class MainTab;
 class ProfileGraphicsView;
 class QWebView;
 class QSettings;
+class UpdateManager;
 
 enum MainWindowTitleFormat {
 	MWTF_DEFAULT,
@@ -90,6 +91,7 @@ slots:
 	void on_actionSaveAs_triggered();
 	void on_actionClose_triggered();
 	void on_actionExportUDDF_triggered();
+	void on_actionExportHTMLworldmap_triggered();
 	void on_actionPrint_triggered();
 	void on_actionPreferences_triggered();
 	void on_actionQuit_triggered();
@@ -120,6 +122,7 @@ slots:
 	void on_actionAboutSubsurface_triggered();
 	void on_actionUserManual_triggered();
 	void on_actionDivePlanner_triggered();
+	void on_action_Check_for_Updates_triggered();
 
 	void current_dive_changed(int divenr);
 	void initialUiSetup();
@@ -170,6 +173,7 @@ private:
 	QString lastUsedDir();
 	void updateLastUsedDir(const QString &s);
 	bool filesAsArguments;
+	UpdateManager *updateManager;
 };
 
 MainWindow *mainWindow();

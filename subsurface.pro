@@ -28,6 +28,8 @@ HEADERS = \
 	helpers.h \
 	libdivecomputer.h \
 	planner.h \
+	worldmap-save.h \
+	worldmap-options.h \
 	pref.h \
 	profile.h \
 	qt-gui.h \
@@ -74,7 +76,8 @@ HEADERS = \
 	qt-ui/profile/diveprofileitem.h \
 	qt-ui/profile/diveeventitem.h \
 	qt-ui/profile/divetooltipitem.h \
-	qt-ui/profile/ruleritem.h
+	qt-ui/profile/ruleritem.h \
+	qt-ui/updatemanager.h
 
 android: HEADERS -= \
 	qt-ui/usermanual.h \
@@ -97,6 +100,7 @@ SOURCES =  \
 	parse-xml.c \
 	planner.c \
 	profile.c \
+	worldmap-save.c \
 	qt-gui.cpp \
 	qthelper.cpp \
 	qt-ui/about.cpp \
@@ -145,7 +149,8 @@ SOURCES =  \
 	qt-ui/profile/diveprofileitem.cpp \
 	qt-ui/profile/diveeventitem.cpp \
 	qt-ui/profile/divetooltipitem.cpp \
-	qt-ui/profile/ruleritem.cpp
+	qt-ui/profile/ruleritem.cpp \
+	qt-ui/updatemanager.cpp
 
 android: SOURCES += android.cpp
 else: linux*: SOURCES += linux.c

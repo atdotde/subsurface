@@ -36,6 +36,8 @@
 #include "simplewidgets.h"
 #include "diveplanner.h"
 #include "about.h"
+#include "worldmap-save.h"
+#include "updatemanager.h"
 #ifndef NO_PRINTING
 #include "printdialog.h"
 #endif
@@ -52,7 +54,8 @@ MainWindow::MainWindow() : QMainWindow(),
 	helpView(0),
 	yearlyStats(0),
 	yearlyStatsModel(0),
-	state(VIEWALL)
+	state(VIEWALL),
+	updateManager(0)
 {
 	Q_ASSERT_X(m_Instance == NULL, "MainWindow", "MainWindow recreated!");
 	m_Instance = this;
@@ -83,8 +86,9 @@ MainWindow::MainWindow() : QMainWindow(),
 	ui.divePlanner->settingsChanged();
 	ui.divePlannerWidget->settingsChanged();
 
+
 #ifndef ENABLE_PLANNER
-	ui.menuLog->removeAction(ui.actionDivePlanner);
+//	ui.menuLog->removeAction(ui.actionDivePlanner);
 #endif
 #ifdef NO_MARBLE
 	ui.layoutWidget->hide();
@@ -275,6 +279,15 @@ void MainWindow::on_actionExportUDDF_triggered()
 							tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
 		export_dives_uddf(filename.toUtf8(), false);
+}
+
+void MainWindow::on_actionExportHTMLworldmap_triggered()
+{
+	QFileInfo fi(system_default_filename());
+	QString filename = QFileDialog::getSaveFileName(this, tr("Export World Map"), fi.absolutePath(),
+							tr("HTML files (*.html)"));
+	if (!filename.isNull() && !filename.isEmpty())
+		export_worldmap_HTML(filename.toUtf8().data());
 }
 
 void MainWindow::on_actionPrint_triggered()
@@ -563,6 +576,14 @@ void MainWindow::on_actionAboutSubsurface_triggered()
 	SubsurfaceAbout dlg(this);
 
 	dlg.exec();
+}
+
+void MainWindow::on_action_Check_for_Updates_triggered()
+{
+	if (!updateManager)
+		updateManager = new UpdateManager(this);
+
+	updateManager->checkForUpdates();
 }
 
 void MainWindow::on_actionUserManual_triggered()
