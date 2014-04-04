@@ -518,11 +518,11 @@ void DivePlannerGraphics::drawProfile()
 
 	addingDeco = true;
 	QVector<int> computedPoints;
-	for (int i = 0; i < plannerModel->rowCount(); i++) 
+	for (int i = 0; i < plannerModel->rowCount(); i++)
 		if (!plannerModel->at(i).entered)
 			computedPoints.push_back(i);
 	plannerModel->removeSelectedPoints(computedPoints);
-	
+
 	int lastdepth = 0;
 	for (dp = diveplan.dp; dp != NULL; dp = dp->next) {
 		if (dp->time == 0) // magic entry for available tank
@@ -539,7 +539,7 @@ void DivePlannerGraphics::drawProfile()
 				if (dp->depth == lastdepth)
 					plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
 				lastdepth = dp->depth;
-			}	
+			}
 		}
 		lastx = xpos;
 		lasty = ypos;
@@ -1052,8 +1052,13 @@ QVariant DivePlannerPointsModel::data(const QModelIndex &index, int role) const
 			return (double)p.po2 / 1000;
 		case DEPTH:
 			return rint(get_depth_units(p.depth, NULL, NULL));
-		case DURATION:
+		case RUNTIME:
 			return p.time / 60;
+		case DURATION:
+			if (index.row())
+				return (p.time - divepoints.at(index.row() -1).time) / 60;
+			else
+				return p.time / 60;
 		case GAS:
 			return dpGasToStr(p);
 		}
@@ -1063,7 +1068,13 @@ QVariant DivePlannerPointsModel::data(const QModelIndex &index, int role) const
 			return QIcon(":trash");
 		}
 	} else if (role == Qt::FontRole) {
-		return defaultModelFont();
+		if (divepoints.at(index.row()).entered) {
+			return defaultModelFont();
+		} else {
+			QFont font = defaultModelFont();
+			font.setBold(true);
+			return font;
+		}
 	}
 	return QVariant();
 }
@@ -1078,8 +1089,14 @@ bool DivePlannerPointsModel::setData(const QModelIndex &index, const QVariant &v
 		case DEPTH:
 			p.depth = units_to_depth(value.toInt());
 			break;
-		case DURATION:
+		case RUNTIME:
 			p.time = value.toInt() * 60;
+			break;
+		case DURATION:
+			if (index.row())
+				p.time = value.toInt() * 60 + divepoints[index.row() - 1].time;
+			else
+				p.time = value.toInt() * 60;
 			break;
 		case CCSETPOINT: {
 			int po2 = 0;
@@ -1106,6 +1123,8 @@ QVariant DivePlannerPointsModel::headerData(int section, Qt::Orientation orienta
 		switch (section) {
 		case DEPTH:
 			return tr("Final Depth");
+		case RUNTIME:
+			return tr("Run time");
 		case DURATION:
 			return tr("Duration");
 		case GAS:
