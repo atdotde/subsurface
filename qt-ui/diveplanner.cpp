@@ -516,6 +516,14 @@ void DivePlannerGraphics::drawProfile()
 	QPolygonF poly;
 	poly.append(QPointF(lastx, lasty));
 
+	addingDeco = true;
+	QVector<int> computedPoints;
+	for (int i = 0; i < plannerModel->rowCount(); i++) 
+		if (!plannerModel->at(i).entered)
+			computedPoints.push_back(i);
+	plannerModel->removeSelectedPoints(computedPoints);
+	
+	int lastdepth = 0;
 	for (dp = diveplan.dp; dp != NULL; dp = dp->next) {
 		if (dp->time == 0) // magic entry for available tank
 			continue;
@@ -524,21 +532,20 @@ void DivePlannerGraphics::drawProfile()
 		if (!dp->entered) {
 			QGraphicsLineItem *item = new QGraphicsLineItem(lastx, lasty, xpos, ypos);
 			item->setPen(QPen(QBrush(Qt::red), 0));
+
 			scene()->addItem(item);
 			lines << item;
 			if (dp->depth) {
-				qDebug() << "Time: " << dp->time / 60 << " depth: " << dp->depth / 1000;
-				addingDeco = true;
-				plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
-				addingDeco = false;
-				qDebug() << "Point added";
-
+				if (dp->depth == lastdepth)
+					plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
+				lastdepth = dp->depth;
 			}	
 		}
 		lastx = xpos;
 		lasty = ypos;
 		poly.append(QPointF(lastx, lasty));
 	}
+	addingDeco = false;
 
 	qDebug() << " ";
 
