@@ -29,6 +29,8 @@
 #define MAX_DEPTH M_OR_FT(150, 450)
 #define MIN_DEPTH M_OR_FT(20, 60)
 
+#define DEBUG_PLAN 1
+
 QString gasToStr(const int o2Permille, const int hePermille)
 {
 	uint o2 = (o2Permille + 5) / 10, he = (hePermille + 5) / 10;
@@ -458,6 +460,8 @@ QStringList &DivePlannerPointsModel::getGasList()
 
 void DivePlannerGraphics::drawProfile()
 {
+	if(addingDeco)
+		return;
 	qDeleteAll(lines);
 	lines.clear();
 
