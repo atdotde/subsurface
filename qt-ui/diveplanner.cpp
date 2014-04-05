@@ -1527,10 +1527,14 @@ void DivePlannerPointsModel::createPlan()
 		// FIXME: The epic assumption that all the cylinders after the first is deco
 		int sac = i ? diveplan.decosac : diveplan.bottomsac;
 		cyl->start.mbar = cyl->type.workingpressure.mbar;
-		int consumption = ((depth_to_mbar(mean[i], tempDive) * duration[i] / 60) * sac) / (cyl->type.size.mliter / 1000);
-		cyl->end.mbar = cyl->start.mbar - consumption;
+		if(cyl->type.size.mliter) {
+			int consumption = ((depth_to_mbar(mean[i], tempDive) * duration[i] / 60) * sac) / (cyl->type.size.mliter / 1000);
+			cyl->end.mbar = cyl->start.mbar - consumption;
+		} else {
+			/* Cylider without a proper size are easily emptied */
+			cyl->end.mbar = 0;
+		}
 	}
-
 	mark_divelist_changed(true);
 
 	// Remove and clean the diveplan, so we don't delete
