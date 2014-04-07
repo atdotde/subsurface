@@ -20,6 +20,7 @@ public:
 		REMOVE,
 		DEPTH,
 		DURATION,
+		RUNTIME,
 		GAS,
 		CCSETPOINT,
 		COLUMNS
