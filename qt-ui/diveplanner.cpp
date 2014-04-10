@@ -1140,7 +1140,10 @@ QVariant DivePlannerPointsModel::headerData(int section, Qt::Orientation orienta
 
 Qt::ItemFlags DivePlannerPointsModel::flags(const QModelIndex &index) const
 {
-	return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+	if(index.column() !=  DURATION)
+		return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+	else
+		return QAbstractItemModel::flags(index);
 }
 
 int DivePlannerPointsModel::rowCount(const QModelIndex &parent) const
