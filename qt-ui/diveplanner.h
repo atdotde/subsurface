@@ -55,6 +55,8 @@ public:
 	struct diveplan getDiveplan();
 	QStringList &getGasList();
 	QVector<QPair<int, int> > collectGases(dive *d);
+	int lastEnteredPoint();
+	static bool addingDeco;
 
 public
 slots:
@@ -177,7 +179,6 @@ class DivePlannerGraphics : public QGraphicsView {
 	Q_OBJECT
 public:
 	DivePlannerGraphics(QWidget *parent = 0);
-	bool addingDeco;
 
 protected:
 	virtual void mouseDoubleClickEvent(QMouseEvent *event);
