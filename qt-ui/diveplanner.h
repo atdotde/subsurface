@@ -42,6 +42,8 @@ public:
 	void createSimpleDive();
 	void clear();
 	Mode currentMode() const;
+	void setRecalc(bool recalc);
+	bool recalcQ();
 	void tanksUpdated();
 	void rememberTanks();
 	bool tankInUse(int o2, int he);
@@ -76,6 +78,7 @@ slots:
 	void deleteTemporaryPlan();
 	void loadFromDive(dive *d);
 	void restoreBackupDive();
+
 signals:
 	void planCreated();
 	void planCanceled();
@@ -85,6 +88,7 @@ private:
 	bool addGas(int o2, int he);
 	struct diveplan diveplan;
 	Mode mode;
+	bool recalc;
 	QVector<divedatapoint> divepoints;
 	struct dive *tempDive;
 	struct dive backupDive;

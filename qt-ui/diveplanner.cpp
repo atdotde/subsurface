@@ -184,7 +184,7 @@ void DivePlannerGraphics::pointInserted(const QModelIndex &parent, int start, in
 	gasChooseBtn->setZValue(10);
 	gasChooseBtn->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 	gases << gasChooseBtn;
-	if(!plannerModel->addingDeco)
+	if(plannerModel->recalcQ())
 		drawProfile();
 }
 
@@ -459,7 +459,7 @@ QStringList &DivePlannerPointsModel::getGasList()
 
 void DivePlannerGraphics::drawProfile()
 {
-	if(plannerModel->addingDeco)
+	if(plannerModel->recalcQ())
 		return;
 	qDeleteAll(lines);
 	lines.clear();
@@ -515,7 +515,7 @@ void DivePlannerGraphics::drawProfile()
 	QPolygonF poly;
 	poly.append(QPointF(lastx, lasty));
 
-	plannerModel->addingDeco = true;
+	plannerModel->setRecalc(false);
 	QVector<int> computedPoints;
 	for (int i = 0; i < plannerModel->rowCount(); i++)
 		if (!plannerModel->at(i).entered)
@@ -544,7 +544,7 @@ void DivePlannerGraphics::drawProfile()
 		lasty = ypos;
 		poly.append(QPointF(lastx, lasty));
 	}
-	plannerModel->addingDeco = false;
+	plannerModel->setRecalc(true);
 
 	qDebug() << " ";
 
@@ -953,7 +953,7 @@ DivePlannerWidget::DivePlannerWidget(QWidget *parent, Qt::WindowFlags f) : QWidg
 	ui.setupUi(this);
 	ui.tableWidget->setTitle(tr("Dive Planner Points"));
 	ui.tableWidget->setModel(DivePlannerPointsModel::instance());
-	DivePlannerPointsModel::instance()->addingDeco = false;
+	DivePlannerPointsModel::instance()->setRecalc(true);
 	ui.tableWidget->view()->setItemDelegateForColumn(DivePlannerPointsModel::GAS, new AirTypesDelegate(this));
 	ui.cylinderTableWidget->setTitle(tr("Available Gases"));
 	ui.cylinderTableWidget->setModel(CylindersModel::instance());
@@ -1036,6 +1036,16 @@ void DivePlannerPointsModel::setPlanMode(Mode m)
 bool DivePlannerPointsModel::isPlanner()
 {
 	return mode == PLAN;
+}
+
+void DivePlannerPointsModel::setRecalc(bool rec)
+{
+	recalc = rec;
+}
+
+bool DivePlannerPointsModel::recalcQ()
+{
+	return recalc;
 }
 
 int DivePlannerPointsModel::columnCount(const QModelIndex &parent) const
@@ -1298,13 +1308,13 @@ int DivePlannerPointsModel::addStop(int milimeters, int seconds, int o2, int he,
 			}
 		}
 	}
-	addingDeco = true;
+	setRecalc(false);
 	QVector<int> computedPoints;
 	for (int i = 0; i < plannerModel->rowCount(); i++)
 		if (!plannerModel->at(i).entered)
 			computedPoints.push_back(i);
 	plannerModel->removeSelectedPoints(computedPoints);
-	addingDeco = false;
+	setRecalc(true);
 	// add the new stop
 	beginInsertRows(QModelIndex(), row, row);
 	divedatapoint point;
