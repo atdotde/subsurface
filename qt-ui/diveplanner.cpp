@@ -459,7 +459,7 @@ QStringList &DivePlannerPointsModel::getGasList()
 
 void DivePlannerGraphics::drawProfile()
 {
-	if(plannerModel->recalcQ())
+	if(!plannerModel->recalcQ())
 		return;
 	qDeleteAll(lines);
 	lines.clear();
