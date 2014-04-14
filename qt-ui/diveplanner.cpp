@@ -515,7 +515,7 @@ void DivePlannerGraphics::drawProfile()
 	QPolygonF poly;
 	poly.append(QPointF(lastx, lasty));
 
-	plannerModel->setRecalc(false);
+	bool oldRecalc = plannerModel->setRecalc(false);
 	QVector<int> computedPoints;
 	for (int i = 0; i < plannerModel->rowCount(); i++)
 		if (!plannerModel->at(i).entered)
@@ -544,7 +544,7 @@ void DivePlannerGraphics::drawProfile()
 		lasty = ypos;
 		poly.append(QPointF(lastx, lasty));
 	}
-	plannerModel->setRecalc(true);
+	plannerModel->setRecalc(oldRecalc);
 
 	qDebug() << " ";
 
@@ -1038,9 +1038,11 @@ bool DivePlannerPointsModel::isPlanner()
 	return mode == PLAN;
 }
 
-void DivePlannerPointsModel::setRecalc(bool rec)
+bool DivePlannerPointsModel::setRecalc(bool rec)
 {
+	bool old = recalc;
 	recalc = rec;
+	return old;
 }
 
 bool DivePlannerPointsModel::recalcQ()
@@ -1308,13 +1310,15 @@ int DivePlannerPointsModel::addStop(int milimeters, int seconds, int o2, int he,
 			}
 		}
 	}
-	setRecalc(false);
-	QVector<int> computedPoints;
-	for (int i = 0; i < plannerModel->rowCount(); i++)
-		if (!plannerModel->at(i).entered)
-			computedPoints.push_back(i);
-	plannerModel->removeSelectedPoints(computedPoints);
-	setRecalc(true);
+	bool oldRecalc = setRecalc(false);
+	if (oldRecalc){
+		QVector<int> computedPoints;
+		for (int i = 0; i < plannerModel->rowCount(); i++)
+			if (!plannerModel->at(i).entered)
+				computedPoints.push_back(i);
+		plannerModel->removeSelectedPoints(computedPoints);
+	}
+	setRecalc(oldRecalc);
 	// add the new stop
 	beginInsertRows(QModelIndex(), row, row);
 	divedatapoint point;

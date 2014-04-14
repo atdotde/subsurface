@@ -42,7 +42,7 @@ public:
 	void createSimpleDive();
 	void clear();
 	Mode currentMode() const;
-	void setRecalc(bool recalc);
+	bool setRecalc(bool recalc);
 	bool recalcQ();
 	void tanksUpdated();
 	void rememberTanks();
