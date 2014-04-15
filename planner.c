@@ -692,6 +692,20 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			break;	/* We are at the surface */
 
 
+		if (gi >= 0 && stoplevels[stopidx] == gaschanges[gi].depth) {
+			plan_add_segment(diveplan, clock - previous_point_time, depth, o2, he, po2, false);
+			previous_point_time = clock;
+			stopping = false;
+
+			current_cylinder = gaschanges[gi].gasidx;
+			o2 = dive->cylinder[current_cylinder].gasmix.o2.permille;
+			he = dive->cylinder[current_cylinder].gasmix.he.permille;
+#if DEBUG_PLAN & 16
+			printf("switch to gas %d (%d/%d) @ %5.2lfm\n", gaschanges[gi].gasidx,
+				       (o2 + 5) / 10, (he + 5) / 10, gaschanges[gi].depth / 1000.0);
+#endif
+			gi--;
+		}
 
 		/* if gaschange change gas 
 		 * in that case add point */
