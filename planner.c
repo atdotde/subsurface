@@ -405,14 +405,14 @@ struct gaschanges {
 	int gasidx;
 };
 
-static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive *dive, int *gaschangenr)
+static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive *dive, int *gaschangenr, int depth)
 {
 	int nr = 0;
 	struct gaschanges *gaschanges = NULL;
 	struct divedatapoint *dp = diveplan->dp;
 
 	while (dp) {
-		if (dp->time == 0) {
+		if (dp->time == 0 && dp->depth <= depth) {
 			int i = 0, j = 0;
 			nr++;
 			gaschanges = realloc(gaschanges, nr * sizeof(struct gaschanges));
@@ -660,7 +660,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	printf("depth %5.2lfm ceiling %5.2lfm\n", depth / 1000.0, ceiling / 1000.0);
 #endif
 	
-	gaschanges = analyze_gaslist(diveplan, dive, &gaschangenr);
+	gaschanges = analyze_gaslist(diveplan, dive, &gaschangenr, depth);
 	for (stopidx = 0; stopidx < sizeof(decostoplevels) / sizeof(int); stopidx++)
 		if (decostoplevels[stopidx] >= depth)
 			break;
@@ -670,7 +670,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	stopidx += gaschangenr;
 
 	clock = previous_point_time = dive->dc.sample[dive->dc.samples - 1].time.seconds;
-	gi = gaschangenr;
+	gi = gaschangenr - 1;
 	if (gaschanges)
 		current_cylinder = gaschanges[gi].gasidx;
 	else
@@ -696,7 +696,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		if (gi >= 0 && stoplevels[stopidx] == gaschanges[gi].depth) {
 			plan_add_segment(diveplan, clock - previous_point_time, depth, o2, he, po2, false);
 			previous_point_time = clock;
-			stopping = false;
+			stopping = true;
 
 			current_cylinder = gaschanges[gi].gasidx;
 			o2 = dive->cylinder[current_cylinder].gasmix.o2.permille;
