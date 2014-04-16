@@ -29,8 +29,6 @@
 #define MAX_DEPTH M_OR_FT(150, 450)
 #define MIN_DEPTH M_OR_FT(20, 60)
 
-#define DEBUG_PLAN 1
-
 QString gasToStr(const int o2Permille, const int hePermille)
 {
 	uint o2 = (o2Permille + 5) / 10, he = (hePermille + 5) / 10;
@@ -1262,11 +1260,11 @@ bool DivePlannerPointsModel::addGas(int o2, int he)
 int DivePlannerPointsModel::lastEnteredPoint()
 {
 	for (int i = divepoints.count()-1; i >= 0; i--)
-		if (divepoints.at(i).entered) 
+		if (divepoints.at(i).entered)
 			return i;
 	return -1;
 }
-			
+
 int DivePlannerPointsModel::addStop(int milimeters, int seconds, int o2, int he, int ccpoint, bool entered)
 {
 	int row = divepoints.count();

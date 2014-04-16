@@ -13,8 +13,6 @@
 #include "planner.h"
 #include "gettext.h"
 
-#define DEBUG_PLAN 1
-
 int decostoplevels[] = { 0, 3000, 6000, 9000, 12000, 15000, 18000, 21000, 24000, 27000,
 				  30000, 33000, 36000, 39000, 42000, 45000, 48000, 51000, 54000, 57000,
 				  60000, 63000, 66000, 69000, 72000, 75000, 78000, 81000, 84000, 87000,
@@ -657,12 +655,12 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	}
 
 	tissue_tolerance = tissue_at_end(dive, cached_datap);
-	
+
 #if DEBUG_PLAN & 4
 	printf("gas %d/%d\n", o2, he);
 	printf("depth %5.2lfm ceiling %5.2lfm\n", depth / 1000.0, ceiling / 1000.0);
 #endif
-	
+
 	gaschanges = analyze_gaslist(diveplan, dive, &gaschangenr, depth);
 	for (stopidx = 0; stopidx < sizeof(decostoplevels) / sizeof(int); stopidx++)
 		if (decostoplevels[stopidx] >= depth)
@@ -674,10 +672,6 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 
 	clock = previous_point_time = dive->dc.sample[dive->dc.samples - 1].time.seconds;
 	gi = gaschangenr - 1;
-	if (gaschanges)
-		current_cylinder = gaschanges[gi].gasidx;
-	else
-		current_cylinder = 0; /* Let's assume air by default */
 
 	while (1) {
 		/* We will break out when we hit the surface */
@@ -686,7 +680,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			int deltad = ascend_velocity(depth);
 			if (depth - deltad < stoplevels[stopidx])
 				deltad = depth - stoplevels[stopidx];
-			
+
 			tissue_tolerance = add_segment(depth_to_mbar(depth, dive) / 1000.0, &dive->cylinder[current_cylinder].gasmix, 1, po2, dive);
 			++clock;
 			depth -= deltad;
@@ -711,9 +705,6 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			gi--;
 		}
 
-		/* if gaschange change gas 
-		 * in that case add point */
-
 		/* trial ascend */
 		--stopidx;
 		int trial_depth = depth;
@@ -735,7 +726,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			/* The next stop is clear */
 			if(clear_to_ascend)
 				break;
-			
+
 			/* Wait a minute */
 			if (!stopping) {
 				plan_add_segment(diveplan, clock - previous_point_time, depth, o2, he, po2, false);
@@ -752,8 +743,8 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			previous_point_time = clock;
 			stopping = false;
 		}
-			
-	}	
+
+	}
 	plan_add_segment(diveplan, clock - previous_point_time, 0, o2, he, po2, false);
 	delete_single_dive(dive_table.nr - 1);
 	*divep = dive = create_dive_from_plan(diveplan);
