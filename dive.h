@@ -714,6 +714,12 @@ extern const char *saved_git_id;
 extern void clear_git_id(void);
 extern void set_git_id(const struct git_oid *);
 
+struct user_info {
+	const char *name;
+	const char *email;
+};
+
+extern void subsurface_user_info(struct user_info *);
 extern int subsurface_rename(const char *path, const char *newpath);
 extern int subsurface_open(const char *path, int oflags, mode_t mode);
 extern FILE *subsurface_fopen(const char *path, const char *mode);
@@ -886,6 +892,12 @@ extern double strtod_flags(const char *str, const char **ptr, unsigned int flags
 #define STRTOD_ASCII (STRTOD_NO_COMMA)
 
 #define ascii_strtod(str, ptr) strtod_flags(str, ptr, STRTOD_ASCII)
+
+extern short save_userid_local;
+extern char* userid;
+
+extern void set_save_userid_local(short value);
+extern void set_userid(char* user_id);
 
 #ifdef __cplusplus
 }

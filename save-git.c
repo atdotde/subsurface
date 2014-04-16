@@ -38,24 +38,11 @@ static void cond_put_format(int cond, struct membuffer *b, const char *fmt, ...)
 
 #define SAVE(str, x) cond_put_format(dive->x, b, str " %d\n", dive->x)
 
-static void put_degrees(struct membuffer *b, degrees_t value, const char sep)
-{
-	int udeg = value.udeg;
-	const char *sign = "";
-
-	if (udeg < 0) {
-		udeg = -udeg;
-		sign = "-";
-	}
-	put_format(b,"%s%u.%06u%c", sign, FRACTION(udeg, 1000000), sep);
-}
-
 static void show_gps(struct membuffer *b, degrees_t latitude, degrees_t longitude)
 {
 	if (latitude.udeg || longitude.udeg) {
-		put_string(b, "gps ");
-		put_degrees(b, latitude, ' ');
-		put_degrees(b, longitude, '\n');
+		put_degrees(b, latitude, "gps ", " ");
+		put_degrees(b, longitude, "", "\n");
 	}
 }
 
@@ -691,6 +678,13 @@ static struct dir *mktree(struct dir *dir, const char *fmt, ...)
 	return subdir;
 }
 
+static void save_userid(void *_b)
+{
+	struct membuffer *b = _b;
+	if (save_userid_local)
+		put_format(b, "userid %30s", userid);
+}
+
 static void save_one_device(void *_b, const char *model, uint32_t deviceid,
 	const char *nickname, const char *serial, const char *firmware)
 {
@@ -719,6 +713,7 @@ static void save_settings(git_repository *repo, struct dir *tree)
 	struct membuffer b = { 0 };
 
 	put_format(&b, "version %d\n", VERSION);
+	save_userid(&b);
 	call_for_each_dc(&b, save_one_device);
 	cond_put_format(autogroup, &b, "autogroup\n");
 
@@ -820,6 +815,24 @@ static int update_git_checkout(git_repository *repo, git_object *parent, git_tre
 	return git_checkout_tree(repo, (git_object *) tree, &opts);
 }
 
+static int get_authorship(git_repository *repo, git_signature **authorp)
+{
+#if LIBGIT2_VER_MAJOR || LIBGIT2_VER_MINOR >= 20
+	return git_signature_default(authorp, repo);
+#else
+	/* Default name information, with potential OS overrides */
+	struct user_info user = {
+		.name = "Subsurface",
+		.email = "subsurace@hohndel.org"
+	};
+
+	subsurface_user_info(&user);
+
+	/* git_signature_default() is too recent */
+	return git_signature_now(authorp, user.name, user.email);
+#endif
+}
+
 static int create_new_commit(git_repository *repo, const char *branch, git_oid *tree_id)
 {
 	int ret;
@@ -858,8 +871,7 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 	if (git_tree_lookup(&tree, repo, tree_id))
 		return report_error("Could not look up newly created tree");
 
-	/* git_signature_default() is too recent */
-	if (git_signature_now(&author, "Subsurface", "subsurface@hohndel.org"))
+	if (get_authorship(repo, &author))
 		return report_error("No user name configuration in git repo");
 
 	/* If the parent commit has the same tree ID, do not create a new commit */
@@ -901,6 +913,8 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 	if (git_reference_set_target(&ref, ref, &commit_id, author, "Subsurface save event"))
 		return report_error("Failed to update branch '%s'", branch);
 	set_git_id(&commit_id);
+
+	git_signature_free(author);
 
 	return 0;
 }
