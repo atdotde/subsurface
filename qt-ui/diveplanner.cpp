@@ -474,7 +474,7 @@ void DivePlannerGraphics::drawProfile()
 		return;
 	}
 	while (dp->next) {
-		if (dp->depth > max_depth)
+		if (dp->time && dp->depth > max_depth)
 			max_depth = dp->depth;
 		dp = dp->next;
 	}

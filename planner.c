@@ -207,6 +207,7 @@ void fill_default_cylinder(cylinder_t *cyl)
 		if (ti->psi)
 			cyl->type.size.mliter = cuft_to_l(ti->cuft) * 1000 / bar_to_atm(psi_to_bar(ti->psi));
 	}
+	cyl->depth.mm = 1600 * 1000 / O2_IN_AIR * 10 - 10000; // MOD of air
 }
 
 static int add_gas(struct dive *dive, int o2, int he)
