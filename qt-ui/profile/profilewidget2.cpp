@@ -13,6 +13,8 @@
 #include "planner.h"
 #include "device.h"
 #include "ruleritem.h"
+#include "dive.h"
+#include "pref.h"
 #include <libdivecomputer/parser.h>
 #include <QSignalTransition>
 #include <QPropertyAnimation>
@@ -159,7 +161,7 @@ void ProfileWidget2::setupItemOnScene()
 	gasYAxis->setLineSize(96);
 
 	heartBeatAxis->setOrientation(DiveCartesianAxis::BottomToTop);
-	heartBeatAxis->setTickSize(1);
+	heartBeatAxis->setTickSize(0.2);
 	heartBeatAxis->setTickInterval(10);
 	heartBeatAxis->setFontLabelScale(0.7);
 	heartBeatAxis->setLineSize(96);
@@ -193,6 +195,8 @@ void ProfileWidget2::setupItemOnScene()
 	setupItem(gasPressureItem, timeAxis, cylinderPressureAxis, dataModel, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
 	setupItem(temperatureItem, timeAxis, temperatureAxis, dataModel, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
 	setupItem(heartBeatItem, timeAxis, heartBeatAxis, dataModel, DivePlotDataModel::HEARTBEAT, DivePlotDataModel::TIME, 1);
+	heartBeatItem->setVisibilitySettingsKey("hrgraph");
+	heartBeatItem->preferencesChanged();
 	setupItem(diveProfileItem, timeAxis, profileYAxis, dataModel, DivePlotDataModel::DEPTH, DivePlotDataModel::TIME, 0);
 
 #define CREATE_PP_GAS(ITEM, VERTICAL_COLUMN, COLOR, COLOR_ALERT, THRESHOULD_SETTINGS, VISIBILITY_SETTINGS)              \
@@ -334,10 +338,8 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 
 	int animSpeedBackup = -1;
 	if (firstCall && MainWindow::instance()->filesFromCommandLine()) {
-		QSettings s;
-		s.beginGroup("Animations");
-		animSpeedBackup = s.value("animation_speed", 500).toInt();
-		s.setValue("animation_speed", 0);
+		animSpeedBackup = prefs.animation;
+		prefs.animation = 0;
 		firstCall = false;
 	}
 
@@ -400,11 +402,15 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 	temperatureAxis->setMinimum(pInfo.mintemp);
 	temperatureAxis->setMaximum(pInfo.maxtemp);
 
-	if (pInfo.maxhr) {
-		heartBeatAxis->setMinimum(pInfo.minhr);
-		heartBeatAxis->setMaximum(pInfo.maxhr);
-		heartBeatAxis->updateTicks(); // this shows the ticks
-		heartBeatAxis->setVisible(true);
+	if (heartBeatItem->isVisible()) {
+		if (pInfo.maxhr) {
+			heartBeatAxis->setMinimum(pInfo.minhr);
+			heartBeatAxis->setMaximum(pInfo.maxhr);
+			heartBeatAxis->updateTicks(); // this shows the ticks
+			heartBeatAxis->setVisible(true);
+		} else {
+			heartBeatAxis->setVisible(false);
+		}
 	} else {
 		heartBeatAxis->setVisible(false);
 	}
@@ -463,9 +469,7 @@ void ProfileWidget2::plotDives(QList<dive *> dives)
 	}
 	diveComputerText->setText(currentdc->model);
 	if (MainWindow::instance()->filesFromCommandLine() && animSpeedBackup != -1) {
-		QSettings s;
-		s.beginGroup("Animations");
-		s.setValue("animation_speed", animSpeedBackup);
+		prefs.animation = animSpeedBackup;
 	}
 }
 
@@ -473,7 +477,7 @@ void ProfileWidget2::settingsChanged()
 {
 	QSettings s;
 	s.beginGroup("TecDetails");
-	if (s.value("phegraph").toBool() || s.value("po2graph").toBool() || s.value("pn2graph").toBool()) {
+	if (prefs.pp_graphs.phe || prefs.pp_graphs.po2 || prefs.pp_graphs.pn2) {
 		profileYAxis->animateChangeLine(itemPos.depth.shrinked);
 		temperatureAxis->animateChangeLine(itemPos.temperature.shrinked);
 		cylinderPressureAxis->animateChangeLine(itemPos.cylinder.shrinked);
@@ -482,8 +486,8 @@ void ProfileWidget2::settingsChanged()
 		temperatureAxis->animateChangeLine(itemPos.temperature.expanded);
 		cylinderPressureAxis->animateChangeLine(itemPos.cylinder.expanded);
 	}
-	if (s.value("zoomed_plot").toBool() != isPlotZoomed) {
-		isPlotZoomed = s.value("zoomed_plot").toBool();
+	if (prefs.zoomed_plot != isPlotZoomed) {
+		isPlotZoomed = prefs.zoomed_plot;
 		replot();
 	}
 
@@ -631,9 +635,7 @@ void ProfileWidget2::setProfileState()
 	cylinderPressureAxis->setVisible(true);
 
 	profileYAxis->setPos(itemPos.depth.pos.on);
-	QSettings s;
-	s.beginGroup("TecDetails");
-	if (s.value("phegraph").toBool() || s.value("po2graph").toBool() || s.value("pn2graph").toBool()) {
+	if (prefs.pp_graphs.phe || prefs.pp_graphs.po2 || prefs.pp_graphs.pn2) {
 		profileYAxis->setLine(itemPos.depth.shrinked);
 		temperatureAxis->setLine(itemPos.temperature.shrinked);
 		cylinderPressureAxis->setLine(itemPos.cylinder.shrinked);
@@ -642,9 +644,9 @@ void ProfileWidget2::setProfileState()
 		temperatureAxis->setLine(itemPos.temperature.expanded);
 		cylinderPressureAxis->setLine(itemPos.cylinder.expanded);
 	}
-	pn2GasItem->setVisible(s.value("pn2graph").toBool());
-	po2GasItem->setVisible(s.value("po2graph").toBool());
-	pheGasItem->setVisible(s.value("phegraph").toBool());
+	pn2GasItem->setVisible(prefs.pp_graphs.pn2);
+	po2GasItem->setVisible(prefs.pp_graphs.po2);
+	pheGasItem->setVisible(prefs.pp_graphs.phe);
 
 	gasYAxis->setPos(itemPos.partialPressure.pos.on);
 	gasYAxis->setLine(itemPos.partialPressure.expanded);
@@ -656,20 +658,22 @@ void ProfileWidget2::setProfileState()
 	temperatureAxis->setPos(itemPos.temperature.pos.on);
 	heartBeatAxis->setPos(itemPos.heartBeat.pos.on);
 	heartBeatAxis->setLine(itemPos.heartBeat.expanded);
+	heartBeatItem->setVisible(prefs.hrgraph);
 	meanDepth->setVisible(true);
 
 	diveComputerText->setVisible(true);
 	diveComputerText->setPos(itemPos.dcLabel.on);
 
-	diveCeiling->setVisible(s.value("calcceiling").toBool());
-	reportedCeiling->setVisible(s.value("dcceiling").toBool());
+	diveCeiling->setVisible(prefs.calcceiling);
+	reportedCeiling->setVisible(prefs.dcceiling);
 
-	if (s.value("calcalltissues").toBool()) {
+	if (prefs.calcalltissues) {
 		Q_FOREACH(DiveCalculatedTissue * tissue, allTissues) {
 			tissue->setVisible(true);
 		}
 	}
-
+	QSettings s;
+	s.beginGroup("TecDetails");
 	bool rulerVisible = s.value("rulergraph", false).toBool();
 	rulerItem->setVisible(rulerVisible);
 	rulerItem->destNode()->setVisible(rulerVisible);

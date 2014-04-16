@@ -49,8 +49,8 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.pheThreshold->setValue(prefs.pp_graphs.phe_threshold);
 	ui.po2Threshold->setValue(prefs.pp_graphs.po2_threshold);
 	ui.pn2Threshold->setValue(prefs.pp_graphs.pn2_threshold);
-	ui.maxppo2->setValue(prefs.mod_ppO2);
-	ui.red_ceiling->setChecked(prefs.profile_red_ceiling);
+	ui.maxppo2->setValue(prefs.modppO2);
+	ui.red_ceiling->setChecked(prefs.redceiling);
 	ui.units_group->setEnabled(ui.personalize->isChecked());
 
 	ui.gflow->setValue(prefs.gflow);
@@ -90,6 +90,7 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.show_average_depth->setChecked(prefs.show_average_depth);
 	ui.vertical_speed_minutes->setChecked(prefs.units.vertical_speed_time == units::MINUTES);
 	ui.vertical_speed_seconds->setChecked(prefs.units.vertical_speed_time == units::SECONDS);
+	ui.velocitySlider->setValue(prefs.animation);
 
 	QSortFilterProxyModel *filterModel = new QSortFilterProxyModel();
 	filterModel->setSourceModel(LanguageModel::instance());
@@ -99,6 +100,10 @@ void PreferencesDialog::setUiFromPrefs()
 	connect(ui.languageFilter, SIGNAL(textChanged(QString)), filterModel, SLOT(setFilterFixedString(QString)));
 
 	QSettings s;
+
+	ui.save_uid_local->setChecked(s.value("save_uid_local").toBool());
+	ui.default_uid->setText(s.value("subsurface_webservice_uid").toString().toUpper());
+
 	s.beginGroup("Language");
 	ui.languageSystemDefault->setChecked(s.value("UseSystemLanguage", true).toBool());
 	QAbstractItemModel *m = ui.languageView->model();
@@ -107,9 +112,6 @@ void PreferencesDialog::setUiFromPrefs()
 		ui.languageView->setCurrentIndex(languages.first());
 
 	s.endGroup();
-	s.beginGroup("Animations");
-	int animVelocity = s.value("animation_speed",500).toInt();
-	ui.velocitySlider->setValue(animVelocity);
 }
 
 void PreferencesDialog::restorePrefs()
@@ -172,9 +174,11 @@ void PreferencesDialog::syncSettings()
 {
 	QSettings s;
 
+	s.setValue("subsurface_webservice_uid", ui.default_uid->text().toUpper());
+	set_save_userid_local(ui.save_uid_local->checkState());
+
 	// Graph
 	s.beginGroup("TecDetails");
-
 	s.setValue("phethreshold", ui.pheThreshold->value());
 	s.setValue("po2threshold", ui.po2Threshold->value());
 	s.setValue("pn2threshold", ui.pn2Threshold->value());
@@ -198,6 +202,7 @@ void PreferencesDialog::syncSettings()
 	s.setValue("weight", ui.lbs->isChecked() ? units::LBS : units::KG);
 	s.setValue("vertical_speed_time", ui.vertical_speed_minutes->isChecked() ? units::MINUTES : units::SECONDS);
 	s.endGroup();
+
 	// Defaults
 	s.beginGroup("GeneralSettings");
 	s.setValue("default_filename", ui.defaultfilename->text());
@@ -211,6 +216,7 @@ void PreferencesDialog::syncSettings()
 	s.endGroup();
 	s.sync();
 
+	// Locale
 	QLocale loc;
 	s.beginGroup("Language");
 	bool useSystemLang = s.value("UseSystemLanguage", true).toBool();
@@ -223,8 +229,11 @@ void PreferencesDialog::syncSettings()
 	s.setValue("UiLanguage", ui.languageView->currentIndex().data(Qt::UserRole));
 	s.endGroup();
 
+	// Animation
 	s.beginGroup("Animations");
 	s.setValue("animation_speed",ui.velocitySlider->value());
+	s.endGroup();
+
 	loadSettings();
 	emit settingsChanged();
 }
@@ -237,6 +246,10 @@ void PreferencesDialog::loadSettings()
 
 	QSettings s;
 	QVariant v;
+
+	ui.save_uid_local->setChecked(s.value("save_uid_local").toBool());
+	ui.default_uid->setText(s.value("subsurface_webservice_uid").toString().toUpper());
+
 	s.beginGroup("Units");
 	if (s.value("unit_system").toString() == "metric") {
 		prefs.unit_system = METRIC;
@@ -262,14 +275,15 @@ void PreferencesDialog::loadSettings()
 	GET_DOUBLE("pn2threshold", pp_graphs.pn2_threshold);
 	GET_DOUBLE("phethreshold", pp_graphs.phe_threshold);
 	GET_BOOL("mod", mod);
-	GET_DOUBLE("modppO2", mod_ppO2);
+	GET_DOUBLE("modppO2", modppO2);
 	GET_BOOL("ead", ead);
-	GET_BOOL("redceiling", profile_red_ceiling);
-	GET_BOOL("dcceiling", profile_dc_ceiling);
-	GET_BOOL("calcceiling", profile_calc_ceiling);
-	GET_BOOL("calcceiling3m", calc_ceiling_3m_incr);
-	GET_BOOL("calcndltts", calc_ndl_tts);
-	GET_BOOL("calcalltissues", calc_all_tissues);
+	GET_BOOL("redceiling", redceiling);
+	GET_BOOL("dcceiling", dcceiling);
+	GET_BOOL("calcceiling", calcceiling);
+	GET_BOOL("calcceiling3m", calcceiling3m);
+	GET_BOOL("calcndltts", calcndltts);
+	GET_BOOL("calcalltissues", calcalltissues);
+	GET_BOOL("hrgraph", hrgraph);
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
 	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
@@ -298,8 +312,7 @@ void PreferencesDialog::loadSettings()
 	s.endGroup();
 
 	s.beginGroup("Animations");
-	int animVelocity = s.value("animation_speed",500).toInt();
-	ui.velocitySlider->setValue(animVelocity);
+	GET_INT("animation_speed", animation);
 }
 
 void PreferencesDialog::buttonClicked(QAbstractButton *button)
@@ -307,6 +320,7 @@ void PreferencesDialog::buttonClicked(QAbstractButton *button)
 	switch (ui.buttonBox->standardButton(button)) {
 	case QDialogButtonBox::Discard:
 		restorePrefs();
+		syncSettings();
 		close();
 		break;
 	case QDialogButtonBox::Apply:
