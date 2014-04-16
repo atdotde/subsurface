@@ -523,6 +523,8 @@ void DivePlannerGraphics::drawProfile()
 	plannerModel->removeSelectedPoints(computedPoints);
 
 	int lastdepth = 0;
+	int lasto2 = 0;
+	int lasthe = 0;
 	for (dp = diveplan.dp; dp != NULL; dp = dp->next) {
 		if (dp->time == 0) // magic entry for available tank
 			continue;
@@ -535,9 +537,11 @@ void DivePlannerGraphics::drawProfile()
 			scene()->addItem(item);
 			lines << item;
 			if (dp->depth) {
-				if (dp->depth == lastdepth)
+				if (dp->depth == lastdepth || dp->o2 != dp->next->o2 || dp->he != dp->next->he)
 					plannerModel->addStop(dp->depth, dp->time, dp->o2, dp->he, 0, false);
 				lastdepth = dp->depth;
+				lasto2 = dp->o2;
+				lasthe = dp->he;
 			}
 		}
 		lastx = xpos;
@@ -973,6 +977,12 @@ DivePlannerWidget::DivePlannerWidget(QWidget *parent, Qt::WindowFlags f) : QWidg
 		GasSelectionModel::instance(), SLOT(repopulate()));
 	connect(CylindersModel::instance(), SIGNAL(rowsRemoved(QModelIndex, int, int)),
 		GasSelectionModel::instance(), SLOT(repopulate()));
+	connect(CylindersModel::instance(), SIGNAL(dataChanged(QModelIndex, int, int)),
+		plannerModel, SLOT(drawProfile()));
+	connect(CylindersModel::instance(), SIGNAL(rowsInserted(QModelIndex, int, int)),
+		plannerModel, SLOT(drawProfile()));
+	connect(CylindersModel::instance(), SIGNAL(rowsRemoved(QModelIndex, int, int)),
+		plannerModel, SLOT(drawProfile()));
 
 	ui.tableWidget->setBtnToolTip(tr("add dive data point"));
 	connect(ui.startTime, SIGNAL(timeChanged(QTime)), plannerModel, SLOT(setStartTime(QTime)));
@@ -1072,6 +1082,7 @@ QVariant DivePlannerPointsModel::data(const QModelIndex &index, int role) const
 			else
 				return p.time / 60;
 		case GAS:
+
 			return dpGasToStr(p);
 		}
 	} else if (role == Qt::DecorationRole) {
@@ -1415,6 +1426,8 @@ bool DivePlannerPointsModel::tankInUse(int o2, int he)
 	for (int j = 0; j < rowCount(); j++) {
 		divedatapoint &p = divepoints[j];
 		if (p.time == 0) // special entries that hold the available gases
+			continue;
+		if (!p.entered) // removing deco gases is ok
 			continue;
 		if ((p.o2 == o2 && p.he == he) ||
 		    (is_air(p.o2, p.he) && is_air(o2, he)))
