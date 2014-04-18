@@ -17,6 +17,9 @@
 #define TIMESTEP 1 /* second */
 #define DECOTIMESTEP 60 /* seconds. Unit of deco stop times */
 
+#define TIMESTEP 1 /* second */
+#define DECOTIMESTEP 60 /* seconds. Unit of deco stop times */
+
 int decostoplevels[] = { 0, 3000, 6000, 9000, 12000, 15000, 18000, 21000, 24000, 27000,
 				  30000, 33000, 36000, 39000, 42000, 45000, 48000, 51000, 54000, 57000,
 				  60000, 63000, 66000, 69000, 72000, 75000, 78000, 81000, 84000, 87000,
