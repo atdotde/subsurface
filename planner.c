@@ -152,33 +152,6 @@ double tissue_at_end(struct dive *dive, char **cached_datap)
 	return tissue_tolerance;
 }
 
-/* how many seconds until we can ascend to the next stop? */
-static int time_at_last_depth(struct dive *dive, int o2, int he, int next_stop, char **cached_data_p)
-{
-	int depth, gasidx;
-	double surface_pressure, tissue_tolerance;
-	int wait = 0;
-	struct sample *sample;
-
-	if (!dive)
-		return 0;
-	surface_pressure = dive->dc.surface_pressure.mbar / 1000.0;
-	tissue_tolerance = tissue_at_end(dive, cached_data_p);
-	sample = &dive->dc.sample[dive->dc.samples - 1];
-	depth = sample->depth.mm;
-	gasidx = get_gasidx(dive, o2, he);
-	if (gasidx == -1) {
-		fprintf(stderr, "cannot find gas (%d/%d), using first gas\n", o2, he);
-		gasidx = 0;
-	}
-	while (deco_allowed_depth(tissue_tolerance, surface_pressure, dive, 1) > next_stop) {
-		/* Let's hope that the ceiling does not come down again during the ascend */
-		wait++;
-		tissue_tolerance = add_segment(depth_to_mbar(depth, dive) / 1000.0,
-					       &dive->cylinder[gasidx].gasmix, 1, sample->po2, dive);
-	}
-	return wait;
-}
 
 /* if a default cylinder is set, use that */
 void fill_default_cylinder(cylinder_t *cyl)

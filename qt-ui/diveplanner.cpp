@@ -548,8 +548,6 @@ void DivePlannerGraphics::drawProfile()
 	}
 	plannerModel->setRecalc(oldRecalc);
 
-	qDebug() << " ";
-
 	diveBg->setPolygon(poly);
 	QRectF b = poly.boundingRect();
 	QLinearGradient pat(
@@ -1246,7 +1244,6 @@ bool DivePlannerPointsModel::addGas(int o2, int he)
 				cyl->depth.mm = 1600 * 1000 / O2_IN_AIR * 10 - 10000;
 			else
 				cyl->depth.mm = 1600 * 1000 / o2 * 10 - 10000;
-			qDebug() << o2 << "at" << cyl->depth.mm;
 			CylindersModel::instance()->setDive(stagingDive);
 			return true;
 		}
