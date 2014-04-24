@@ -575,7 +575,10 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 int ascend_velocity(int depth)
 {
 	/* We need to make this configurable */
-	return 10000/60;
+	if (depth > 6000)
+		return 10000/60;	/* 10 m/min below 6m */
+	else
+		return 1000/60;		/* 1 m/min for the last meter */
 }
 
 void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco)
