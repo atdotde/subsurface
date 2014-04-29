@@ -39,6 +39,7 @@ slots:
 	void showSearchEdit();
 	void removeFromTrip();
 	void deleteDive();
+	void exportTeX();
 	void markDiveInvalid();
 	void testSlot();
 	void fixMessyQtModelBehaviour();

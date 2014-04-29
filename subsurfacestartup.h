@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 extern bool imported;
+	extern bool has_pdftex;
 
 void setup_system_prefs(void);
 void parse_argument(const char *arg);

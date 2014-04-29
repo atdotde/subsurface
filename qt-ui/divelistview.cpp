@@ -25,6 +25,7 @@
 #include <QFileDialog>
 #include <string>
 #include <iostream>
+#include "../subsurfacestartup.h"
 
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false), sortColumn(0), currentOrder(Qt::DescendingOrder), searchBox(this)
@@ -717,6 +718,51 @@ void DiveListView::deleteDive()
 	fixMessyQtModelBehaviour();
 }
 
+
+void DiveListView::exportTeX()
+{
+	int nr;
+	struct dive *dive = (struct dive *) contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void*>();
+	if (dive) {
+
+		ProfileWidget2 *profile = MainWindow::instance()->graphics();
+	  profile->replot();
+	  QString fileName = "profile.png";
+	  QPixmap pixMap = QPixmap::grabWidget(profile);
+	  pixMap.save(fileName);
+	  
+	  FILE *f = fopen("dive.tex","w");
+	  if (!f)
+	    return;
+	  
+	  struct tm tm;
+
+	  utc_mkdate(dive->when, &tm);
+	  
+	  fprintf(f, "\\def\\date{%04u-%02u-%02u}\n",
+		tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday);
+	  fprintf(f, "\\def\\number{%d}\n", dive->number);
+	  fprintf(f, "\\def\\place{%s}\n", dive->location);
+	  fputs("\\def\\spot{}\n", f);
+	  fputs("\\def\\country{}\n", f);
+	  fputs("\\def\\entrance{}\n", f);
+	  fprintf(f, "\\def\\time{%u:%02u}\n", FRACTION(dive->duration.seconds, 60));
+	  fprintf(f, "\\def\\depth{%u.%01um}\n", FRACTION(dive->maxdepth.mm/100, 10));
+	  fputs("\\def\\gasuse{}\n",f);
+	  fprintf(f, "\\def\\sac{%u.%01u l/min}\n", FRACTION(dive->sac/100,10));
+	  fputs("\\def\\type{}\n",f);
+	  fprintf(f, "\\def\\viz{%d}\n", dive->visibility);
+	  fputs("\\def\\plot{\\includegraphics[width=9cm,height=4cm]{profile}}\n",f);
+	  fprintf(f, "\\def\\comment{%s}\n", dive->notes);
+	  fprintf(f, "\\def\\buddy{%s}\n", dive->buddy);
+	  fputs("\\input logbookstyle\n", f);
+
+	  fclose(f);
+	  system("pdftex dive.tex");
+	  system("open dive.pdf");
+	}
+}
+
 void DiveListView::testSlot()
 {
 	struct dive *d = (struct dive *)contextMenuIndex.data(DiveTripModel::DIVE_ROLE).value<void *>();
@@ -749,6 +795,8 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 			popup.addAction(tr("create new trip above"), this, SLOT(newTripAbove()));
 			popup.addAction(tr("add dive(s) to trip immediately above"), this, SLOT(addToTripAbove()));
 			popup.addAction(tr("add dive(s) to trip immediately below"), this, SLOT(addToTripBelow()));
+			if(has_pdftex)
+			  popup.addAction(tr("export as TeX"), this, SLOT(exportTeX()));
 		}
 		if (trip) {
 			popup.addAction(tr("merge trip with trip above"), this, SLOT(mergeTripAbove()));
