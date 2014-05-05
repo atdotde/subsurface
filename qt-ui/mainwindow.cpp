@@ -19,6 +19,7 @@
 #include <QDesktopServices>
 #include <QStringList>
 #include <QSettings>
+#include <QShortcut>
 #include "divelistview.h"
 #include "starwidget.h"
 
@@ -276,10 +277,20 @@ void MainWindow::updateLastUsedDir(const QString &dir)
 void MainWindow::on_actionExportUDDF_triggered()
 {
 	QFileInfo fi(system_default_filename());
-	QString filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+	QString filename = QFileDialog::getSaveFileName(this, tr("Export UDDF File as"), fi.absolutePath(),
 							tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
-		export_dives_uddf(filename.toUtf8(), false);
+		export_dives_xslt(filename.toUtf8(), false, "uddf-export.xslt");
+}
+
+void MainWindow::on_actionExport_CSV_triggered()
+{
+	QFileInfo fi(system_default_filename());
+	QString filename = QFileDialog::getSaveFileName(this, tr("Export CSV File as"), fi.absolutePath(),
+							tr("CSV files (*.csv *.CSV)"));
+
+	if (!filename.isNull() && !filename.isEmpty())
+		export_dives_xslt(filename.toUtf8(), false, "xml2csv.xslt");
 }
 
 void MainWindow::on_actionExportHTMLworldmap_triggered()
@@ -437,6 +448,12 @@ void MainWindow::on_actionYearlyStatistics_triggered()
 		yearlyStats->setMinimumWidth(600);
 		yearlyStats->setWindowTitle(tr("Yearly Statistics"));
 		yearlyStats->setWindowIcon(QIcon(":subsurface-icon"));
+		QShortcut* closeKey = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_W), yearlyStats);
+		connect(closeKey, SIGNAL(activated()), yearlyStats, SLOT(close()));
+		closeKey = new QShortcut(QKeySequence(Qt::Key_Escape), yearlyStats);
+		connect(closeKey, SIGNAL(activated()), yearlyStats, SLOT(close()));
+		QShortcut* quitKey = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q), yearlyStats);
+		connect(quitKey, SIGNAL(activated()), this, SLOT(close()));
 	}
 	/* problem here is that without more MainWindow variables or a separate YearlyStatistics
 	 * class the user needs to close the window/widget and re-open it for it to update.
@@ -592,7 +609,7 @@ void MainWindow::on_actionUserManual_triggered()
 {
 #ifndef NO_USERMANUAL
 	if (!helpView) {
-		helpView = new UserManual();
+		helpView = new UserManual(this);
 	}
 	helpView->show();
 #endif
@@ -1077,7 +1094,7 @@ void MainWindow::on_actionImportDiveLog_triggered()
 	}
 
 	if (csvFiles.size()) {
-		DiveLogImportDialog *diveLogImport = new DiveLogImportDialog(&csvFiles);
+		DiveLogImportDialog *diveLogImport = new DiveLogImportDialog(&csvFiles, this);
 		diveLogImport->show();
 		process_dives(true, false);
 		refreshDisplay();

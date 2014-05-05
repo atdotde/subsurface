@@ -1,10 +1,10 @@
-// Subsurface 4.0.1 User Manual
-// ============================
+// Subsurface 4.1 User Manual
+// ==========================
 // :author: Manual authors: Jacco van Koll, Dirk Hohndel, Reinout Hoornweg,
 // Linus Torvalds, Miika Turkia, Amit Chaudhuri, Jan Schubert, Willem
 // Ferguson, Salvador Cuñat
 // :revnumber: 4.1
-// :revdate: April 2014
+// :revdate: May 2014
 :icons:
 :toc:
 :toc-placement: manual
@@ -16,9 +16,9 @@ image::images/Subsurface4Banner.png["Banner",align="center"]
 [big]#USER MANUAL#
 
 *Manual authors*: Willem Ferguson, Jacco van Koll, Dirk Hohndel, Reinout Hoornweg,
-Linus Torvalds, Miika Turkia, Amit Chaudhuri, Jan Schubert,  Salvador Cuñat
+Linus Torvalds, Miika Turkia, Amit Chaudhuri, Jan Schubert, Salvador Cuñat
 
-[blue]#_Version 4.1,  April 2014_#
+[blue]#_Version 4.1,  May 2014_#
 
 
 Welcome as a user of _Subsurface_, an advanced dive logging programme with
@@ -66,21 +66,21 @@ The _Subsurface_ window is usually divided into four panels with a *Main
 Menu* (File Import Log View Filter Help) at the top of the window (for Windows
 and Linux) or the top of the screen (for Mac and Ubuntu Unity). The four panels are:
 
-1) The *Dive List* to the bottom left containing a list of all the dives in the
+1. The *Dive List* to the bottom left containing a list of all the dives in the
 user's
 dive log. A dive can be selected and highlighted on the dive list by clicking on
 it. In most situations the up/down keys can be used to switch
 between dives. The Dive List is an important tool for manipulating a dive log.
 
-2) The *Dive Map* to the bottom right, showing the user's dive sites on a world
+2. The *Dive Map* to the bottom right, showing the user's dive sites on a world
 map
 and centred on the site of the last dive selected in the *Dive List*.
 
-3) The *Dive Info* to the top left, giving more detailed information on the
+3. The *Dive Info* to the top left, giving more detailed information on the
 dive selected in the *Dive List*, including some statistics for the selected dive or for all
 highlighted dive(s).
 
-4) The *Dive Profile* to the top right, showing a graphical dive profile of the
+4. The *Dive Profile* to the top right, showing a graphical dive profile of the
 selected dive in the *Dive List*.
 
 The dividers can be dragged between panels in order to change the size of any of
@@ -447,21 +447,24 @@ involves setting up the communications port (or mount point) of the computer
 with _Subsurface_ that communicates with the dive computer. In order to set up
 this communication, one needs to find the appropriate information to
 instruct
-_Subsurface_ where and how to import the dive information. *Appendix A* provides
-the technical information to help the user achieving this for different
+_Subsurface_ where and how to import the dive information.
+xref:_appendix_a_operating_system_specific_information_for_importing_dive_information_from_a_dive_computer[Appendix A]
+provides the technical information to help the user achieving this for different
 operating
-systems and *Appendix B* has dive computer specific information.
+systems and
+xref:_appendix_b_dive_computer_specific_information_for_importing_dive_information[Appendix B]
+has dive computer specific information.
 
 After this, the dive computer can be hooked up to the user's PC, which can be
 achieved by following these steps:
 
- - The interface cable should be connected to a free USB port (or the Infrared
+1. The interface cable should be connected to a free USB port (or the Infrared
 	or Bluetooth connection set up as described later in this manual)
 
- - The dive computer should be placed into PC Communication mode.
+2. The dive computer should be placed into PC Communication mode.
 	(Users should refer to the manual of their specific dive computer)
 
- - In _Subsurface_, from the Main Menu, the user must select _Import -> Import
+3. In _Subsurface_, from the Main Menu, the user must select _Import -> Import
 From Dive Computer_.
 Dialogue *A* in the figure below appears:
 
@@ -486,9 +489,11 @@ the dive computer must be selected, e.g. D4 (Suunto), Veo200 (Oceanic), or Puck
 
  - The *Device or Mount Point* drop-down list contains the USB or Bluetooth port
 name that _Subsurface_ needs in order to communicate with the dive computer.
-The appropriate port name must be selected. Consult *Appendix A*
-and *Appendix B* for
-technical details on how to find the appropriate port information for a
+The appropriate port name must be selected. Consult
+xref:_appendix_a_operating_system_specific_information_for_importing_dive_information_from_a_dive_computer[Appendix A]
+and
+xref:_appendix_b_dive_computer_specific_information_for_importing_dive_information[Appendix B]
+for technical details on how to find the appropriate port information for a
 particular dive
 computer and, in some cases, how to do the correct settings to the operating
 system of the computer on which _Subsurface_ is running.
@@ -541,16 +546,25 @@ message will be shown, similar to this text: "Unable to open /dev/ttyUSB0 Mares
 *PROBLEMS WITH DATA DOWNLOAD FROM A DIVE COMPUTER?*
 [icon="images/icons/important.png"]
 [IMPORTANT]
-Check the following: 1) Is the dive computer still in PC-communication or
+Check the following:
+
+ - Is the dive computer still in PC-communication or
 Upload mode?
-2) Is the battery of the dive computer fully charged? If not then the battery
+
+ - Is the battery of the dive computer fully charged? If not then the battery
 must be charged or replaced.
-3) Is the connecting cable faulty? Does the cable work perfectly using other
+
+ - Is the connecting cable faulty? Does the cable work perfectly using other
 software? Has it worked before, or is this the first time the cable is being used?
-4) Consult *Appendix A* and make sure that the correct Mount Point
+
+ - Consult
+xref:_appendix_a_operating_system_specific_information_for_importing_dive_information_from_a_dive_computer[Appendix A]
+and make sure that the correct Mount Point
 was specified (see above).
-5) On Unix-like operating systems, does the user have write permission to the
-USB port? If not, consult *Appendix A*.
+
+ - On Unix-like operating systems, does the user have write permission to the
+USB port? If not, consult
+xref:_appendix_a_operating_system_specific_information_for_importing_dive_information_from_a_dive_computer[Appendix A]
 
 If the _Subsurface_ computer does not recognise the USB adaptor by
 showing an appropriate device name next to the Mount Point, then there is a
@@ -851,17 +865,17 @@ directly imported into
 _Subsurface_. Mares dive logs need to be imported using a three-step process,
 using _www.divelogs.de_ as a mechanism to extract the dive log information.
 
- - The dive log data from Mares Dive Organiser need to be exported to the user's
+1. The dive log data from Mares Dive Organiser need to be exported to the user's
 desktop, using
  a _.sdf_ file name extension. Refer to xref:Mares_Export[Appendix C] for more
 information.
- - Data should then be imported into _www.divelogs.de_. One needs to create a user
+2. Data should then be imported into _www.divelogs.de_. One needs to create a user
 account in
 _www.divelogs.de_, log into that web site, then
 select _Import Logbook -> Dive Organiser_ from the menu on the left hand side.
 The instructions must be carefully followed to transfer the dive information
 (in _.sdf_ format) from the Dive Organiser data base to _www.divelogs.de_.
- - Finally,  import the dives
+3. Finally,  import the dives
 from _divelogs.de_ to _Subsurface_, using the instructions below.
 
 
@@ -1024,18 +1038,19 @@ appear in the *Dive List* area of _Subsurface_.
 
 
 [[S_Companion]]
-=== Importing GPS coordinates with the *Subsurface Companion App* for mobile phones
+=== Importing GPS coordinates with the _Subsurface Companion App_ for mobile phones
 
-If the user has an Android device with GPS, the coordinates for the diving
-location can be obtained and automatically passed to the _Subsurface_
-divelog. This takes place when the Companion App stores the dive locations on
+Using the *Subsurface Companion App* on an Android device with a GPS, the coordinates
+for the diving
+location can be automatically passed to the _Subsurface_
+divelog. The Companion App stores the dive locations on
 a dedicated Internet-based file server. _Subsurface_, in turn, can collect
 the localities from the file server.
 
-To do this, one needs to:
+To do this:
 
-- Register on the http://api.hohndel.org/login/[Subsurface companion web page].
-A confirmation mail with instructions and a personal *DIVERID* will be send together with
+- Register on the http://api.hohndel.org/login/[_Subsurface companion web page_].
+A confirmation email with instructions and a personal *DIVERID* will be send together with
 a long number that gives access to the file server and Companion App capabilities.
 
 - Download the app from
@@ -1049,7 +1064,7 @@ http://f-droid.org/repository/browse/?fdfilter=subsurface&fdid=org.subsurface[F-
 On first use the app has three options:
 
 * _Create a new account._  Equivalent to registering in _Subsurface_ companion
-page.
+page using an Internet browser.
 
 * _Retrieve an account._  If users forgot their DIVERID they will receive an email
 to recover the number.
@@ -1061,14 +1076,14 @@ option (see below).
 Now one is ready to get a dive position and send it to the server. The Android
 display will look like the left hand image (*A*) below, but without any dive.
 
-Touch the "+" icon on the top right to add a new dive site. Users will be
-prompted for a place name (or asked to activate the GPS if it is turned off).
+Touch the "+" icon on the top right to add a new dive site, resulting in a prompt
+for a place name (or a request to activate the GPS if it is turned off).
 The main screen shows a list of dive locations, each with a name, date and
-time. Some dives may have an arrow-up icon on the selection box to the left (see
+time. Some locations may have an arrow-up icon on the selection box to the left (see
 image B in the middle, below) indicating that they require upload to the server.
 
-There are several ways to send dives to the server; the easiest is by simply
-selecting the dive. See middle image below (*B*):
+There are several ways to send locationd to the server; the easiest is by simply
+selecting the location. See middle image below (*B*):
 
 image::images/Companion.jpg["FIGURE: Screen shots (A-C) of companion app",align="center"]
 
@@ -1076,13 +1091,25 @@ Touching the right arrow will send it to the server.
 
 [icon="images/icons/important.png"]
 [IMPORTANT]
-Users must be careful, as the trash icon on the right means exactly what it is supposed to mean,
+Users must be careful, as the trash icon on the right means exactly what it should mean:
 it deletes the dive location(s).
 
-The new dive points are now stored on the server and can be downloaded to the
+New dive locations are now stored on the server and can be downloaded to the
 _Subsurface_ dive log whenever users upload or add dives to _Subsurface_.
-After a dive trip using the Companion app, all dive locations are ready to be
+After a dive trip using the Companion App, all dive locations are ready to be
 saved on a _Subsurface_ dive log (see below).
+
+When you click on a dive (*not* selecting the check button as shown in the images above), the
+name given to it, date/time and GPS coordinates will be shown, with two options:
+
+- Edit:  Change the text name of the dive location.
+
+- Maps:  Display a map showing the dive location (you'll be prompted to
+choose which helper app use from your installed apps). Currently this feature is
+non fully functional, but is under active development.
+
+After editing and saving a dive location, one needs to upload it to the web
+service, as explained above.
 
 ===== Settings on the Companion app
 
@@ -1092,41 +1119,42 @@ Selecting the _Settings_ menu option results in the right hand image above (*C*)
 
 - _Web-service URL._ This is predefined (http://api.hohndel.org/)
 
-- _User ID._ Obtained by registering as indicated above. The easiest way to
-obtain it is simply to copy and paste from the confirmation mail but, of
+- _User ID._ The DIVERID obtained by registering as described above. The easiest way to
+obtain it is simply to copy and paste from the confirmation email but, of
 course, users can also type this information.
 
 ===== Synchronization
 
-- _Synchronize on startup._ If selected, dives in the Android device and those
-on the web service will synchronize each time the app is started.
+- _Synchronize on startup._ If selected, dive locations in the Android device and those
+on the web service synchronize each time the app is started.
 
-- _Upload new dives._ If selected, each time the user adds a dive location it will
-automatically be sent to the server.
+- _Upload new dives._ If selected, each time the user adds a dive location it is
+automatically sent to the server.
 
 ===== Background service
 Instead of entering a unique dive location, users can leave the service running
-in the background of their device, thus allowing the continuous collection of GPS locations.
+in the background of their Android device, allowing the continuous collection of GPS locations.
 
 
 The settings below define the behaviour of the service:
 
-- _Min duration._ In minutes. The app will try to get a position each X minutes
-until it's stopped by the user.
+- _Min duration._ In minutes. The app will try to get a location every X minutes
+until stopped by the user.
 
-- _Min distance._ In meters. Minimum distance between two position fixes.
+- _Min distance._ In meters. Minimum distance between two locations.
 
-- _Name template._ The name the app will use when saving the position fixes.
+- _Name template._ The name the app will use when saving the locations.
 
 [icon="images/icons/info.jpg"]
 [TIP]
-_How does the background service work?_ Assuming that the user set 5 minutes and 50
-meters in the settings above, the app will start by taking a fix at the current location,
-followed by another one
-at every 5 minutes. If this 2nd (3rd, 4th ...) location is within a radius of 50
-meters from the previous one, then this new fix is not saved. If the user is not moving,
-only one fix is saved, but if the user is moving, then a trace of the journey is obtained,
-by saving each new position at every 5 minutes.
+_How does the background service work?_ Assuming the user sets 5 minutes and 50
+meters in the settings above, the app will start by recording a location at the current
+location, followed by another one at every 5 minutes *or* every time one moves 50m
+from previous location.
+If subsequent locations are within a radius of 50 meters from the previous one,
+a new location is not saved. If the user is not moving, only one location is saved,
+but if the user is moving, a trace of the route is obtained by saving a
+location every 50 meters.
 
 ===== Other
 
@@ -1135,23 +1163,23 @@ Subsurface mailing list.
 
 - _Subsurface website._ A link to the URL of Subsurface web
 
-- _Version._ Displays the current version of the companion app.
+- _Version._ Displays the current version of the Companion App.
 
 ===== Search
 
-Here one can search one's saved dive locations by the name or by date and hour.
+Search the saved dive locations by name or by date and time.
 
 ===== Start service
 
-Initiates the _background service_ depending on the previously defined settings.
+Initiates the _background service_ following the previously defined settings.
 
 ===== Disconnect
 
-This is a badly named option. It disconnects the app from the server by
+This is a badly named option that disconnects the app from the server by
 resetting the user ID in the app, showing the first screen where an account
 can be created, retrieve the ID for an existing account or use the users own
 ID. The disconnect option
-is useful if a user's Android device was used to download the dive positions
+is useful if a user's Android device was used to download the dive locations
 of another registered diver.
 
 ===== Send all locations
@@ -1165,29 +1193,48 @@ Download dive(s) from a dive computer or enter them manually into
 _Subsurface_ before obtaining the GPS coordinates from the server. The download
 dialog can be reached via _Ctrl+G_ or from the _Subsurface_ Main Menu _Import
 -> Import GPS data from Subsurface Service_, resulting in the image on the
-left (*A*), below. On first use the DIVERID text box will be blank. Users must provide their
-DIVERID and then select the _Download_ button to initiate the download process. When this
-is completed, users will see the screen on the right (*B*), below:
+left (*A*), below. On first use the DIVERID text box is blank. Provide a
+DIVERID, then select the _Download_ button to initiate the download process, after
+which the screen on the right (*B*) below appears:
 
 image::images/DownloadGPS.jpg["FIGURE: Downloading Companion app GPS data",align="center"]
 
 Note that the _Apply_ button is now active. By clicking on it, users can update the locations
 of the newly entered or uploaded dives in _Subsurface_ which applies the
 coordinates and names entered on the app for all the new dives that match the
-date-times of the uploaded GPS localities.
+date-times of the uploaded GPS localities. If one has entered the name of the dive
+location in _Subsurface_ before downloading the GPS coordinates, this name will take
+precedence over downloaded one.
+
+Since _Subsurface_ matches GPS locations from the Android device and dive information from the
+dive computer based on date-time data, automatic assignment of GPS data to dives is dependent
+on agreement of the date-time information between these two devices. Although _Subsurface_ has
+a wide range tolerance, it may be unable to identify the appropriate dive if there is
+a large difference between the time in the dive computer and that of the Android device,
+resulting in no updates.
+
+Similar date-times may not always be possible and there may be many reasons for this (e.g. time zones), or
+_Subsurface_ may be unable to decide which is the correct position for a dive (e.g. on repetitive
+dives while running _background service_ there may be several locations that would be
+included in the time range that fit not only the first dive, but one or more subsequent dives as well).
+A workaround for this situation to manually edit the date-time of a dive in the _Subsurface_
+Dive List *before* downloading the GPS data and then to change the date-time back again *after*
+downloading GPS data.
 
 [icon="images/icons/info.jpg"]
 [NOTE]
-_Features, issues and tips._  Since _Subsurface_ matches GPS locations from the
-Android device and dive information from the dive computer based on date-time
-data, automatic assignment of GPS data to dives is dependent on agreement of
-date and time between these two devices. If there is a large difference between
-the time in the dive computer and the time in the Android device,
-_Subsurface_ is unable to identify the dive matching a location and nothing
-happens. Similar date-times may be not always be possible.  A dirty hack is
-manually editing the date-time of a dive in Subsurface's Dive List _before_
-downloading the GPS data and then to edit the date-time back again _after_
-downloading GPS data.
+TIPS:
+
+- _Background service_, being a very powerful tool, may fill the location list with
+many unnecessary locations not corresponding to the exact dive point but reflecting the boat's route.
+Currently these locations are dificult to delete from the server. In some situations it
+is therefore prudent to clean up the list on the Android device before sending the dive points to the web
+server by simply deleting the inappropriate locations. This might be necesary, for
+instance, if one wants to keep the location list clear to see dives in the web service map display (see above).
+
+- It may also make sense to give informative names to the locations sent to the web server, or at least
+to use an informative name in the _Name Template_ setting while running the _background service_,
+especially on a dive trip with many dives and dive locations.
 
 == Obtaining more information about dives entered into the logbook
 
@@ -1608,7 +1655,7 @@ image::images/MergedDive.png["Example: Merged dive",align="center"]
 [[S_ExportLog]]
 == Exporting the dive log or parts of the dive log
 
-A dive log can be saved in two formats:
+A dive log can be saved in three formats:
 
 * _Subsurface_ XML format. This is the native format used by _Subsurface_.
 
@@ -1616,15 +1663,21 @@ A dive log can be saved in two formats:
 UDDF is a generic format that enables communication among many dive computers
 and computer programs.
 
+* CSV format, that includes the most critical information of the dive
+profile. Included information of a dive is: number, date, time,
+duration, depth, temperature and pressure.
+
 In order to save the WHOLE dive log (i.e. all trips and dives), select *File*
 from the Main menu. To save in _Subsurface_ XML format, select _File -> Save as_.
-To save in UDDF format, select _File -> Export UDDF_.
+To save in UDDF format, select _File -> Export UDDF_ and to save in CSV
+format, select _File -> Export CSV_.
 
 In order to save only one or more dives or one or two trips, select the
 appropriate dives or trips in the *Dive List* panel and then right-click the
 selected dives to bring up the context menu. To save in _Subsurface_ XML
-format, select _Save as_ from the context menu. To save in UDDF format, select
-_Export as UDDF_ from the context menu.
+format, select _Save as_ from the context menu. To save in UDDF or CSV
+format, select _Export as UDDF_ or _Export as CSV_ from the context menu
+respectively.
 
 Export to other formats can be achieved through third party facilities, for
 instance _www.divelogs.de_.
@@ -2241,9 +2294,9 @@ can be found
 xref:Unified_import[here.]
 However, in some cases, a two-step process may be required:
 
- - Export the forieign dive log data to format that is accessible from
+1. Export the forieign dive log data to format that is accessible from
 _Subsurface_.
- - Import the accessible dive log data into _Subsurface_.
+2. Import the accessible dive log data into _Subsurface_.
 
 This appendix provides some information about approaches to export dive log
 data from foreign
@@ -2260,18 +2313,17 @@ conventions to export dive log data.
 
 *Divemanager 3 (DM3):*
 
- - Start 'Suunto Divemanager 3' and log in with the name containing the logs
- - Do not start the import wizard to import dives from the dive computer.
- - In the navigation tree on the left side of the program-window, select the appropriate
+1. Start 'Suunto Divemanager 3' and log in with the name containing the logs
+2. Do not start the import wizard to import dives from the dive computer.
+3. In the navigation tree on the left side of the program-window, select the appropriate
 dives.
- - Within the list of dives, select the dives you would like to import later:
+4. Within the list of dives, select the dives you would like to import later:
 	* To select certain dives: hold 'ctrl' and click the dive
 	* To select all dives:  Select the first dive, hold down shift and
 select the
 last dive
- - With the dives marked, use the program menu _File -> Export_
- - The export pop-up will show
- - Within this pop-up, there is one field called 'Export Path'.
+5. With the dives marked, use the program menu _File -> Export_
+6. The export pop-up will show. Within this pop-up, there is one field called 'Export Path'.
 	* Click the browse button next to the field Export Path
 		** A file-manager like window pops up
 		** Navigate to the directory or storing the
@@ -2279,7 +2331,7 @@ Divelog.SDE file
 		** Optionally change the name of the file for saving
 		** Click 'Save'
 	* Back in the Export pop-up, press the button 'Export'
- - The dives are now exported to the file Divelogs.SDE.
+7. The dives are now exported to the file Divelogs.SDE.
 
 *Divemanager 4 (DM4):*
 
@@ -2289,21 +2341,21 @@ database or make a backup of the dives. Both methods are described here.
 
 Locating the Suunto DM4 database:
 
- * Start Suunto DM4
- * Select 'Help -> About'
- * Click 'Copy' after text 'Copy log folder path to clipboard'
- * Now open Windows Explorer
- * Paste the address to the path box at the top of the File Explorer
- * The database is called DM4.db
+1. Start Suunto DM4
+2. Select 'Help -> About'
+3. Click 'Copy' after text 'Copy log folder path to clipboard'
+4. Now open Windows Explorer
+5. Paste the address to the path box at the top of the File Explorer
+6. The database is called DM4.db
 
 Backing up Suunto DM4:
 
- * Start Suunto DM4
- * Select 'File - Create backup'
- * From the file menu select the location and name for the backup, we'll
+1. Start Suunto DM4
+2. Select 'File - Create backup'
+3. From the file menu select the location and name for the backup, we'll
    use DM4 in here with the default extension .bak
- * Click 'Save'
- * The dives are now exported to the file DM4.bak
+4. Click 'Save'
+5. The dives are now exported to the file DM4.bak
 
 
 === Exporting from Mares Dive Organiser V2.1
@@ -2318,14 +2370,14 @@ computer and all Mares dive computers used. The safest way to obtain a copy
 of the dive data base is to export the information to another compatible format
 which can be imported into _Subsurface_.
 
- - Within Dive Organiser, select
+1. Within Dive Organiser, select
 _Database -> Backup_ from the main menu and back up the data base to the desk
 top.
 This creates a zipped file DiveOrganiserxxxxx.dbf.
- - Rename the file to
+2. Rename the file to
 DiveOrganiserxxxxx.zip. Inside the zipped directory is a file
 _DiveOrganiser.sdf_.
- - Extract the _.sdf_ file from the zipped folder to your Desktop.
+3. Extract the _.sdf_ file from the zipped folder to your Desktop.
 
 [[S_ImportingDivinglog]]
 === Exporting dives from *DivingLog 5.0*
@@ -2340,9 +2392,9 @@ to use the Metric system (one can easily change this within Diving Log by
 selecting 'File -> Preferences -> Units and Language' by clicking the 'Metric'
 button). Then do the following:
 
- - In Divinglog open the 'File -> Export -> XML' menu
- - Select the dives to export
- - Click on the export button and select the filename
+1. In Divinglog open the 'File -> Export -> XML' menu
+2. Select the dives to export
+3. Click on the export button and select the filename
 
 
 == APPENDIX D: FAQs.

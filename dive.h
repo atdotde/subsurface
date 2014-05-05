@@ -702,7 +702,7 @@ extern int parse_manual_file(const char *filename, int separator_index, int unit
 extern int save_dives(const char *filename);
 extern int save_dives_logic(const char *filename, bool select_only);
 extern int save_dive(FILE *f, struct dive *dive);
-extern int export_dives_uddf(const char *filename, const bool selected);
+extern int export_dives_xslt(const char *filename, const bool selected, const char *export_xslt);
 
 struct git_oid;
 struct git_repository;
@@ -742,6 +742,8 @@ extern void record_dive(struct dive *dive);
 
 extern struct sample *prepare_sample(struct divecomputer *dc);
 extern void finish_sample(struct divecomputer *dc);
+
+extern bool has_hr_data(struct divecomputer *dc);
 
 extern void sort_table(struct dive_table *table);
 extern struct dive *fixup_dive(struct dive *dive);

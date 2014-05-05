@@ -218,6 +218,8 @@ void DiveListView::selectDive(int i, bool scrollto, bool toggle)
 	if (idx.parent().isValid()) {
 		setAnimated(false);
 		expand(idx.parent());
+		if (scrollto)
+			scrollTo(idx.parent());
 		setAnimated(true);
 	}
 	if (scrollto)
@@ -274,6 +276,8 @@ void DiveListView::selectDives(const QList<int> &newDiveSelection)
 		this, SLOT(currentChanged(QModelIndex, QModelIndex)));
 	Q_EMIT currentDiveChanged(selected_dive);
 	const QModelIndex &idx = m->match(m->index(0, 0), DiveTripModel::DIVE_IDX, selected_dive, 2, Qt::MatchRecursive).first();
+	if (idx.parent().isValid())
+		scrollTo(idx.parent());
 	scrollTo(idx);
 }
 
@@ -371,6 +375,7 @@ void DiveListView::reload(DiveTripModel::Layout layout, bool forceSort)
 		if (!isExpanded(curr)) {
 			setAnimated(false);
 			expand(curr);
+			scrollTo(curr);
 			setAnimated(true);
 		}
 	}
@@ -761,6 +766,7 @@ void DiveListView::contextMenuEvent(QContextMenuEvent *event)
 	if (amount_selected >= 1) {
 		popup.addAction(tr("save As"), this, SLOT(saveSelectedDivesAs()));
 		popup.addAction(tr("export As UDDF"), this, SLOT(exportSelectedDivesAsUDDF()));
+		popup.addAction(tr("export As CSV"), this, SLOT(exportSelectedDivesAsCSV()));
 		popup.addAction(tr("shift times"), this, SLOT(shiftTimes()));
 		popup.addAction(tr("load images"), this, SLOT(loadImages()));
 	}
@@ -810,10 +816,21 @@ void DiveListView::exportSelectedDivesAsUDDF()
 	QString filename;
 	QFileInfo fi(system_default_filename());
 
-	filename = QFileDialog::getSaveFileName(this, tr("Save File as"), fi.absolutePath(),
+	filename = QFileDialog::getSaveFileName(this, tr("Export UDDF File as"), fi.absolutePath(),
 						tr("UDDF files (*.uddf *.UDDF)"));
 	if (!filename.isNull() && !filename.isEmpty())
-		export_dives_uddf(filename.toUtf8(), true);
+		export_dives_xslt(filename.toUtf8(), true, "uddf-export.xslt");
+}
+
+void DiveListView::exportSelectedDivesAsCSV()
+{
+	QString filename;
+	QFileInfo fi(system_default_filename());
+
+	filename = QFileDialog::getSaveFileName(this, tr("Export CSV File as"), fi.absolutePath(),
+						tr("CSV files (*.csv *.CSV)"));
+	if (!filename.isNull() && !filename.isEmpty())
+		export_dives_xslt(filename.toUtf8(), true, "xml2csv.xslt");
 }
 
 
@@ -828,6 +845,9 @@ void DiveListView::loadImages()
 	EXIFInfo exif;
 	int retval;
 	time_t imagetime;
+	struct divecomputer *dc;
+	time_t when;
+	int duration_s;
 	QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Open Image Files"), lastUsedImageDir(), tr("Image Files (*.jpg *.jpeg *.pnm *.tif *.tiff)"));
 
 	if (fileNames.isEmpty())
@@ -857,26 +877,32 @@ void DiveListView::loadImages()
 		for_each_dive(j, dive) {
 			if (!dive->selected)
 				continue;
-			// FIXME: this adds the events only to the first DC
-			if (dive->when - 3600 < imagetime && dive->when + dive->duration.seconds + 3600 > imagetime) {
-				if (dive->when > imagetime) {
-					// Before dive
-					add_event(&(dive->dc), 0, 123, 0, 0, fileNames.at(i).toUtf8().data());
-				} else if (dive->when + dive->duration.seconds < imagetime) {
-					// After dive
-					add_event(&(dive->dc), dive->duration.seconds, 123, 0, 0, fileNames.at(i).toUtf8().data());
-				} else {
-					add_event(&(dive->dc), imagetime - dive->when, 123, 0, 0, fileNames.at(i).toUtf8().data());
+			dc = &(dive->dc);
+			while (dc) {
+				when = dc->when ? dc->when : dive->when;
+				duration_s = dc->duration.seconds ? dc->duration.seconds : dive->duration.seconds;
+				if (when - 3600 < imagetime && when + duration_s + 3600 > imagetime) {
+					if (when > imagetime) {
+						// Before dive
+						add_event(dc, 0, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					} else if (when + duration_s < imagetime) {
+						// After dive
+						add_event(dc, duration_s, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					} else {
+						add_event(dc, imagetime - when, 123, 0, 0, fileNames.at(i).toUtf8().data());
+					}
+					if (!dive->latitude.udeg && !IS_FP_SAME(exif.GeoLocation.Latitude, 0.0)) {
+						dive->latitude.udeg = lrint(1000000.0 * exif.GeoLocation.Latitude);
+						dive->longitude.udeg = lrint(1000000.0 * exif.GeoLocation.Longitude);
+					}
+					mark_divelist_changed(true);
+					MainWindow::instance()->refreshDisplay();
+					MainWindow::instance()->graphics()->replot();
 				}
-				if (!dive->latitude.udeg && !IS_FP_SAME(exif.GeoLocation.Latitude, 0.0)) {
-					dive->latitude.udeg = lrint(1000000.0 * exif.GeoLocation.Latitude);
-					dive->longitude.udeg = lrint(1000000.0 * exif.GeoLocation.Longitude);
-				}
-				mark_divelist_changed(true);
+				dc = dc->next;
 			}
 		}
 	}
-	MainWindow::instance()->refreshDisplay();
 }
 
 void DiveListView::uploadToDivelogsDE()

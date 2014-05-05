@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QShortcut>
 
 struct product {
 	const char *product;
@@ -80,6 +81,10 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget *parent, Qt::WindowFlags f) :
 	connect(timer, SIGNAL(timeout()), this, SLOT(updateProgressBar()));
 	updateState(INITIAL);
 	memset(&data, 0, sizeof(data));
+	QShortcut *close = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_W), this);
+	connect(close, SIGNAL(activated()), this, SLOT(close()));
+	QShortcut *quit = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q), this);
+	connect(quit, SIGNAL(activated()), parent, SLOT(close()));
 }
 
 void DownloadFromDCWidget::updateProgressBar()
@@ -378,7 +383,13 @@ void DownloadFromDCWidget::onDownloadThreadFinished()
 		} else {
 			process_dives(true, preferDownloaded());
 		}
-	} else {
+	} else if (currentState == CANCELLING || currentState == CANCELLED){
+		if (import_thread_cancelled) {
+			// walk backwards so we don't keep moving the dives
+			// down in the dive_table
+			for (int i = dive_table.nr - 1; i >= previousLast; i--)
+				delete_single_dive(i);
+		}
 		updateState(CANCELLED);
 	}
 }

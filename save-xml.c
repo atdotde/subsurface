@@ -71,19 +71,16 @@ static void quote(struct membuffer *b, const char *text, int is_attribute)
 static void show_utf8(struct membuffer *b, const char *text, const char *pre, const char *post, int is_attribute)
 {
 	int len;
-
-	if (!text)
-		return;
-	while (isspace(*text))
-		text++;
-	len = strlen(text);
-	if (!len)
-		return;
-	while (len && isspace(text[len - 1]))
-		len--;
-	/* FIXME! Quoting! */
 	put_string(b, pre);
-	quote(b, text, is_attribute);
+	if (text){
+		while (isspace(*text))
+			text++;
+		len = strlen(text);
+		while (len && isspace(text[len - 1]))
+			len--;
+		/* FIXME! Quoting! */
+		quote(b, text, is_attribute);
+	}
 	put_string(b, post);
 }
 
@@ -188,13 +185,7 @@ static void show_location(struct membuffer *b, struct dive *dive)
 	 */
 	if (latitude.udeg || longitude.udeg) {
 		int len = sprintf(buffer, "  <location ");
-
 		len += format_location(buffer + len, latitude, longitude);
-		if (!dive->location) {
-			memcpy(buffer + len, "/>\n", 4);
-			put_string(b, buffer);
-			return;
-		}
 		buffer[len++] = '>';
 		buffer[len] = 0;
 		prefix = buffer;
@@ -627,7 +618,7 @@ int save_dives_logic(const char *filename, const bool select_only)
 	return error;
 }
 
-int export_dives_uddf(const char *filename, const bool selected)
+int export_dives_xslt(const char *filename, const bool selected, const char *export_xslt)
 {
 	FILE *f;
 	struct membuffer buf = { 0 };
@@ -635,15 +626,16 @@ int export_dives_uddf(const char *filename, const bool selected)
 	xsltStylesheetPtr xslt = NULL;
 	xmlDoc *transformed;
 
+
 	if (!filename)
-		return report_error("No filename for UDDF export");
+		return report_error("No filename for export");
 
 	/* Save XML to file and convert it into a memory buffer */
 	save_dives_buffer(&buf, selected);
 
 	/*
 	 * Parse the memory buffer into XML document and
-	 * transform it to UDDF format, finally dumping
+	 * transform it to selected export format, finally dumping
 	 * the XML into a character buffer.
 	 */
 	doc = xmlReadMemory(buf.buffer, buf.len, "divelog", NULL, 0);
@@ -651,16 +643,16 @@ int export_dives_uddf(const char *filename, const bool selected)
 	if (!doc)
 		return report_error("Failed to read XML memory");
 
-	/* Convert to UDDF format */
-	xslt = get_stylesheet("uddf-export.xslt");
+	/* Convert to export format */
+	xslt = get_stylesheet(export_xslt);
 	if (!xslt)
-		return report_error("Failed to open UDDF conversion stylesheet");
+		return report_error("Failed to open export conversion stylesheet");
 
 	transformed = xsltApplyStylesheet(xslt, doc, NULL);
 	xsltFreeStylesheet(xslt);
 	xmlFreeDoc(doc);
 
-	/* Write the transformed XML to file */
+	/* Write the transformed export to file */
 	f = subsurface_fopen(filename, "w");
 	if (!f)
 		return report_error("Failed to open %s for writing (%s)", filename, strerror(errno));

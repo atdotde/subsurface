@@ -6,6 +6,7 @@
 #include "dive.h"
 #include "profile.h"
 #include <QDebug>
+#include "gettextfromc.h"
 
 extern struct ev_select *ev_namelist;
 extern int evn_used;
@@ -76,26 +77,27 @@ void DiveEventItem::setupPixmap()
 void DiveEventItem::setupToolTipString()
 {
 	// we display the event on screen - so translate
-	QString name = tr(internalEvent->name);
+	QString name = gettextFromC::instance()->tr(internalEvent->name);
 	int value = internalEvent->value;
+	int type = internalEvent->type;
 	if (value) {
-		if (name == "gaschange") {
+		if (type == SAMPLE_EVENT_GASCHANGE || type == SAMPLE_EVENT_GASCHANGE2) {
 			int he = value >> 16;
 			int o2 = value & 0xffff;
 
 			name += ": ";
 			if (he)
 				name += QString("%1/%2").arg(o2).arg(he);
-			else if (is_air(o2, he))
+			else if (o2 == 21) // don't use is_air() as that assumes permille
 				name += tr("air");
 			else
 				name += QString(tr("EAN%1")).arg(o2);
-		} else if (name == "SP change") {
+		} else if (type == SAMPLE_EVENT_PO2) {
 			name += QString(":%1").arg((double)value / 1000);
 		} else {
 			name += QString(":%1").arg(value);
 		}
-	} else if (name == "SP change") {
+	} else if (type == SAMPLE_EVENT_PO2) {
 		name += "\n" + tr("Bailing out to OC");
 	} else {
 		name += internalEvent->flags == SAMPLE_FLAGS_BEGIN ? tr(" begin", "Starts with space!") :

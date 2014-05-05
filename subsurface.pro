@@ -13,7 +13,7 @@ DEPENDPATH += qt-ui
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 4.0.2
+VERSION = 4.0.98
 
 # enable or disable the dive planner
 planner {
@@ -197,6 +197,7 @@ TRANSLATIONS = \
 	translations/subsurface_de_CH.ts \
 	translations/subsurface_de_DE.ts \
 	translations/subsurface_el_GR.ts \
+	translations/subsurface_en_GB.ts \
 	translations/subsurface_es_ES.ts \
 	translations/subsurface_et_EE.ts \
 	translations/subsurface_fi_FI.ts \

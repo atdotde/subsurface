@@ -157,7 +157,7 @@ static int get_local_sac(struct plot_data *entry1, struct plot_data *entry2, str
 		return 0;
 	a.mbar = GET_PRESSURE(entry1);
 	b.mbar = GET_PRESSURE(entry2);
-	if (!a.mbar || !b.mbar)
+	if (!b.mbar || a.mbar <= b.mbar)
 		return 0;
 
 	/* Mean pressure in ATM */
@@ -686,6 +686,8 @@ struct plot_info calculate_max_limits_new(struct dive *dive, struct divecomputer
 		unsigned int mbar = dive->cylinder[cyl].start.mbar;
 		if (mbar > maxpressure)
 			maxpressure = mbar;
+		if (mbar < minpressure)
+			minpressure = mbar;
 	}
 
 	/* Then do all the samples from all the dive computers */

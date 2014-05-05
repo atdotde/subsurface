@@ -89,6 +89,9 @@ void init_ui(void)
 	// 106 is "UTF-8", this is faster than lookup by name
 	// [http://www.iana.org/assignments/character-sets/character-sets.xml]
 	QTextCodec::setCodecForCStrings(QTextCodec::codecForMib(106));
+	// and for reasons I can't understand, I need to do the same again for tr
+	// even though that clearly uses C strings as well...
+	QTextCodec::setCodecForTr(QTextCodec::codecForMib(106));
 #ifdef Q_OS_WIN
 	QFile::setDecodingFunction(decodeUtf8);
 	QFile::setEncodingFunction(encodeUtf8);
@@ -121,7 +124,7 @@ void init_ui(void)
 	// we don't have translations for English - if we don't check for this
 	// Qt will proceed to load the second language in preference order - not what we want
 	// on Linux this tends to be en-US, but on the Mac it's just en
-	if (!uiLang.startsWith("en")) {
+	if (!uiLang.startsWith("en") || uiLang.startsWith("en-GB")) {
 		qtTranslator = new QTranslator;
 		if (qtTranslator->load(loc, "qt", "_", QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
 			application->installTranslator(qtTranslator);
