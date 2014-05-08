@@ -579,13 +579,19 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 }
 #endif
 
-int ascend_velocity(int depth)
+int ascend_velocity(int depth, int avg_depth, int bottom_time)
 {
 	/* We need to make this configurable */
-	if (depth > 6000)
-		return 10000/60;	/* 10 m/min below 6m */
+	/* As an example (and possibly reasonable default) this is the Tech 1 provedure according
+	 * to http://www.globalunderwaterexplorers.org/files/Standards_and_Procedures/SOP_Manual_Ver2.0.2.pdf */
+
+	if (depth <= 6000)
+		return 1000 / 60;
+
+	if (depth * 4 > avg_depth *3)
+		return 9000 / 60;
 	else
-		return 1000/60;		/* 1 m/min for the last meter */
+		return 6000 / 60;
 }
 
 void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco)
@@ -605,6 +611,8 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	bool stopping = false;
 	bool clear_to_ascend;
 	int clock, previous_point_time;
+	int avg_depth, bottom_time;
+	int last_ascend_rate;
 
 	set_gf(diveplan->gflow, diveplan->gfhigh, default_prefs.gf_low_at_maxdepth);
 	if (!diveplan->surface_pressure)
@@ -628,6 +636,8 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		current_cylinder = 0;
 	}
 	depth = dive->dc.sample[dive->dc.samples - 1].depth.mm;
+	avg_depth = average_depth(diveplan);
+	last_ascend_rate = ascend_velocity(depth, avg_depth, bottom_time);
 
 	/* if all we wanted was the dive just get us back to the surface */
 	if (!add_deco) {
@@ -661,7 +671,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 	stopidx += gaschangenr;
 
 	/* Keep time during the ascend */
-	clock = previous_point_time = dive->dc.sample[dive->dc.samples - 1].time.seconds;
+	bottom_time = clock = previous_point_time = dive->dc.sample[dive->dc.samples - 1].time.seconds;
 	gi = gaschangenr - 1;
 
 	while (1) {
@@ -669,7 +679,13 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		do {
 			/* Ascend to next stop depth */
 			assert(deco_allowed_depth(tissue_tolerance, diveplan->surface_pressure / 1000.0, dive, 1) < depth);
-			int deltad = ascend_velocity(depth) * TIMESTEP;
+			int deltad = ascend_velocity(depth, avg_depth, bottom_time) * TIMESTEP;
+			if (ascend_velocity(depth, avg_depth, bottom_time) != last_ascend_rate) {
+				plan_add_segment(diveplan, clock - previous_point_time, depth, o2, he, po2, false);
+				previous_point_time = clock;
+				stopping = false;
+				last_ascend_rate = ascend_velocity(depth, avg_depth, bottom_time);
+			}
 			if (depth - deltad < stoplevels[stopidx])
 				deltad = depth - stoplevels[stopidx];
 
@@ -708,7 +724,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 			/* Check if ascending to next stop is clear, go back and wait if we hit the ceiling on the way */
 			clear_to_ascend = true;
 			while (trial_depth > stoplevels[stopidx]) {
-				int deltad = ascend_velocity(trial_depth) * TIMESTEP;
+				int deltad = ascend_velocity(trial_depth, avg_depth, bottom_time) * TIMESTEP;
 				tissue_tolerance = add_segment(depth_to_mbar(trial_depth, dive) / 1000.0, &dive->cylinder[current_cylinder].gasmix, TIMESTEP, po2, dive);
 				if (deco_allowed_depth(tissue_tolerance, diveplan->surface_pressure / 1000.0, dive, 1) > trial_depth - deltad){
 					/* We should have stopped */
