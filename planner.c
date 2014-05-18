@@ -478,7 +478,6 @@ static unsigned int *sort_stops(int *dstops, int dnr, struct gaschanges *gstops,
 	return stoplevels;
 }
 
-#if DO_WE_WANT_THIS_IN_QT
 static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 {
 	char buffer[20000];
@@ -491,7 +490,7 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 		return;
 
 	snprintf(buffer, sizeof(buffer), translate("gettextFromC", "%s\nSubsurface dive plan\nbased on GFlow = %.0f and GFhigh = %.0f\n\n"),
-		 disclaimer, plangflow * 100, plangfhigh * 100);
+		 disclaimer, diveplan->gflow * 100, diveplan->gfhigh * 100);
 	/* we start with gas 0, then check if that was changed */
 	o2 = dive->cylinder[0].gasmix.o2.permille;
 	he = dive->cylinder[0].gasmix.he.permille;
@@ -564,6 +563,8 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 		double volume;
 		const char *unit;
 		char gas[64];
+		if (dive->cylinder[gasidx].type.size.mliter)
+			dive->cylinder[gasidx].end.mbar = dive->cylinder[gasidx].start.mbar - consumption[gasidx] / dive->cylinder[gasidx].type.size.mliter / 1000;
 		if (consumption[gasidx] == 0)
 			continue;
 		len = strlen(buffer);
@@ -574,7 +575,6 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 	}
 	dive->notes = strdup(buffer);
 }
-#endif
 
 int ascend_velocity(int depth, int avg_depth, int bottom_time)
 {
@@ -766,9 +766,7 @@ void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, b
 		goto error_exit;
 	record_dive(dive);
 
-#if DO_WE_WANT_THIS_IN_QT
 	add_plan_to_notes(diveplan, dive);
-#endif
 
 error_exit:
 	free(stoplevels);
