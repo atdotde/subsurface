@@ -530,7 +530,7 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 		gasidx = get_gasidx(dive, o2, he);
 		len = strlen(buffer);
 		if (dp->depth != lastdepth) {
-			used = diveplan->bottomsac / 1000.0 * depth_to_mbar((dp->depth + lastdepth) / 2, dive) *
+			used = diveplan->bottomsac / 1000000.0 * depth_to_mbar((dp->depth + lastdepth) / 2, dive) *
 			       (dp->time - lasttime) / 60;
 			snprintf(buffer + len, sizeof(buffer) - len, translate("gettextFromC", "Transition to %.*f %s in %d:%02d min - runtime %d:%02u on %s\n"),
 				 decimals, depthvalue, depth_unit,
@@ -540,7 +540,7 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 		} else {
 			/* we use deco SAC rate during the calculated deco stops, bottom SAC rate everywhere else */
 			int sac = dp->entered ? diveplan->bottomsac : diveplan->decosac;
-			used = sac / 1000.0 * depth_to_mbar(dp->depth, dive) * (dp->time - lasttime) / 60;
+			used = sac / 1000000.0 * depth_to_mbar(dp->depth, dive) * (dp->time - lasttime) / 60;
 			snprintf(buffer + len, sizeof(buffer) - len, translate("gettextFromC", "Stay at %.*f %s for %d:%02d min - runtime %d:%02u on %s\n"),
 				 decimals, depthvalue, depth_unit,
 				 FRACTION(dp->time - lasttime, 60),
@@ -566,7 +566,7 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive)
 		const char *unit;
 		char gas[64];
 		if (dive->cylinder[gasidx].type.size.mliter)
-			dive->cylinder[gasidx].end.mbar = dive->cylinder[gasidx].start.mbar - consumption[gasidx] / dive->cylinder[gasidx].type.size.mliter / 1000;
+			dive->cylinder[gasidx].end.mbar = dive->cylinder[gasidx].start.mbar - consumption[gasidx] / dive->cylinder[gasidx].type.size.mliter / 1000000;
 		if (consumption[gasidx] == 0)
 			continue;
 		len = strlen(buffer);
