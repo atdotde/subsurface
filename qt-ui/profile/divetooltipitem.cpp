@@ -18,7 +18,7 @@
 #include "display.h"
 #endif
 
-void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon, const QPixmap &pixmap)
+void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon, const QPixmap *pixmap)
 {
 	QGraphicsPixmapItem *iconItem = 0, *pixmapItem = 0;
 	double yValue = title->boundingRect().height() + SPACING;
@@ -29,8 +29,8 @@ void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon, const QP
 		iconItem = new QGraphicsPixmapItem(icon.pixmap(ICON_SMALL, ICON_SMALL), this);
 		iconItem->setPos(SPACING, yValue);
 	} else {
-		if (!pixmap.isNull()) {
-			pixmapItem = new QGraphicsPixmapItem(pixmap, this);
+		if (!pixmap->isNull()) {
+			pixmapItem = new QGraphicsPixmapItem(*pixmap, this);
 			pixmapItem->setPos(SPACING, yValue);
 		}
 	}
@@ -222,7 +222,10 @@ void ToolTipItem::setTimeAxis(DiveCartesianAxis *axis)
 
 void ToolTipItem::refresh(const QPointF &pos)
 {
-	QPixmap tissues = QPixmap::QPixmap(16,50);
+	int i;
+	struct plot_data *entry;
+	QPixmap *tissues = new QPixmap(16,50);
+	QPainter *painter = new QPainter(tissues);
 	int time = timeAxis->valueAt(pos);
 	if (time == lastTime)
 		return;
@@ -231,8 +234,11 @@ void ToolTipItem::refresh(const QPointF &pos)
 	clear();
 	struct membuffer mb = { 0 };
 
-	get_plot_details_new(&pInfo, time, &mb);
-	tissues.fill();
+	entry = get_plot_details_new(&pInfo, time, &mb);
+	tissues->fill();
+	for (i=0; i<16; i++) {
+		painter->drawLine(i, 0, i, entry->percentages[i] / 2);
+	}
 	addToolTip(QString::fromUtf8(mb.buffer, mb.len),QIcon(), tissues);
 	free_buffer(&mb);
 
