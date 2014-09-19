@@ -18,9 +18,9 @@
 #include "display.h"
 #endif
 
-void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon)
+void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon, const QPixmap &pixmap)
 {
-	QGraphicsPixmapItem *iconItem = 0;
+	QGraphicsPixmapItem *iconItem = 0, *pixmapItem = 0;
 	double yValue = title->boundingRect().height() + SPACING;
 	Q_FOREACH (ToolTip t, toolTips) {
 		yValue += t.second->boundingRect().height();
@@ -28,6 +28,11 @@ void ToolTipItem::addToolTip(const QString &toolTip, const QIcon &icon)
 	if (!icon.isNull()) {
 		iconItem = new QGraphicsPixmapItem(icon.pixmap(ICON_SMALL, ICON_SMALL), this);
 		iconItem->setPos(SPACING, yValue);
+	} else {
+		if (!pixmap.isNull()) {
+			pixmapItem = new QGraphicsPixmapItem(pixmap, this);
+			pixmapItem->setPos(SPACING, yValue);
+		}
 	}
 
 	QGraphicsSimpleTextItem *textItem = new QGraphicsSimpleTextItem(toolTip, this);
@@ -217,6 +222,7 @@ void ToolTipItem::setTimeAxis(DiveCartesianAxis *axis)
 
 void ToolTipItem::refresh(const QPointF &pos)
 {
+	QPixmap tissues = QPixmap::QPixmap(16,50);
 	int time = timeAxis->valueAt(pos);
 	if (time == lastTime)
 		return;
@@ -226,7 +232,8 @@ void ToolTipItem::refresh(const QPointF &pos)
 	struct membuffer mb = { 0 };
 
 	get_plot_details_new(&pInfo, time, &mb);
-	addToolTip(QString::fromUtf8(mb.buffer, mb.len));
+	tissues.fill();
+	addToolTip(QString::fromUtf8(mb.buffer, mb.len),QIcon(), tissues);
 	free_buffer(&mb);
 
 	Q_FOREACH (QGraphicsItem *item, scene()->items(pos, Qt::IntersectsItemShape
