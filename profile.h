@@ -31,6 +31,7 @@ struct plot_data {
 	int depth;
 	int ceiling;
 	int ceilings[16];
+	int percentages[16];
 	int ndl;
 	int tts;
 	int stoptime;
@@ -55,6 +56,8 @@ struct plot_data {
 	int pressure_time;
 	int heartbeat;
 	int bearing;
+	double ambpressure;
+	double gfline;
 };
 
 struct ev_select {
@@ -68,7 +71,7 @@ struct plot_data *populate_plot_entries(struct dive *dive, struct divecomputer *
 struct plot_info *analyze_plot_info(struct plot_info *pi);
 void create_plot_info_new(struct dive *dive, struct divecomputer *dc, struct plot_info *pi);
 void calculate_deco_information(struct dive *dive, struct divecomputer *dc, struct plot_info *pi, bool print_mode);
-void get_plot_details_new(struct plot_info *pi, int time, struct membuffer *);
+struct plot_data *get_plot_details_new(struct plot_info *pi, int time, struct membuffer *);
 
 /*
  * When showing dive profiles, we scale things to the
