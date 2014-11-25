@@ -1128,6 +1128,7 @@ void ProfileWidget2::contextMenuEvent(QContextMenuEvent *event)
 			gasChange->addAction(action);
 		}
 	}
+	QAction
 	QAction *action = m.addAction(tr("Add bookmark"), this, SLOT(addBookmark()));
 	action->setData(event->globalPos());
 	if (DiveEventItem *item = dynamic_cast<DiveEventItem *>(sceneItem)) {
