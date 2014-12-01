@@ -2,12 +2,11 @@
 #define DIVELOGIMPORTDIALOG_H
 
 #include <QDialog>
-#include <QModelIndex>
+
 #include "../dive.h"
 #include "../divelist.h"
 
-namespace Ui
-{
+namespace Ui {
 	class DiveLogImportDialog;
 }
 
@@ -37,11 +36,14 @@ private:
 		int temperature;
 		int po2;
 		int cns;
+		int ndl;
+		int tts;
 		int stopdepth;
+		int pressure;
 		QString separator;
 	};
 
-#define CSVAPPS 5
+#define CSVAPPS 6
 	static const CSVAppConfig CSVApps[CSVAPPS];
 };
 

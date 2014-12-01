@@ -6,12 +6,17 @@
         <file alias="trash">icons/trash.png</file>
         <file alias="units">icons/units.png</file>
         <file alias="advanced">icons/advanced.png</file>
+        <file alias="network">icons/network.png</file>
         <file alias="edit">icons/advanced.png</file>
         <file alias="graph">icons/graph.png</file>
         <file alias="minimum">icons/minimum.png</file>
         <file alias="maximum">icons/maximum.png</file>
         <file alias="average">icons/average.png</file>
         <file alias="warning">icons/warning.png</file>
+        <file alias="gaschange">icons/gaschange.png</file>
+        <file alias="gaschangeAir">icons/Air_change.png</file>
+        <file alias="gaschangeNitrox">icons/Nx_change.png</file>
+        <file alias="gaschangeTrimix">icons/Tmx_change.png</file>
         <file alias="flag">icons/flag.png</file>
         <file alias="scale">icons/scale.png</file>
         <file alias="ruler">icons/ruler.png</file>
@@ -53,5 +58,15 @@
         <file alias="icon_ceiling_dc">icons/pc.png</file>
         <file alias="icon_ead">icons/ead.png</file>
         <file alias="icon_HR">icons/icon-HR.png</file>
+        <file alias="icon_tissue">icons/tissues.png</file>
+        <file alias="calendar">icons/calendarbg.png</file>
+        <file alias="pictures">icons/pictures.png</file>
+        <file>icons/subsurface/index.theme</file>
+        <file>icons/subsurface/32x32/actions/go-down.png</file>
+        <file>icons/subsurface/32x32/actions/go-up.png</file>
+        <file alias="close">icons/subsurface/32x32/actions/window-close.png</file>
+        <file>icons/ostc2n.png</file>
+        <file>icons/ostc3.png</file>
+        <file>icons/suunto_vyper.png</file>
     </qresource>
 </RCC>

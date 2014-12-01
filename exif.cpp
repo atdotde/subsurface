@@ -30,12 +30,12 @@
      EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <algorithm>
+#include "dive.h"
 #include "exif.h"
 
 using std::string;
 
-namespace
-{
+namespace {
 	// IF Entry
 	struct IFEntry {
 		// Raw fields
@@ -459,15 +459,15 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len)
 				// GPS latitude
 				if (format == 5 && length == 3) {
 					this->GeoLocation.LatComponents.degrees =
-					    parseEXIFRational(buf + data + tiff_header_start, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start, alignIntel);
 					this->GeoLocation.LatComponents.minutes =
-					    parseEXIFRational(buf + data + tiff_header_start + 8, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start + 8, alignIntel);
 					this->GeoLocation.LatComponents.seconds =
-					    parseEXIFRational(buf + data + tiff_header_start + 16, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start + 16, alignIntel);
 					this->GeoLocation.Latitude =
-					    this->GeoLocation.LatComponents.degrees +
-					    this->GeoLocation.LatComponents.minutes / 60 +
-					    this->GeoLocation.LatComponents.seconds / 3600;
+						this->GeoLocation.LatComponents.degrees +
+						this->GeoLocation.LatComponents.minutes / 60 +
+						this->GeoLocation.LatComponents.seconds / 3600;
 					if ('S' == this->GeoLocation.LatComponents.direction)
 						this->GeoLocation.Latitude = -this->GeoLocation.Latitude;
 				}
@@ -484,15 +484,15 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len)
 				// GPS longitude
 				if (format == 5 && length == 3) {
 					this->GeoLocation.LonComponents.degrees =
-					    parseEXIFRational(buf + data + tiff_header_start, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start, alignIntel);
 					this->GeoLocation.LonComponents.minutes =
-					    parseEXIFRational(buf + data + tiff_header_start + 8, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start + 8, alignIntel);
 					this->GeoLocation.LonComponents.seconds =
-					    parseEXIFRational(buf + data + tiff_header_start + 16, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start + 16, alignIntel);
 					this->GeoLocation.Longitude =
-					    this->GeoLocation.LonComponents.degrees +
-					    this->GeoLocation.LonComponents.minutes / 60 +
-					    this->GeoLocation.LonComponents.seconds / 3600;
+						this->GeoLocation.LonComponents.degrees +
+						this->GeoLocation.LonComponents.minutes / 60 +
+						this->GeoLocation.LonComponents.seconds / 3600;
 					if ('W' == this->GeoLocation.LonComponents.direction)
 						this->GeoLocation.Longitude = -this->GeoLocation.Longitude;
 				}
@@ -509,7 +509,7 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len)
 				// GPS altitude reference
 				if (format == 5) {
 					this->GeoLocation.Altitude =
-					    parseEXIFRational(buf + data + tiff_header_start, alignIntel);
+						parseEXIFRational(buf + data + tiff_header_start, alignIntel);
 					if (1 == this->GeoLocation.AltitudeRef)
 						this->GeoLocation.Altitude = -this->GeoLocation.Altitude;
 				}
@@ -525,15 +525,15 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len)
 void EXIFInfo::clear()
 {
 	// Strings
-	ImageDescription = "";
-	Make = "";
-	Model = "";
-	Software = "";
-	DateTime = "";
-	DateTimeOriginal = "";
-	DateTimeDigitized = "";
-	SubSecTimeOriginal = "";
-	Copyright = "";
+	ImageDescription.clear();
+	Make.clear();
+	Model.clear();
+	Software.clear();
+	DateTime.clear();
+	DateTimeOriginal.clear();
+	DateTimeDigitized.clear();
+	SubSecTimeOriginal.clear();
+	Copyright.clear();
 
 	// Shorts / unsigned / double
 	ByteAlign = 0;
@@ -566,4 +566,22 @@ void EXIFInfo::clear()
 	GeoLocation.LonComponents.minutes = 0;
 	GeoLocation.LonComponents.seconds = 0;
 	GeoLocation.LonComponents.direction = 0;
+}
+
+time_t EXIFInfo::epoch()
+{
+	struct tm tm;
+	int year, month, day, hour, min, sec;
+
+	if (DateTimeOriginal.size())
+		sscanf(DateTimeOriginal.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+	else
+		sscanf(DateTime.c_str(), "%d:%d:%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+	tm.tm_year = year;
+	tm.tm_mon = month - 1;
+	tm.tm_mday = day;
+	tm.tm_hour = hour;
+	tm.tm_min = min;
+	tm.tm_sec = sec;
+	return (utc_mktime(&tm));
 }

@@ -68,7 +68,7 @@ static void process_dive(struct dive *dp, stats_t *stats)
 	stats->avg_depth.mm = (1.0 * old_tt * stats->avg_depth.mm +
 			       duration * dp->meandepth.mm) /
 			      stats->total_time.seconds;
-	if (dp->sac > 2800) { /* less than .1 cuft/min (2800ml/min) is bogus */
+	if (dp->sac > 100) { /* less than .1 l/min is bogus, even with a pSCR */
 		sac_time = stats->total_sac_time + duration;
 		stats->avg_sac.mliter = (1.0 * stats->total_sac_time * stats->avg_sac.mliter +
 					 duration * dp->sac) /
@@ -114,11 +114,10 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 	 * case (one dive per year or all dives during
 	 * one month) for yearly and monthly statistics*/
 
-	if (stats_yearly != NULL) {
-		free(stats_yearly);
-		free(stats_monthly);
-		free(stats_by_trip);
-	}
+	free(stats_yearly);
+	free(stats_monthly);
+	free(stats_by_trip);
+
 	size = sizeof(stats_t) * (dive_table.nr + 1);
 	stats_yearly = malloc(size);
 	stats_monthly = malloc(size);
@@ -132,8 +131,7 @@ void process_all_dives(struct dive *dive, struct dive **prev_dive)
 
 	/* this relies on the fact that the dives in the dive_table
 	 * are in chronological order */
-	for (idx = 0; idx < dive_table.nr; idx++) {
-		dp = dive_table.dives[idx];
+	for_each_dive (idx, dp) {
 		if (dive && dp->when == dive->when) {
 			/* that's the one we are showing */
 			if (idx > 0)
@@ -231,10 +229,10 @@ static void get_ranges(char *buffer, int size)
 {
 	int i, len;
 	int first = -1, last = -1;
+	struct dive *dive;
 
 	snprintf(buffer, size, "%s", translate("gettextFromC", "for dives #"));
-	for (i = 0; i < dive_table.nr; i++) {
-		struct dive *dive = get_dive(i);
+	for_each_dive (i, dive) {
 		if (!dive->selected)
 			continue;
 		if (dive->number < 1) {
@@ -294,23 +292,24 @@ void get_selected_dives_text(char *buffer, int size)
 	}
 }
 
-static bool is_gas_used(struct dive *dive, int idx)
+bool is_cylinder_used(struct dive *dive, int idx)
 {
-	struct divecomputer *dc = &dive->dc;
+	struct divecomputer *dc;
 	bool firstGasExplicit = false;
 	if (cylinder_none(&dive->cylinder[idx]))
 		return false;
 
-	while (dc) {
+	for_each_dc(dive, dc) {
 		struct event *event = get_next_event(dc->events, "gaschange");
 		while (event) {
-			if (event->time.seconds < 30)
+			if (dc->sample && event->time.seconds == dc->sample[0].time.seconds)
 				firstGasExplicit = true;
 			if (get_cylinder_index(dive, event) == idx)
 				return true;
 			event = get_next_event(event->next, "gaschange");
 		}
-		dc = dc->next;
+		if (dc->dctype == CCR && (idx == dive->diluent_cylinder_index || idx == dive->oxygen_cylinder_index))
+			return true;
 	}
 	if (idx == 0 && !firstGasExplicit)
 		return true;
@@ -324,7 +323,7 @@ void get_gas_used(struct dive *dive, volume_t gases[MAX_CYLINDERS])
 		cylinder_t *cyl = &dive->cylinder[idx];
 		pressure_t start, end;
 
-		if (!is_gas_used(dive, idx))
+		if (!is_cylinder_used(dive, idx))
 			continue;
 
 		start = cyl->start.mbar ? cyl->start : cyl->sample_start;
@@ -334,39 +333,38 @@ void get_gas_used(struct dive *dive, volume_t gases[MAX_CYLINDERS])
 	}
 }
 
-#define MAXBUF 80
-/* for the O2/He readings just create a list of them */
-char *get_gaslist(struct dive *dive)
+/* Quite crude reverse-blender-function, but it produces a approx result */
+static void get_gas_parts(struct gasmix mix, volume_t vol, int o2_in_topup, volume_t *o2, volume_t *he)
 {
-	int idx, offset = 0;
-	static char buf[MAXBUF];
-	int o2, he;
+	volume_t air = {};
 
-	buf[0] = '\0';
-	for (idx = 0; idx < MAX_CYLINDERS; idx++) {
-		cylinder_t *cyl;
-		if (!is_gas_used(dive, idx))
-			continue;
-		cyl = &dive->cylinder[idx];
-		o2 = get_o2(&cyl->gasmix);
-		he = get_he(&cyl->gasmix);
-		if (offset > 0) {
-			strncpy(buf + offset, "\n", MAXBUF - offset);
-			offset = strlen(buf);
-		}
-		if (is_air(o2, he))
-			strncpy(buf + offset, translate("gettextFromC", "air"), MAXBUF - offset);
-		else if (he == 0)
-			snprintf(buf + offset, MAXBUF - offset,
-				 translate("gettextFromC", "EAN%d"), (o2 + 5) / 10);
-		else
-			snprintf(buf + offset, MAXBUF - offset,
-				 "%d/%d", (o2 + 5) / 10, (he + 5) / 10);
-		offset = strlen(buf);
+	if (gasmix_is_air(&mix)) {
+		o2->mliter = 0;
+		he->mliter = 0;
+		return;
 	}
-	if (*buf == '\0')
-		strncpy(buf, translate("gettextFromC", "air"), MAXBUF);
 
-	buf[MAXBUF - 1] = '\0';
-	return buf;
+	air.mliter = rint(((double)vol.mliter * (1000 - get_he(&mix) - get_o2(&mix))) / (1000 - o2_in_topup));
+	he->mliter = rint(((double)vol.mliter * get_he(&mix)) / 1000.0);
+	o2->mliter += vol.mliter - he->mliter - air.mliter;
+}
+
+void selected_dives_gas_parts(volume_t *o2_tot, volume_t *he_tot)
+{
+	int i, j;
+	struct dive *d;
+	for_each_dive (i, d) {
+		if (!d->selected)
+			continue;
+		volume_t diveGases[MAX_CYLINDERS] = {};
+		get_gas_used(d, diveGases);
+		for (j = 0; j < MAX_CYLINDERS; j++) {
+			if (diveGases[j].mliter) {
+				volume_t o2 = {}, he = {};
+				get_gas_parts(d->cylinder[j].gasmix, diveGases[j], O2_IN_AIR, &o2, &he);
+				o2_tot->mliter += o2.mliter;
+				he_tot->mliter += he.mliter;
+			}
+		}
+	}
 }

@@ -1,7 +1,9 @@
 /* windows.c */
 /* implements Windows specific functions */
+#include <io.h>
 #include "dive.h"
 #include "display.h"
+#undef _WIN32_WINNT
 #define _WIN32_WINNT 0x500
 #include <windows.h>
 #include <shlobj.h>
@@ -11,11 +13,30 @@
 #include <dirent.h>
 #include <zip.h>
 
-const char system_divelist_default_font[] = "Calibri";
-const int system_divelist_default_font_size = 8;
+const char non_standard_system_divelist_default_font[] = "Calibri";
+const char current_system_divelist_default_font[] = "Segoe UI";
+const char *system_divelist_default_font = non_standard_system_divelist_default_font;
+double system_divelist_default_font_size = -1;
 
 void subsurface_user(struct user_info *user)
 { /* Encourage use of at least libgit2-0.20 */ }
+
+extern bool isWin7Or8();
+
+void subsurface_OS_pref_setup(void)
+{
+	if (isWin7Or8())
+		system_divelist_default_font = current_system_divelist_default_font;
+}
+
+bool subsurface_ignore_font(const char *font)
+{
+	// if this is running on a recent enough version of Windows and the font
+	// passed in is the pre 4.3 default font, ignore it
+	if (isWin7Or8() && strcmp(font, non_standard_system_divelist_default_font) == 0)
+		return true;
+	return false;
+}
 
 const char *system_default_filename(void)
 {
@@ -36,56 +57,91 @@ const char *system_default_filename(void)
 	return buffer;
 }
 
-int enumerate_devices(device_callback_t callback, void *userdata)
+int enumerate_devices(device_callback_t callback, void *userdata, int dc_type)
 {
-	// Open the registry key.
-	HKEY hKey;
 	int index = -1;
-	LONG rc = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_QUERY_VALUE, &hKey);
-	if (rc != ERROR_SUCCESS) {
-		return -1;
-	}
-
-	// Get the number of values.
-	DWORD count = 0;
-	rc = RegQueryInfoKey(hKey, NULL, NULL, NULL, NULL, NULL, NULL, &count, NULL, NULL, NULL, NULL);
-	if (rc != ERROR_SUCCESS) {
-		RegCloseKey(hKey);
-		return -1;
-	}
 	DWORD i;
-	for (i = 0; i < count; ++i) {
-		// Get the value name, data and type.
-		char name[512], data[512];
-		DWORD name_len = sizeof(name);
-		DWORD data_len = sizeof(data);
-		DWORD type = 0;
-		rc = RegEnumValue(hKey, i, name, &name_len, NULL, &type, (LPBYTE)data, &data_len);
+	if (dc_type != DC_TYPE_UEMIS) {
+		// Open the registry key.
+		HKEY hKey;
+		LONG rc = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_QUERY_VALUE, &hKey);
+		if (rc != ERROR_SUCCESS) {
+			return -1;
+		}
+
+		// Get the number of values.
+		DWORD count = 0;
+		rc = RegQueryInfoKey(hKey, NULL, NULL, NULL, NULL, NULL, NULL, &count, NULL, NULL, NULL, NULL);
 		if (rc != ERROR_SUCCESS) {
 			RegCloseKey(hKey);
 			return -1;
 		}
+		for (i = 0; i < count; ++i) {
+			// Get the value name, data and type.
+			char name[512], data[512];
+			DWORD name_len = sizeof(name);
+			DWORD data_len = sizeof(data);
+			DWORD type = 0;
+			rc = RegEnumValue(hKey, i, name, &name_len, NULL, &type, (LPBYTE)data, &data_len);
+			if (rc != ERROR_SUCCESS) {
+				RegCloseKey(hKey);
+				return -1;
+			}
 
-		// Ignore non-string values.
-		if (type != REG_SZ)
-			continue;
+			// Ignore non-string values.
+			if (type != REG_SZ)
+				continue;
 
-		// Prevent a possible buffer overflow.
-		if (data_len >= sizeof(data)) {
-			RegCloseKey(hKey);
-			return -1;
+			// Prevent a possible buffer overflow.
+			if (data_len >= sizeof(data)) {
+				RegCloseKey(hKey);
+				return -1;
+			}
+
+			// Null terminate the string.
+			data[data_len] = 0;
+
+			callback(data, userdata);
+			index++;
+			if (is_default_dive_computer_device(name))
+				index = i;
 		}
 
-		// Null terminate the string.
-		data[data_len] = 0;
-
-		callback(data, userdata);
-		index++;
-		if (is_default_dive_computer_device(name))
-			index = i;
+		RegCloseKey(hKey);
 	}
+	if (dc_type != DC_TYPE_SERIAL) {
+		int i;
+		int count_drives = 0;
+		const int bufdef = 512;
+		const char *dlabels[] = {"UEMISSDA", NULL};
+		char bufname[bufdef], bufval[bufdef], *p;
+		DWORD bufname_len;
 
-	RegCloseKey(hKey);
+		/* add drive letters that match labels */
+		memset(bufname, 0, bufdef);
+		bufname_len = bufdef;
+		if (GetLogicalDriveStringsA(bufname_len, bufname)) {
+			p = bufname;
+
+			while (*p) {
+				memset(bufval, 0, bufdef);
+				if (GetVolumeInformationA(p, bufval, bufdef, NULL, NULL, NULL, NULL, 0)) {
+					for (i = 0; dlabels[i] != NULL; i++)
+						if (!strcmp(bufval, dlabels[i])) {
+							char data[512];
+							snprintf(data, sizeof(data), "%s (%s)", p, dlabels[i]);
+							callback(data, userdata);
+							if (is_default_dive_computer_device(p))
+								index = count_drives;
+							count_drives++;
+						}
+				}
+				p = &p[strlen(p) + 1];
+			}
+			if (count_drives == 1) /* we found exactly one Uemis "drive" */
+				index = 0; /* make it the selected "device" */
+		}
+	}
 	return index;
 }
 
@@ -120,7 +176,7 @@ int subsurface_rename(const char *path, const char *newpath)
 {
 	int ret = -1;
 	if (!path || !newpath)
-		return -1;
+		return ret;
 
 	wchar_t *wpath = utf8_to_utf16(path);
 	wchar_t *wnewpath = utf8_to_utf16(newpath);
@@ -136,13 +192,11 @@ int subsurface_open(const char *path, int oflags, mode_t mode)
 {
 	int ret = -1;
 	if (!path)
-		return -1;
-	wchar_t *wpath = utf8_to_utf16(path);
-	if (wpath) {
-		ret = _wopen(wpath, oflags, mode);
-		free((void *)wpath);
 		return ret;
-	}
+	wchar_t *wpath = utf8_to_utf16(path);
+	if (wpath)
+		ret = _wopen(wpath, oflags, mode);
+	free((void *)wpath);
 	return ret;
 }
 
@@ -159,9 +213,8 @@ FILE *subsurface_fopen(const char *path, const char *mode)
 			wmode[i] = (wchar_t)mode[i];
 		wmode[len] = 0;
 		ret = _wfopen(wpath, wmode);
-		free((void *)wpath);
-		return ret;
 	}
+	free((void *)wpath);
 	return ret;
 }
 
@@ -172,12 +225,22 @@ void *subsurface_opendir(const char *path)
 	if (!path)
 		return ret;
 	wchar_t *wpath = utf8_to_utf16(path);
-	if (wpath) {
+	if (wpath)
 		ret = _wopendir(wpath);
-		free((void *)wpath);
-		return (void *)ret;
-	}
+	free((void *)wpath);
 	return (void *)ret;
+}
+
+int subsurface_access(const char *path, int mode)
+{
+	int ret = -1;
+	if (!path)
+		return ret;
+	wchar_t *wpath = utf8_to_utf16(path);
+	if (wpath)
+		ret = _waccess(wpath, mode);
+	free((void *)wpath);
+	return ret;
 }
 
 #ifndef O_BINARY

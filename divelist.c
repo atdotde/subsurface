@@ -42,6 +42,7 @@
 #include "dive.h"
 #include "divelist.h"
 #include "display.h"
+#include "planner.h"
 
 static short dive_list_changed = false;
 
@@ -113,48 +114,13 @@ void get_dive_gas(struct dive *dive, int *o2_p, int *he_p, int *o2low_p)
 
 	for (i = 0; i < MAX_CYLINDERS; i++) {
 		cylinder_t *cyl = dive->cylinder + i;
-		struct gasmix *mix = &cyl->gasmix;
-		int o2 = mix->o2.permille;
-		int he = mix->he.permille;
-		struct divecomputer *dc = &dive->dc;
-		int used = 0;
-		int first_gas_explicit = 0;
+		int o2 = get_o2(&cyl->gasmix);
+		int he = get_he(&cyl->gasmix);
 
-		while (dc) {
-			struct event *event = dc->events;
-			while (event) {
-				if (event->value) {
-					if (event->name && !strcmp(event->name, "gaschange")) {
-						unsigned int event_he = event->value >> 16;
-						unsigned int event_o2 = event->value & 0xffff;
-
-						if (event->time.seconds < 30)
-							first_gas_explicit = 1;
-						if (is_air(o2, he)) {
-							if (is_air(event_o2 * 10, event_he * 10))
-								used = 1;
-						} else {
-							if (he == event_he * 10 && o2 == event_o2 * 10)
-								used = 1;
-						}
-					}
-				}
-				event = event->next;
-			}
-			dc = dc->next;
-		}
-
-		/* Unless explicity set, the first gas to use has index 0 */
-		if (i == 0 && !first_gas_explicit)
-			used = 1;
-
-		if (!used)
+		if (!is_cylinder_used(dive, i))
 			continue;
-
 		if (cylinder_none(cyl))
 			continue;
-		if (!o2)
-			o2 = O2_IN_AIR;
 		if (o2 < mino2)
 			mino2 = o2;
 		if (he > maxhe)
@@ -187,20 +153,9 @@ int total_weight(struct dive *dive)
 
 static int active_o2(struct dive *dive, struct divecomputer *dc, duration_t time)
 {
-	int o2permille = dive->cylinder[0].gasmix.o2.permille;
-	struct event *event;
-
-	if (!o2permille)
-		o2permille = O2_IN_AIR;
-
-	for (event = dc->events; event; event = event->next) {
-		if (event->time.seconds > time.seconds)
-			break;
-		if (strcmp(event->name, "gaschange"))
-			continue;
-		o2permille = 10 * (event->value & 0xffff);
-	}
-	return o2permille;
+	struct gasmix gas;
+	get_gas_at_time(dive, dc, time, &gas);
+	return get_o2(&gas);
 }
 
 /* calculate OTU for a dive - this only takes the first divecomputer into account */
@@ -216,8 +171,8 @@ static int calculate_otu(struct dive *dive)
 		struct sample *sample = dc->sample + i;
 		struct sample *psample = sample - 1;
 		t = sample->time.seconds - psample->time.seconds;
-		if (sample->po2) {
-			po2 = sample->po2;
+		if (sample->setpoint.mbar) {
+			po2 = sample->setpoint.mbar;
 		} else {
 			int o2 = active_o2(dive, dc, sample->time);
 			po2 = o2 * depth_to_atm(sample->depth.mm, dive);
@@ -280,12 +235,15 @@ static int calculate_cns(struct dive *dive)
 		struct sample *sample = dc->sample + i;
 		struct sample *psample = sample - 1;
 		t = sample->time.seconds - psample->time.seconds;
-		if (sample->po2) {
-			po2 = sample->po2;
+		if (sample->setpoint.mbar) {
+			po2 = sample->setpoint.mbar;
 		} else {
 			int o2 = active_o2(dive, dc, sample->time);
-			po2 = o2 / depth_to_atm(sample->depth.mm, dive);
+			po2 = o2 * depth_to_atm(sample->depth.mm, dive);
 		}
+		/* CNS don't increse when below 500 matm */
+		if (po2 < 500)
+			continue;
 		/* Find what table-row we should calculate % for */
 		for (j = 1; j < sizeof(cns_table) / (sizeof(int) * 3); j++)
 			if (po2 > cns_table[j][0])
@@ -364,7 +322,7 @@ static void add_dive_to_deco(struct dive *dive)
 		for (j = t0; j < t1; j++) {
 			int depth = interpolate(psample->depth.mm, sample->depth.mm, j - t0, t1 - t0);
 			(void)add_segment(depth_to_mbar(depth, dive) / 1000.0,
-					  &dive->cylinder[sample->sensor].gasmix, 1, sample->po2, dive);
+					  &dive->cylinder[sample->sensor].gasmix, 1, sample->setpoint.mbar, dive, dive->sac);
 		}
 	}
 }
@@ -373,21 +331,23 @@ int get_divenr(struct dive *dive)
 {
 	int i;
 	struct dive *d;
-	for_each_dive(i, d) {
-		if (d == dive)
-			return i;
-	}
+	// tempting as it may be, don't die when called with dive=NULL
+	if (dive)
+		for_each_dive(i, d) {
+			if (d->id == dive->id) // don't compare pointers, we could be passing in a copy of the dive
+				return i;
+		}
 	return -1;
 }
 
-static struct gasmix air = { .o2.permille = O2_IN_AIR };
+static struct gasmix air = { .o2.permille = O2_IN_AIR, .he.permille = 0 };
 
 /* take into account previous dives until there is a 48h gap between dives */
 double init_decompression(struct dive *dive)
 {
 	int i, divenr = -1;
 	unsigned int surface_time;
-	timestamp_t when, lasttime = 0;
+	timestamp_t when, lasttime = 0, laststart = 0;
 	bool deco_init = false;
 	double tissue_tolerance, surface_pressure;
 
@@ -398,18 +358,27 @@ double init_decompression(struct dive *dive)
 	divenr = get_divenr(dive);
 	when = dive->when;
 	i = divenr;
-	while (i && --i) {
+	if (i < 0) {
+		i = dive_table.nr - 1;
+		while (i >= 0 && get_dive(i)->when > when)
+			--i;
+		i++;
+	}
+	while (i--) {
 		struct dive *pdive = get_dive(i);
 		/* we don't want to mix dives from different trips as we keep looking
 		 * for how far back we need to go */
 		if (dive->divetrip && pdive->divetrip != dive->divetrip)
 			continue;
-		if (!pdive || pdive->when > when || pdive->when + pdive->duration.seconds + 48 * 60 * 60 < when)
+		if (!pdive || pdive->when >= when || pdive->when + pdive->duration.seconds + 48 * 60 * 60 < when)
 			break;
+		/* For simultaneous dives, only consider the first */
+		if (pdive->when == laststart)
+			continue;
 		when = pdive->when;
 		lasttime = when + pdive->duration.seconds;
 	}
-	while (++i < divenr) {
+	while (++i < (divenr >= 0 ? divenr : dive_table.nr)) {
 		struct dive *pdive = get_dive(i);
 		/* again skip dives from different trips */
 		if (dive->divetrip && dive->divetrip != pdive->divetrip)
@@ -423,6 +392,7 @@ double init_decompression(struct dive *dive)
 #endif
 		}
 		add_dive_to_deco(pdive);
+		laststart = pdive->when;
 #if DECO_CALC_DEBUG & 2
 		printf("added dive #%d\n", pdive->number);
 		dump_tissues();
@@ -430,7 +400,7 @@ double init_decompression(struct dive *dive)
 		if (pdive->when > lasttime) {
 			surface_time = pdive->when - lasttime;
 			lasttime = pdive->when + pdive->duration.seconds;
-			tissue_tolerance = add_segment(surface_pressure, &air, surface_time, 0, dive);
+			tissue_tolerance = add_segment(surface_pressure, &air, surface_time, 0, dive, prefs.decosac);
 #if DECO_CALC_DEBUG & 2
 			printf("after surface intervall of %d:%02u\n", FRACTION(surface_time, 60));
 			dump_tissues();
@@ -441,7 +411,7 @@ double init_decompression(struct dive *dive)
 	if (lasttime && dive->when > lasttime) {
 		surface_time = dive->when - lasttime;
 		surface_pressure = get_surface_pressure_in_mbar(dive, true) / 1000.0;
-		tissue_tolerance = add_segment(surface_pressure, &air, surface_time, 0, dive);
+		tissue_tolerance = add_segment(surface_pressure, &air, surface_time, 0, dive, prefs.decosac);
 #if DECO_CALC_DEBUG & 2
 		printf("after surface intervall of %d:%02u\n", FRACTION(surface_time, 60));
 		dump_tissues();
@@ -468,14 +438,14 @@ void update_cylinder_related_info(struct dive *dive)
 	}
 }
 
-#define MAX_NITROX_STRING 80
+#define MAX_GAS_STRING 80
 #define UTF8_ELLIPSIS "\xE2\x80\xA6"
 
 /* callers needs to free the string */
-char *get_nitrox_string(struct dive *dive)
+char *get_dive_gas_string(struct dive *dive)
 {
 	int o2, he, o2low;
-	char *buffer = malloc(MAX_NITROX_STRING);
+	char *buffer = malloc(MAX_GAS_STRING);
 
 	if (buffer) {
 		get_dive_gas(dive, &o2, &he, &o2low);
@@ -484,12 +454,12 @@ char *get_nitrox_string(struct dive *dive)
 		o2low = (o2low + 5) / 10;
 
 		if (he)
-			snprintf(buffer, MAX_NITROX_STRING, "%d/%d", o2, he);
+			snprintf(buffer, MAX_GAS_STRING, "%d/%d", o2, he);
 		else if (o2)
 			if (o2 == o2low)
-				snprintf(buffer, MAX_NITROX_STRING, "%d", o2);
+				snprintf(buffer, MAX_GAS_STRING, "%d%%", o2);
 			else
-				snprintf(buffer, MAX_NITROX_STRING, "%d" UTF8_ELLIPSIS "%d", o2low, o2);
+				snprintf(buffer, MAX_GAS_STRING, "%d" UTF8_ELLIPSIS "%d%%", o2low, o2);
 		else
 			strcpy(buffer, translate("gettextFromC", "air"));
 	}
@@ -599,10 +569,8 @@ static void delete_trip(dive_trip_t *trip)
 	}
 
 	/* .. and free it */
-	if (trip->location)
-		free(trip->location);
-	if (trip->notes)
-		free(trip->notes);
+	free(trip->location);
+	free(trip->notes);
 	free(trip);
 }
 
@@ -616,6 +584,44 @@ void find_new_trip_start_time(dive_trip_t *trip)
 			when = dive->when;
 	}
 	trip->when = when;
+}
+
+/* check if we have a trip right before / after this dive */
+bool is_trip_before_after(struct dive *dive, bool before)
+{
+	int idx = get_idx_by_uniq_id(dive->id);
+	if (before) {
+		if (idx > 0 && get_dive(idx - 1)->divetrip)
+			return true;
+	} else {
+		if (idx < dive_table.nr - 1 && get_dive(idx + 1)->divetrip)
+			return true;
+	}
+	return false;
+}
+
+struct dive *first_selected_dive()
+{
+	int idx;
+	struct dive *d;
+
+	for_each_dive (idx, d) {
+		if (d->selected)
+			return d;
+	}
+	return NULL;
+}
+
+struct dive *last_selected_dive()
+{
+	int idx;
+	struct dive *d, *ret = NULL;
+
+	for_each_dive (idx, d) {
+		if (d->selected)
+			ret = d;
+	}
+	return ret;
 }
 
 void remove_dive_from_trip(struct dive *dive, short was_autogen)
@@ -736,18 +742,12 @@ void delete_single_dive(int idx)
 	dive_table.dives[--dive_table.nr] = NULL;
 	/* free all allocations */
 	free(dive->dc.sample);
-	if (dive->location)
-		free((void *)dive->location);
-	if (dive->notes)
-		free((void *)dive->notes);
-	if (dive->divemaster)
-		free((void *)dive->divemaster);
-	if (dive->buddy)
-		free((void *)dive->buddy);
-	if (dive->suit)
-		free((void *)dive->suit);
-	if (dive->tag_list)
-		taglist_free(dive->tag_list);
+	free((void *)dive->location);
+	free((void *)dive->notes);
+	free((void *)dive->divemaster);
+	free((void *)dive->buddy);
+	free((void *)dive->suit);
+	taglist_free(dive->tag_list);
 	free(dive);
 }
 
@@ -854,6 +854,54 @@ void deselect_dive(int idx)
 	}
 }
 
+void deselect_dives_in_trip(struct dive_trip *trip)
+{
+	struct dive *dive;
+	if (!trip)
+		return;
+	for (dive = trip->dives; dive; dive = dive->next)
+		deselect_dive(get_divenr(dive));
+}
+
+void select_dives_in_trip(struct dive_trip *trip)
+{
+	struct dive *dive;
+	if (!trip)
+		return;
+	for (dive = trip->dives; dive; dive = dive->next)
+		if (!dive->hidden_by_filter)
+			select_dive(get_divenr(dive));
+}
+
+void filter_dive(struct dive *d, bool shown)
+{
+	if (!d)
+		return;
+	d->hidden_by_filter = !shown;
+	if (!shown && d->selected)
+		deselect_dive(get_divenr(d));
+}
+
+
+/* This only gets called with non-NULL trips.
+ * It does not combine notes or location, just picks the first one
+ * (or the second one if the first one is empty */
+void combine_trips(struct dive_trip *trip_a, struct dive_trip *trip_b)
+{
+	if (same_string(trip_a->location, "") && trip_b->location) {
+		free(trip_a->location);
+		trip_a->location = strdup(trip_b->location);
+	}
+	if (same_string(trip_a->notes, "") && trip_b->notes) {
+		free(trip_a->notes);
+		trip_a->notes = strdup(trip_b->notes);
+	}
+	/* this also removes the dives from trip_b and eventually
+	 * calls delete_trip(trip_b) when the last dive has been moved */
+	while (trip_b->dives)
+		add_dive_to_trip(trip_b->dives, trip_a);
+}
+
 void mark_divelist_changed(int changed)
 {
 	dive_list_changed = changed;
@@ -953,6 +1001,9 @@ void process_dives(bool is_imported, bool prefer_imported)
 		for (i = preexisting; i < dive_table.nr; i++)
 			set_dc_nickname(dive_table.dives[i]);
 
+	for (i = preexisting; i < dive_table.nr; i++)
+		dive_table.dives[i]->downloaded = true;
+
 	/* This does the right thing for -1: NULL */
 	last = get_dive(preexisting - 1);
 
@@ -1003,4 +1054,12 @@ void process_dives(bool is_imported, bool prefer_imported)
 		if (preexisting != dive_table.nr)
 			mark_divelist_changed(true);
 	}
+}
+
+void set_dive_nr_for_current_dive()
+{
+	if (dive_table.nr == 1)
+		current_dive->number = 1;
+	else if (selected_dive == dive_table.nr - 1 && get_dive(dive_table.nr - 2)->number)
+		current_dive->number = get_dive(dive_table.nr - 2)->number + 1;
 }

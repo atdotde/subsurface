@@ -6,8 +6,6 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>872</width>
-    <height>648</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -120,6 +118,16 @@
          </iconset>
         </property>
        </item>
+       <item>
+        <property name="text">
+         <string>Network</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normalon>:/network</normalon>
+         </iconset>
+        </property>
+       </item>
       </widget>
      </item>
      <item>
@@ -138,7 +146,7 @@
          <item>
           <widget class="QGroupBox" name="groupBox_2">
            <property name="title">
-            <string>Lists and Tables</string>
+            <string>Lists and tables</string>
            </property>
            <layout class="QFormLayout" name="formLayout_2">
             <item row="0" column="0">
@@ -173,7 +181,7 @@
             <item row="0" column="0">
              <widget class="QLabel" name="label_9">
               <property name="text">
-               <string>Default Dive file</string>
+               <string>Default dive log file</string>
               </property>
              </widget>
             </item>
@@ -181,6 +189,16 @@
              <layout class="QHBoxLayout" name="horizontalLayout_3b">
               <item>
                <widget class="QLineEdit" name="defaultfilename"/>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnUseDefaultFile">
+                <property name="text">
+                 <string>Use default</string>
+                </property>
+                <property name="checkable">
+                 <bool>true</bool>
+                </property>
+               </widget>
               </item>
               <item>
                <widget class="QToolButton" name="chooseFile">
@@ -194,7 +212,7 @@
             <item row="1" column="0">
              <widget class="QLabel" name="label_10">
               <property name="text">
-               <string>Display Invalid</string>
+               <string>Display invalid</string>
               </property>
              </widget>
             </item>
@@ -211,13 +229,13 @@
          <item>
           <widget class="QGroupBox" name="groupBox_6">
            <property name="title">
-            <string>Default Cylinder</string>
+            <string>Default cylinder</string>
            </property>
            <layout class="QFormLayout" name="formLayout_6">
             <item row="0" column="0">
              <widget class="QLabel" name="label_11">
               <property name="text">
-               <string>Use Default Cylinder</string>
+               <string>Use default cylinder</string>
               </property>
              </widget>
             </item>
@@ -267,24 +285,39 @@
          <item>
           <widget class="QGroupBox" name="groupBox_8">
            <property name="title">
-            <string>Subsurface Webservice</string>
+            <string>Subsurface web service</string>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
              <widget class="QLabel" name="label_16">
               <property name="text">
-               <string>Default User ID</string>
+               <string>Default user ID</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="default_uid">
-             </widget>
+             <widget class="QLineEdit" name="default_uid"/>
             </item>
             <item>
              <widget class="QCheckBox" name="save_uid_local">
               <property name="text">
-               <string>Save User ID locally?</string>
+               <string>Save user ID locally?</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_9">
+           <property name="title">
+            <string>Clear all settings</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_7b">
+            <item>
+             <widget class="QPushButton" name="resetSettings">
+              <property name="text">
+               <string>Reset all settings to their default value</string>
               </property>
              </widget>
             </item>
@@ -510,7 +543,7 @@
               <item row="0" column="0">
                <widget class="QLabel" name="label13">
                 <property name="text">
-                 <string>Ascent/Descent speed denominator</string>
+                 <string>Ascent/descent speed denominator</string>
                 </property>
                </widget>
               </item>
@@ -538,7 +571,7 @@
             </widget>
            </item>
           </layout>
-	 </item>
+         </item>
          <item>
           <spacer name="verticalSpacer">
            <property name="orientation">
@@ -570,7 +603,7 @@
                  <bool>true</bool>
                 </property>
                 <property name="text">
-                 <string>threshold when showing pO₂</string>
+                 <string>Threshold when showing pO₂</string>
                 </property>
                </widget>
               </item>
@@ -578,6 +611,9 @@
                <widget class="QDoubleSpinBox" name="po2Threshold">
                 <property name="enabled">
                  <bool>true</bool>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
                 </property>
                </widget>
               </item>
@@ -591,7 +627,7 @@
                  <bool>true</bool>
                 </property>
                 <property name="text">
-                 <string>threshold when showing pN₂</string>
+                 <string>Threshold when showing pN₂</string>
                 </property>
                </widget>
               </item>
@@ -599,6 +635,9 @@
                <widget class="QDoubleSpinBox" name="pn2Threshold">
                 <property name="enabled">
                  <bool>true</bool>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
                 </property>
                </widget>
               </item>
@@ -612,7 +651,7 @@
                  <bool>true</bool>
                 </property>
                 <property name="text">
-                 <string>threshold when showing pHe</string>
+                 <string>Threshold when showing pHe</string>
                 </property>
                </widget>
               </item>
@@ -620,6 +659,9 @@
                <widget class="QDoubleSpinBox" name="pheThreshold">
                 <property name="enabled">
                  <bool>true</bool>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
                 </property>
                </widget>
               </item>
@@ -633,14 +675,17 @@
                  <bool>true</bool>
                 </property>
                 <property name="text">
-                 <string>max ppO₂ when showing MOD</string>
+                 <string>Max pO₂ when showing MOD</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QDoubleSpinBox" name="maxppo2">
+               <widget class="QDoubleSpinBox" name="maxpo2">
                 <property name="enabled">
                  <bool>true</bool>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
                 </property>
                </widget>
               </item>
@@ -654,7 +699,7 @@
                  <bool>true</bool>
                 </property>
                 <property name="text">
-                 <string>draw dive computer reported ceiling red</string>
+                 <string>Draw dive computer reported ceiling red</string>
                 </property>
                </widget>
               </item>
@@ -665,23 +710,23 @@
               <item>
                <widget class="QCheckBox" name="display_unused_tanks">
                 <property name="text">
-                 <string>Show non-used cylinders in Equipment Tab</string>
+                 <string>Show unused cylinders in Equipment tab</string>
                 </property>
                </widget>
               </item>
              </layout>
-	    </item>
-	    <item>
-	     <layout class="QHBoxLayout" name="horizontalLayout_11d">
-	      <item>
-	       <widget class="QCheckBox" name="show_average_depth">
-		<property name="text">
-		 <string>show average depth</string>
-		</property>
-	       </widget>
-	      </item>
-	     </layout>
-	    </item>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_11d">
+              <item>
+               <widget class="QCheckBox" name="show_average_depth">
+                <property name="text">
+                 <string>Show average depth</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
            </layout>
           </widget>
          </item>
@@ -744,7 +789,7 @@
            <item>
             <widget class="QCheckBox" name="languageSystemDefault">
              <property name="text">
-              <string>System Default</string>
+              <string>System default</string>
              </property>
             </widget>
            </item>
@@ -778,6 +823,147 @@
          </item>
         </layout>
        </widget>
+       <widget class="QWidget" name="page_5">
+        <layout class="QVBoxLayout" name="verticalLayout_15">
+         <item>
+          <widget class="QGroupBox" name="groupBox_10">
+           <property name="title">
+            <string>Proxy</string>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_2">
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_21">
+              <property name="text">
+               <string>Proxy type</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QComboBox" name="proxyType"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_22">
+              <property name="text">
+               <string>Host</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="proxyHost">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>2</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maxLength">
+               <number>64</number>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="2">
+             <widget class="QLabel" name="label_23">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Port</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="3">
+             <widget class="QSpinBox" name="proxyPort">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                <horstretch>1</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximum">
+               <number>65535</number>
+              </property>
+              <property name="value">
+               <number>80</number>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QCheckBox" name="proxyAuthRequired">
+              <property name="layoutDirection">
+               <enum>Qt::LeftToRight</enum>
+              </property>
+              <property name="text">
+               <string>Requires authentication</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QLineEdit" name="proxyUsername">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maxLength">
+               <number>32</number>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="label_24">
+              <property name="text">
+               <string>Username</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QLineEdit" name="proxyPassword">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maxLength">
+               <number>32</number>
+              </property>
+              <property name="echoMode">
+               <enum>QLineEdit::Password</enum>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="label_25">
+              <property name="text">
+               <string>Password</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <spacer name="verticalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
       </widget>
      </item>
     </layout>
@@ -803,8 +989,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>247</x>
-     <y>635</y>
+     <x>259</x>
+     <y>817</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -819,8 +1005,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>315</x>
-     <y>635</y>
+     <x>327</x>
+     <y>817</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
@@ -851,12 +1037,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>845</x>
-     <y>51</y>
+     <x>185</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>308</x>
-     <y>100</y>
+     <x>186</x>
+     <y>23</y>
     </hint>
    </hints>
   </connection>
@@ -867,12 +1053,12 @@
    <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>176</x>
-     <y>30</y>
+     <x>126</x>
+     <y>20</y>
     </hint>
     <hint type="destinationlabel">
-     <x>171</x>
-     <y>79</y>
+     <x>186</x>
+     <y>30</y>
     </hint>
    </hints>
   </connection>
@@ -883,12 +1069,12 @@
    <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>209</x>
-     <y>34</y>
+     <x>126</x>
+     <y>20</y>
     </hint>
     <hint type="destinationlabel">
-     <x>599</x>
-     <y>33</y>
+     <x>185</x>
+     <y>20</y>
     </hint>
    </hints>
   </connection>
@@ -899,12 +1085,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>504</x>
-     <y>46</y>
+     <x>164</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>623</x>
-     <y>119</y>
+     <x>175</x>
+     <y>34</y>
     </hint>
    </hints>
   </connection>
@@ -915,12 +1101,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>319</x>
-     <y>46</y>
+     <x>142</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>385</x>
-     <y>119</y>
+     <x>153</x>
+     <y>34</y>
     </hint>
    </hints>
   </connection>
@@ -931,12 +1117,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>504</x>
-     <y>46</y>
+     <x>164</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>623</x>
-     <y>153</y>
+     <x>175</x>
+     <y>33</y>
     </hint>
    </hints>
   </connection>
@@ -947,12 +1133,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>319</x>
-     <y>46</y>
+     <x>142</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>385</x>
-     <y>153</y>
+     <x>153</x>
+     <y>33</y>
     </hint>
    </hints>
   </connection>
@@ -963,12 +1149,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>504</x>
-     <y>46</y>
+     <x>164</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>623</x>
-     <y>187</y>
+     <x>175</x>
+     <y>31</y>
     </hint>
    </hints>
   </connection>
@@ -979,12 +1165,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>319</x>
-     <y>46</y>
+     <x>142</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>385</x>
-     <y>187</y>
+     <x>153</x>
+     <y>31</y>
     </hint>
    </hints>
   </connection>
@@ -995,12 +1181,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>504</x>
-     <y>46</y>
+     <x>164</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>623</x>
-     <y>221</y>
+     <x>175</x>
+     <y>29</y>
     </hint>
    </hints>
   </connection>
@@ -1011,12 +1197,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>319</x>
-     <y>46</y>
+     <x>142</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>385</x>
-     <y>221</y>
+     <x>153</x>
+     <y>29</y>
     </hint>
    </hints>
   </connection>
@@ -1027,12 +1213,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>504</x>
-     <y>46</y>
+     <x>164</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>623</x>
-     <y>255</y>
+     <x>175</x>
+     <y>28</y>
     </hint>
    </hints>
   </connection>
@@ -1043,12 +1229,12 @@
    <slot>setChecked(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>319</x>
-     <y>46</y>
+     <x>142</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
-     <x>385</x>
-     <y>255</y>
+     <x>153</x>
+     <y>28</y>
     </hint>
    </hints>
   </connection>
@@ -1059,12 +1245,12 @@
    <slot>setValue(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>718</x>
-     <y>415</y>
+     <x>361</x>
+     <y>439</y>
     </hint>
     <hint type="destinationlabel">
-     <x>823</x>
-     <y>414</y>
+     <x>831</x>
+     <y>447</y>
     </hint>
    </hints>
   </connection>
@@ -1075,23 +1261,71 @@
    <slot>setValue(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>790</x>
-     <y>400</y>
+     <x>831</x>
+     <y>447</y>
     </hint>
     <hint type="destinationlabel">
-     <x>580</x>
-     <y>417</y>
+     <x>361</x>
+     <y>439</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>proxyAuthRequired</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>proxyUsername</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>200</x>
+     <y>42</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>200</x>
+     <y>42</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>proxyAuthRequired</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>proxyPassword</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>200</x>
+     <y>42</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>200</x>
+     <y>42</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>btnUseDefaultFile</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>chooseFile</receiver>
+   <slot>setHidden(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>754</x>
+     <y>216</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>801</x>
+     <y>213</y>
     </hint>
    </hints>
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="buttonGroup_5"/>
-  <buttongroup name="buttonGroup_6"/>
-  <buttongroup name="buttonGroup"/>
-  <buttongroup name="verticalSpeed"/>
   <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup_3"/>
   <buttongroup name="buttonGroup_4"/>
+  <buttongroup name="buttonGroup_5"/>
+  <buttongroup name="buttonGroup_6"/>
+  <buttongroup name="verticalSpeed"/>
+  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

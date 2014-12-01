@@ -9,17 +9,25 @@
 
 #include "ui_tableview.h"
 
+#include "metrics.h"
+
 class QPushButton;
 class QAbstractItemModel;
 class QModelIndex;
 class QTableView;
 
-class TableView : public QWidget {
+class TableView : public QGroupBox {
 	Q_OBJECT
+
+	struct TableMetrics {
+		const IconMetrics* icon; // icon metrics
+		int col_width; // generic column width
+		int rm_col_width; // column width of REMOVE column
+		int header_ht; // height of the header
+	};
 public:
 	TableView(QWidget *parent = 0);
 	virtual ~TableView();
-	void setTitle(const QString &title);
 	/* The model is expected to have a 'remove' slot, that takes a QModelIndex as parameter.
 	 * It's also expected to have the column '1' as a trash icon. I most probably should create a
 	 * proxy model and add that column, will mark that as TODO. see? marked.
@@ -28,6 +36,7 @@ public:
 	void setBtnToolTip(const QString &tooltip);
 	void fixPlusPosition();
 	void edit(const QModelIndex &index);
+	int  defaultColumnWidth(int col); // default column width for column col
 	QTableView *view();
 
 protected:
@@ -40,6 +49,7 @@ signals:
 private:
 	Ui::TableView ui;
 	QPushButton *plusBtn;
+	TableMetrics metrics;
 };
 
 #endif // TABLEVIEW_H

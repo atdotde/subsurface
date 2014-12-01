@@ -17,12 +17,11 @@ class RulerNodeItem2 : public QObject, public QGraphicsEllipseItem {
 public:
 	explicit RulerNodeItem2();
 	void setRuler(RulerItem2 *r);
-	void setPlotInfo(struct plot_info& info);
+	void setPlotInfo(struct plot_info &info);
 	void recalculate();
 
 protected:
-	QVariant itemChange(GraphicsItemChange change, const QVariant &value);
-
+	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 private:
 	struct plot_info pInfo;
 	struct plot_data *entry;
@@ -31,7 +30,8 @@ private:
 	DiveCartesianAxis *depthAxis;
 };
 
-class RulerItem2 : public QGraphicsLineItem {
+class RulerItem2 : public QObject, public QGraphicsLineItem {
+	Q_OBJECT
 public:
 	explicit RulerItem2();
 	void recalculate();
@@ -40,6 +40,11 @@ public:
 	RulerNodeItem2 *sourceNode() const;
 	RulerNodeItem2 *destNode() const;
 	void setAxis(DiveCartesianAxis *time, DiveCartesianAxis *depth);
+	void setVisible(bool visible);
+
+public
+slots:
+	void settingsChanged();
 
 private:
 	struct plot_info pInfo;

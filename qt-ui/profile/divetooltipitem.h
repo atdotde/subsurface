@@ -27,12 +27,6 @@ public:
 		COLLAPSED,
 		EXPANDED
 	};
-	enum {
-		ICON_SMALL = 16,
-		ICON_MEDIUM = 24,
-		ICON_BIG = 32,
-		SPACING = 4
-	};
 
 	explicit ToolTipItem(QGraphicsItem *parent = 0);
 	virtual ~ToolTipItem();
@@ -40,11 +34,12 @@ public:
 	void collapse();
 	void expand();
 	void clear();
-	void addToolTip(const QString &toolTip, const QIcon &icon = QIcon());
+	void addToolTip(const QString &toolTip, const QIcon &icon = QIcon(), const QPixmap *pixmap = NULL);
 	void refresh(const QPointF &pos);
 	bool isExpanded() const;
 	void persistPos();
 	void readPos();
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
 	void setTimeAxis(DiveCartesianAxis *axis);
 	void setPlotInfo(const plot_info &plot);
@@ -64,6 +59,8 @@ private:
 	DiveCartesianAxis *timeAxis;
 	plot_info pInfo;
 	int lastTime;
+
+	QList<QGraphicsItem*> oldSelection;
 };
 
 #endif // DIVETOOLTIPITEM_H

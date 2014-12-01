@@ -28,7 +28,6 @@
 
 #include "groupedlineedit.h"
 
-#include <QFontMetrics>
 #include <QStyleOptionFrameV3>
 #include <QFontMetrics>
 #include <QApplication>
@@ -42,7 +41,6 @@
 #include <QBrush>
 #include <QColor>
 #include <QPalette>
-#include <QDebug>
 
 struct GroupedLineEdit::Private {
 	struct Block {
@@ -66,7 +64,6 @@ GroupedLineEdit::GroupedLineEdit(QWidget *parent) : QPlainTextEdit(parent),
 	document()->setMaximumBlockCount(1);
 }
 
-
 GroupedLineEdit::~GroupedLineEdit()
 {
 	delete d;
@@ -86,10 +83,11 @@ int GroupedLineEdit::cursorPosition() const
 void GroupedLineEdit::addBlock(int start, int end)
 {
 	Private::Block block;
-
 	block.start = start;
 	block.end = end;
-	block.text = text().mid(start, end - start + 1).trimmed();
+	block.text = text().mid(start, end - start + 1).remove(',').trimmed();
+	if (block.text.isEmpty())
+		return;
 	d->blocks.append(block);
 	viewport()->update();
 }
@@ -107,8 +105,7 @@ void GroupedLineEdit::removeAllColors()
 QStringList GroupedLineEdit::getBlockStringList()
 {
 	QStringList retList;
-	Private::Block block;
-	foreach(block, d->blocks)
+	foreach (const Private::Block &block, d->blocks)
 		retList.append(block.text);
 	return retList;
 }
@@ -134,9 +131,7 @@ void GroupedLineEdit::clear()
 void GroupedLineEdit::selectAll()
 {
 	QTextCursor c = textCursor();
-
 	c.select(QTextCursor::LineUnderCursor);
-
 	setTextCursor(c);
 }
 
@@ -149,11 +144,10 @@ void GroupedLineEdit::removeAllBlocks()
 QSize GroupedLineEdit::sizeHint() const
 {
 	QSize rs(
-	    40,
-	    document()->findBlock(0).layout()->lineAt(0).height() +
-		document()->documentMargin() * 2 +
-		frameWidth() * 2);
-
+		40,
+		document()->findBlock(0).layout()->lineAt(0).height() +
+			document()->documentMargin() * 2 +
+			frameWidth() * 2);
 	return rs;
 }
 
@@ -189,15 +183,19 @@ void GroupedLineEdit::paintEvent(QPaintEvent *e)
 
 	QVectorIterator<QColor> i(d->colors);
 	i.toFront();
-	foreach(const Private::Block & block, d->blocks) {
-		qreal start_x = line.cursorToX(block.start, QTextLine::Trailing);
-		qreal end_x = line.cursorToX(block.end + 1, QTextLine::Leading);
+	foreach (const Private::Block &block, d->blocks) {
+		qreal start_x = line.cursorToX(block.start, QTextLine::Leading);
+#if QT_VERSION >= 0x050000
+		qreal end_x = line.cursorToX(block.end-1, QTextLine::Trailing);
+#else
+		qreal end_x = line.cursorToX(block.end, QTextLine::Trailing);
+#endif
 		QPainterPath path;
 		QRectF rectangle(
-		    start_x - 1.0 - double(horizontalScrollBar()->value()),
-		    1.0,
-		    end_x - start_x + 2.0,
-		    double(viewport()->height() - 2));
+			start_x - 1.0 - double(horizontalScrollBar()->value()),
+			1.0,
+			end_x - start_x + 2.0,
+			double(viewport()->height() - 2));
 		if (!i.hasNext())
 			i.toFront();
 		path.addRoundedRect(rectangle, 5.0, 5.0);

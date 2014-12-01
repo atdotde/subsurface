@@ -11,15 +11,27 @@
 
 extern "C" {
 
-const char system_divelist_default_font[] = "Roboto";
-const int system_divelist_default_font_size = 8;
+const char android_system_divelist_default_font[] = "Roboto";
+const char *system_divelist_default_font = android_system_divelist_default_font;
+double system_divelist_default_font_size = 8.0;
+
+void subsurface_OS_pref_setup(void)
+{
+	// nothing
+}
+
+bool subsurface_ignore_font(const char *font)
+{
+	// there are no old default fonts that we would want to ignore
+	return false;
+}
 
 const char *system_default_filename(void)
 {
 	/* Replace this when QtCore/QStandardPaths getExternalStorageDirectory landed */
 	QAndroidJniObject externalStorage = QAndroidJniObject::callStaticObjectMethod("android/os/Environment", "getExternalStorageDirectory", "()Ljava/io/File;");
-	QAndroidJniObject externalStorageAbsolute = externalStorage.callObjectMethod( "getAbsolutePath", "()Ljava/lang/String;" );
-	QString system_default_filename = externalStorageAbsolute.toString()+"/subsurface.xml";
+	QAndroidJniObject externalStorageAbsolute = externalStorage.callObjectMethod("getAbsolutePath", "()Ljava/lang/String;");
+	QString system_default_filename = externalStorageAbsolute.toString() + "/subsurface.xml";
 	QAndroidJniEnvironment env;
 	if (env->ExceptionCheck()) {
 		// FIXME: Handle exception here.
@@ -29,7 +41,7 @@ const char *system_default_filename(void)
 	return strdup(system_default_filename.toUtf8().data());
 }
 
-int enumerate_devices (device_callback_t callback, void *userdata)
+int enumerate_devices(device_callback_t callback, void *userdata, int dc_type)
 {
 	/* FIXME: we need to enumerate in some other way on android */
 	/* qtserialport maybee? */
@@ -57,6 +69,11 @@ void *subsurface_opendir(const char *path)
 	return (void *)opendir(path);
 }
 
+int subsurface_access(const char *path, int mode)
+{
+	return access(path, mode);
+}
+
 struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *errorp)
 {
 	return zip_open(path, flags, errorp);
@@ -77,5 +94,4 @@ void subsurface_console_exit(void)
 {
 	/* NOP */
 }
-
 }

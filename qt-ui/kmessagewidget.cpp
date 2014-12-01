@@ -21,7 +21,7 @@
 
 #include <QEvent>
 #include <QGridLayout>
-#include <QHBoxLayout>
+#include <QDialogButtonBox>
 #include <QLabel>
 #include <QPainter>
 #include <QShowEvent>
@@ -61,7 +61,7 @@ void KMessageWidgetPrivate::init(KMessageWidget *q_ptr)
 	closeButton = new QToolButton(content);
 	closeButton->setAutoRaise(true);
 	closeButton->setDefaultAction(closeAction);
-
+	closeButton->setVisible(false);
 	q->setMessageType(KMessageWidget::Information);
 }
 
@@ -74,7 +74,7 @@ void KMessageWidgetPrivate::createLayout()
 	qDeleteAll(buttons);
 	buttons.clear();
 
-	Q_FOREACH(QAction * action, q->actions()) {
+	Q_FOREACH (QAction *action, q->actions()) {
 		QToolButton *button = new QToolButton(content);
 		button->setDefaultAction(action);
 		button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -92,27 +92,32 @@ void KMessageWidgetPrivate::createLayout()
 		layout->addWidget(iconLabel, 0, 0, 1, 1, Qt::AlignHCenter | Qt::AlignTop);
 		layout->addWidget(textLabel, 0, 1);
 
-		QHBoxLayout *buttonLayout = new QHBoxLayout;
-		buttonLayout->addStretch();
-		Q_FOREACH(QToolButton * button, buttons) {
+		QDialogButtonBox *buttonLayout = new QDialogButtonBox();
+		//buttonLayout->addStretch();
+		Q_FOREACH (QToolButton *button, buttons) {
 			// For some reason, calling show() is necessary if wordwrap is true,
 			// otherwise the buttons do not show up. It is not needed if
 			// wordwrap is false.
 			button->show();
-			buttonLayout->addWidget(button);
+			buttonLayout->addButton(button, QDialogButtonBox::QDialogButtonBox::AcceptRole);
 		}
-		buttonLayout->addWidget(closeButton);
-		layout->addItem(buttonLayout, 1, 0, 1, 2);
+		buttonLayout->addButton(closeButton, QDialogButtonBox::RejectRole);
+		layout->addWidget(buttonLayout, 1, 0, 1, 2, Qt::AlignHCenter | Qt::AlignTop);
 	} else {
+		bool closeButtonVisible = closeButton->isVisible();
 		QHBoxLayout *layout = new QHBoxLayout(content);
 		layout->addWidget(iconLabel);
 		layout->addWidget(textLabel);
 
-		Q_FOREACH(QToolButton * button, buttons) {
-			layout->addWidget(button);
+		QDialogButtonBox *buttonLayout = new QDialogButtonBox();
+		Q_FOREACH (QToolButton *button, buttons) {
+			buttonLayout->addButton(button, QDialogButtonBox::QDialogButtonBox::AcceptRole);
 		}
 
-		layout->addWidget(closeButton);
+		buttonLayout->addButton(closeButton, QDialogButtonBox::RejectRole);
+		// Something gets changed when added to the buttonLayout
+		closeButton->setVisible(closeButtonVisible);
+		layout->addWidget(buttonLayout);
 	};
 
 	if (q->isVisible()) {
@@ -201,6 +206,12 @@ void KMessageWidget::setText(const QString &text)
 	updateGeometry();
 }
 
+int KMessageWidget::bestContentHeight() const
+{
+	return d->bestContentHeight();
+}
+
+
 KMessageWidget::MessageType KMessageWidget::messageType() const
 {
 	return d->messageType;
@@ -238,7 +249,7 @@ void KMessageWidget::setMessageType(KMessageWidget::MessageType type)
 	bg2 = bg1.darker(110);
 	border = bg2.darker(110);
 	d->content->setStyleSheet(
-	    QString(".QFrame {"
+		QString(".QFrame {"
 			"background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
 			"    stop: 0 %1,"
 			"    stop: 0.1 %2,"
@@ -248,16 +259,16 @@ void KMessageWidget::setMessageType(KMessageWidget::MessageType type)
 			"margin: %5px;"
 			"}"
 			".QLabel { color: %6; }").arg(bg0.name())
-		.arg(bg1.name())
-		.arg(bg2.name())
-		.arg(border.name())
-	    /*
+			.arg(bg1.name())
+			.arg(bg2.name())
+			.arg(border.name())
+		/*
 		DefaultFrameWidth returns the size of the external margin + border width.
 		We know our border is 1px, so we subtract this from the frame
 		normal QStyle FrameWidth to get our margin
 		*/
-		.arg(style()->pixelMetric(QStyle::PM_DefaultFrameWidth, 0, this) - 1)
-		.arg(fg.name()));
+			.arg(style()->pixelMetric(QStyle::PM_DefaultFrameWidth, 0, this) - 1)
+			.arg(fg.name()));
 }
 
 QSize KMessageWidget::sizeHint() const

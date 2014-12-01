@@ -130,8 +130,18 @@ static duration_t get_duration(const char *line)
 	return d;
 }
 
+static enum dive_comp_type get_dctype(const char *line)
+{
+	for (enum dive_comp_type i = 0; i < NUM_DC_TYPE; i++) {
+		if (strcmp(line, dctype_text[i]) == 0)
+			return i;
+	}
+	return 0;
+}
+
 static int get_index(const char *line)
 { return atoi(line); }
+
 static int get_hex(const char *line)
 { return strtoul(line, NULL, 16); }
 
@@ -254,6 +264,10 @@ static void parse_cylinder_keyvalue(void *_cylinder, const char *key, const char
 		cylinder->end = get_pressure(value);
 		return;
 	}
+	if (!strcmp(key, "use")) {
+		cylinder->cylinder_use = cylinderuse_from_text(value);
+		return;
+	}
 	report_error("Unknown cylinder key/value pair (%s/%s)", key, value);
 }
 
@@ -310,15 +324,15 @@ static int match_action(char *line, struct membuffer *str, void *data,
 	char *p = line, c;
 	unsigned low, high;
 
-	while ((c = *p) >= 'a' && c <= 'z')
-		p++;
+	while ((c = *p) >= 'a' && c <= 'z') // skip over 1st word
+		p++;	// Extract the second word from the line:
 	if (p == line)
 		return -1;
 	switch (c) {
-	case 0:
+	case 0:		// if 2nd word is C-terminated
 		break;
-	case ' ':
-		*p++ = 0;
+	case ' ':	// =end of 2nd word?
+		*p++ = 0;	// then C-terminate that word
 		break;
 	default:
 		return -1;
@@ -331,10 +345,10 @@ static int match_action(char *line, struct membuffer *str, void *data,
 		unsigned mid = (low+high)/2;
 		struct keyword_action *a = action + mid;
 		int cmp = strcmp(line, a->keyword);
-		if (!cmp) {
-			a->fn(p, str, data);
-			return 0;
-		}
+		if (!cmp) {	// attribute found:
+			a->fn(p, str, data);	// Execute appropriate function,
+			return 0;		// .. passing 2n word from above
+		}				// (p) as a function argument.
 		if (cmp < 0)
 			high = mid;
 		else
@@ -357,6 +371,10 @@ static void parse_sample_keyvalue(void *_sample, const char *key, const char *va
 		sample->ndl = get_duration(value);
 		return;
 	}
+	if (!strcmp(key, "tts")) {
+		sample->tts = get_duration(value);
+		return;
+	}
 	if (!strcmp(key, "in_deco")) {
 		sample->in_deco = atoi(value);
 		return;
@@ -375,8 +393,27 @@ static void parse_sample_keyvalue(void *_sample, const char *key, const char *va
 	}
 	if (!strcmp(key, "po2")) {
 		pressure_t p = get_pressure(value);
-		// Ugh, typeless.
-		sample->po2 = p.mbar;
+		sample->setpoint.mbar = p.mbar;
+		return;
+	}
+	if (!strcmp(key, "sensor1")) {
+		pressure_t p = get_pressure(value);
+		sample->o2sensor[0].mbar = p.mbar;
+		return;
+	}
+	if (!strcmp(key, "sensor2")) {
+		pressure_t p = get_pressure(value);
+		sample->o2sensor[1].mbar = p.mbar;
+		return;
+	}
+	if (!strcmp(key, "sensor3")) {
+		pressure_t p = get_pressure(value);
+		sample->o2sensor[2].mbar = p.mbar;
+		return;
+	}
+	if (!strcmp(key, "o2pressure")) {
+		pressure_t p = get_pressure(value);
+		sample->o2cylinderpressure.mbar = p.mbar;
 		return;
 	}
 	if (!strcmp(key, "heartbeat")) {
@@ -384,9 +421,10 @@ static void parse_sample_keyvalue(void *_sample, const char *key, const char *va
 		return;
 	}
 	if (!strcmp(key, "bearing")) {
-		sample->bearing = atoi(value);
+		sample->bearing.degrees = atoi(value);
 		return;
 	}
+
 	report_error("Unexpected sample key/value pair (%s/%s)", key, value);
 }
 
@@ -489,6 +527,9 @@ static void parse_dc_diveid(char *line, struct membuffer *str, void *_dc)
 static void parse_dc_duration(char *line, struct membuffer *str, void *_dc)
 { struct divecomputer *dc = _dc; dc->duration = get_duration(line); }
 
+static void parse_dc_dctype(char *line, struct membuffer *str, void *_dc)
+{ struct divecomputer *dc = _dc; dc->dctype = get_dctype(line); }
+
 static void parse_dc_maxdepth(char *line, struct membuffer *str, void *_dc)
 { struct divecomputer *dc = _dc; dc->maxdepth = get_depth(line); }
 
@@ -497,6 +538,9 @@ static void parse_dc_meandepth(char *line, struct membuffer *str, void *_dc)
 
 static void parse_dc_model(char *line, struct membuffer *str, void *_dc)
 { struct divecomputer *dc = _dc; dc->model = get_utf8(str); }
+
+static void parse_dc_numberofoxygensensors(char *line, struct membuffer *str, void *_dc)
+{ struct divecomputer *dc = _dc; dc->no_o2sensors = get_index(line); }
 
 static void parse_dc_surfacepressure(char *line, struct membuffer *str, void *_dc)
 { struct divecomputer *dc = _dc; dc->surface_pressure = get_pressure(line); }
@@ -526,8 +570,41 @@ static void parse_event_keyvalue(void *_event, const char *key, const char *valu
 		event->value = val;
 	} else if (!strcmp(key, "name")) {
 		/* We get the name from the string handling */
+	} else if (!strcmp(key, "cylinder")) {
+		/* NOTE! We add one here as a marker that "yes, we got a cylinder index" */
+		event->gas.index = 1+get_index(value);
+	} else if (!strcmp(key, "o2")) {
+		event->gas.mix.o2 = get_fraction(value);
+	} else if (!strcmp(key, "he")) {
+		event->gas.mix.he = get_fraction(value);
 	} else
 		report_error("Unexpected event key/value pair (%s/%s)", key, value);
+}
+
+/* keyvalue "key" "value"
+ * so we have two strings (possibly empty) in the membuffer, separated by a '\0' */
+static void parse_dc_keyvalue(char *line, struct membuffer *str, void *_dc)
+{
+	const char *key, *value;
+	struct divecomputer *dc = _dc;
+
+	// Let's make sure we have two strings...
+	int string_counter = 0;
+	while(*line) {
+		if (*line == '"')
+			string_counter++;
+		line++;
+	}
+	if (string_counter != 2)
+		return;
+
+	// stupidly the second string in the membuffer isn't NUL terminated;
+	// asking for a cstring fixes that; interestingly enough, given that there are two
+	// strings in the mb, the next command at the same time assigns a pointer to the
+	// first string to 'key' and NUL terminates the second string (which then goes to 'value')
+	key = mb_cstring(str);
+	value = key + strlen(key) + 1;
+	add_extra_data(dc, key, value);
 }
 
 static void parse_dc_event(char *line, struct membuffer *str, void *_dc)
@@ -535,7 +612,7 @@ static void parse_dc_event(char *line, struct membuffer *str, void *_dc)
 	int m, s = 0;
 	const char *name;
 	struct divecomputer *dc = _dc;
-	struct event event = { 0 };
+	struct event event = { 0 }, *ev;
 
 	m = strtol(line, &line, 10);
 	if (*line == ':')
@@ -554,7 +631,17 @@ static void parse_dc_event(char *line, struct membuffer *str, void *_dc)
 	name = "";
 	if (str->len)
 		name = mb_cstring(str);
-	add_event(dc, event.time.seconds, event.type, event.flags, event.value, name);
+	ev = add_event(dc, event.time.seconds, event.type, event.flags, event.value, name);
+	if (ev && event_is_gaschange(ev)) {
+		/*
+		 * We subtract one here because "0" is "no index",
+		 * and the parsing will add one for actual cylinder
+		 * index data (see parse_event_keyvalue)
+		 */
+		ev->gas.index = event.gas.index-1;
+		if (event.gas.mix.o2.permille || event.gas.mix.he.permille)
+			ev->gas.mix = event.gas.mix;
+	}
 }
 
 static void parse_trip_date(char *line, struct membuffer *str, void *_trip)
@@ -660,13 +747,27 @@ static void parse_settings_divecomputerid(char *line, struct membuffer *str, voi
 	create_device_node(id.model, id.deviceid, id.serial, id.firmware, id.nickname);
 }
 
+static void parse_picture_filename(char *line, struct membuffer *str, void *_pic)
+{
+	struct picture *pic = _pic;
+	pic->filename = get_utf8(str);
+}
+
+static void parse_picture_gps(char *line, struct membuffer *str, void *_pic)
+{
+	struct picture *pic = _pic;
+
+	pic->latitude = parse_degrees(line, &line);
+	pic->longitude = parse_degrees(line, &line);
+}
+
 /* These need to be sorted! */
 struct keyword_action dc_action[] = {
 #undef D
 #define D(x) { #x, parse_dc_ ## x }
-	D(airtemp), D(date), D(deviceid), D(diveid), D(duration),
-	D(event), D(maxdepth), D(meandepth), D(model), D(salinity),
-	D(surfacepressure), D(surfacetime), D(time), D(watertemp),
+	D(airtemp), D(date), D(dctype), D(deviceid), D(diveid), D(duration),
+	D(event), D(keyvalue), D(maxdepth), D(meandepth), D(model), D(numberofoxygensensors),
+	D(salinity), D(surfacepressure), D(surfacetime), D(time), D(watertemp)
 };
 
 /* Sample lines start with a space or a number */
@@ -714,6 +815,18 @@ static struct keyword_action settings_action[] = {
 static void settings_parser(char *line, struct membuffer *str, void *_unused)
 {
 	match_action(line, str, NULL, settings_action, ARRAY_SIZE(settings_action));
+}
+
+/* These need to be sorted! */
+static struct keyword_action picture_action[] = {
+#undef D
+#define D(x) { #x, parse_picture_ ## x }
+	D(filename), D(gps)
+};
+
+static void picture_parser(char *line, struct membuffer *str, void *_pic)
+{
+	match_action(line, str, _pic, picture_action, ARRAY_SIZE(picture_action));
 }
 
 /*
@@ -934,15 +1047,21 @@ static int dive_directory(const char *root, const char *name, int timeoff)
 {
 	int yyyy = -1, mm = -1, dd = -1;
 	int h, m, s;
-	int mday_off = timeoff - 7;
-	int month_off = mday_off - 3;
-	int year_off = month_off - 5;
+	int mday_off, month_off, year_off;
 	struct tm tm;
 
-	/* There has to be a mday */
-	if (mday_off < 0)
+	/* Skip the '-' before the time */
+	mday_off = timeoff;
+	if (!mday_off || name[--mday_off] != '-')
 		return GIT_WALK_SKIP;
-	if (name[timeoff-1] != '-')
+	/* Skip the day name */
+	while (mday_off > 0 && name[--mday_off] != '-')
+		/* nothing */;
+
+	mday_off = mday_off - 2;
+	month_off = mday_off - 3;
+	year_off = month_off - 5;
+	if (mday_off < 0)
 		return GIT_WALK_SKIP;
 
 	/* Get the time of day */
@@ -1005,6 +1124,13 @@ static int dive_directory(const char *root, const char *name, int timeoff)
 	return GIT_WALK_OK;
 }
 
+static int picture_directory(const char *root, const char *name)
+{
+	if (!active_dive)
+		return GIT_WALK_SKIP;
+	return GIT_WALK_OK;
+}
+
 /*
  * Return the length of the string without the unique part.
  */
@@ -1046,6 +1172,8 @@ static int nonunique_length(const char *str)
  *    are optional, and may be encoded in the path leading up to
  *    the dive).
  *
+ *  - It is a per-dive picture directory ("Pictures")
+ *
  *  - It's some random non-dive-data directory.
  *
  *    Subsurface doesn't create these yet, but maybe we'll encode
@@ -1058,6 +1186,9 @@ static int walk_tree_directory(const char *root, const git_tree_entry *entry)
 	const char *name = git_tree_entry_name(entry);
 	int digits = 0, len;
 	char c;
+
+	if (!strcmp(name, "Pictures"))
+		return picture_directory(root, name);
 
 	while (isdigit(c = name[digits]))
 		digits++;
@@ -1109,11 +1240,13 @@ static struct divecomputer *create_new_dc(struct dive *dive)
 	/* Did we already fill that in? */
 	if (dc->samples || dc->model || dc->when) {
 		struct divecomputer *newdc = calloc(1, sizeof(*newdc));
-		if (newdc) {
-			dc->next = newdc;
-			dc = newdc;
-		}
+		if (!newdc)
+			return NULL;
+		dc->next = newdc;
+		dc = newdc;
 	}
+	dc->when = dive->when;
+	dc->duration = dive->duration;
 	return dc;
 }
 
@@ -1173,20 +1306,63 @@ static int parse_settings_entry(git_repository *repo, const git_tree_entry *entr
 	return 0;
 }
 
+static int parse_picture_entry(git_repository *repo, const git_tree_entry *entry, const char *name)
+{
+	git_blob *blob;
+	struct picture *pic;
+	int hh, mm, ss, offset;
+	char sign;
+
+	/*
+	 * The format of the picture name files is just the offset
+	 * within the dive in form [[+-]hh:mm:ss, possibly followed
+	 * by a hash to make the filename unique (which we can just
+	 * ignore).
+	 */
+	if (sscanf(name, "%c%d:%d:%d", &sign, &hh, &mm, &ss) != 4)
+		return report_error("Unknown file name %s", name);
+	offset = ss + 60*(mm + 60*hh);
+	if (sign == '-')
+		offset = -offset;
+
+	blob = git_tree_entry_blob(repo, entry);
+	if (!blob)
+		return report_error("Unable to read trip file");
+
+	pic = alloc_picture();
+	pic->offset.seconds = offset;
+	dive_add_picture(active_dive, pic);
+
+	for_each_line(blob, picture_parser, pic);
+	git_blob_free(blob);
+	return 0;
+}
+
 static int walk_tree_file(const char *root, const git_tree_entry *entry, git_repository *repo)
 {
 	struct dive *dive = active_dive;
 	dive_trip_t *trip = active_trip;
 	const char *name = git_tree_entry_name(entry);
 
-	if (dive && !strncmp(name, "Divecomputer", 12))
-		return parse_divecomputer_entry(repo, entry, name+12);
-	if (dive && !strncmp(name, "Dive", 4))
-		return parse_dive_entry(repo, entry, name+4);
-	if (trip && !strcmp(name, "00-Trip"))
-		return parse_trip_entry(repo, entry);
-	if (!strcmp(name, "00-Subsurface"))
-		return parse_settings_entry(repo, entry);
+	switch (*name) {
+	/* Picture file? They are saved as time offsets in the dive */
+	case '-': case '+':
+		if (dive)
+			return parse_picture_entry(repo, entry, name);
+		break;
+	case 'D':
+		if (dive && !strncmp(name, "Divecomputer", 12))
+			return parse_divecomputer_entry(repo, entry, name+12);
+		if (dive && !strncmp(name, "Dive", 4))
+			return parse_dive_entry(repo, entry, name+4);
+		break;
+	case '0':
+		if (trip && !strcmp(name, "00-Trip"))
+			return parse_trip_entry(repo, entry);
+		if (!strcmp(name, "00-Subsurface"))
+			return parse_settings_entry(repo, entry);
+		break;
+	}
 	report_error("Unknown file %s%s (%p %p)", root, name, dive, trip);
 	return GIT_WALK_SKIP;
 }

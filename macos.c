@@ -11,7 +11,7 @@
 #include <sys/syslimits.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <dirent.h>
+#include <unistd.h>
 
 void subsurface_user_info(struct user_info *info)
 { /* Nothing, let's use libgit2-20 on MacOS */ }
@@ -28,8 +28,20 @@ void subsurface_user_info(struct user_info *info)
 #define ICON_NAME "Subsurface.icns"
 #define UI_FONT "Arial 12"
 
-const char system_divelist_default_font[] = "Arial";
-const int system_divelist_default_font_size = 10;
+const char mac_system_divelist_default_font[] = "Arial";
+const char *system_divelist_default_font = mac_system_divelist_default_font;
+double system_divelist_default_font_size = -1.0;
+
+void subsurface_OS_pref_setup(void)
+{
+	// nothing
+}
+
+bool subsurface_ignore_font(const char *font)
+{
+	// there are no old default fonts to ignore
+	return false;
+}
 
 const char *system_default_filename(void)
 {
@@ -45,27 +57,54 @@ const char *system_default_filename(void)
 	return buffer;
 }
 
-int enumerate_devices(device_callback_t callback, void *userdata)
+int enumerate_devices(device_callback_t callback, void *userdata, int dc_type)
 {
-	int index = -1;
+	int index = -1, entries = 0;
 	DIR *dp = NULL;
 	struct dirent *ep = NULL;
 	size_t i;
-	const char *dirname = "/dev";
-	const char *patterns[] = {
-		"tty.*",
-		"usbserial",
-		NULL
-	};
+	if (dc_type != DC_TYPE_UEMIS) {
+		const char *dirname = "/dev";
+		const char *patterns[] = {
+			"tty.*",
+			"usbserial",
+			NULL
+		};
 
-	dp = opendir(dirname);
-	if (dp == NULL) {
-		return -1;
+		dp = opendir(dirname);
+		if (dp == NULL) {
+			return -1;
+		}
+
+		while ((ep = readdir(dp)) != NULL) {
+			for (i = 0; patterns[i] != NULL; ++i) {
+				if (fnmatch(patterns[i], ep->d_name, 0) == 0) {
+					char filename[1024];
+					int n = snprintf(filename, sizeof(filename), "%s/%s", dirname, ep->d_name);
+					if (n >= sizeof(filename)) {
+						closedir(dp);
+						return -1;
+					}
+					callback(filename, userdata);
+					if (is_default_dive_computer_device(filename))
+						index = entries;
+					entries++;
+					break;
+				}
+			}
+		}
+		closedir(dp);
 	}
+	if (dc_type != DC_TYPE_SERIAL) {
+		const char *dirname = "/Volumes";
+		int num_uemis = 0;
+		dp = opendir(dirname);
+		if (dp == NULL) {
+			return -1;
+		}
 
-	while ((ep = readdir(dp)) != NULL) {
-		for (i = 0; patterns[i] != NULL; ++i) {
-			if (fnmatch(patterns[i], ep->d_name, 0) == 0) {
+		while ((ep = readdir(dp)) != NULL) {
+			if (fnmatch("UEMISSDA", ep->d_name, 0) == 0) {
 				char filename[1024];
 				int n = snprintf(filename, sizeof(filename), "%s/%s", dirname, ep->d_name);
 				if (n >= sizeof(filename)) {
@@ -74,14 +113,16 @@ int enumerate_devices(device_callback_t callback, void *userdata)
 				}
 				callback(filename, userdata);
 				if (is_default_dive_computer_device(filename))
-					index = i;
+					index = entries;
+				entries++;
+				num_uemis++;
 				break;
 			}
 		}
+		closedir(dp);
+		if (num_uemis == 1 && entries == 1) /* if we find exactly one entry and that's a Uemis, select it */
+			index = 0;
 	}
-	// TODO: list UEMIS mount point from /proc/mounts
-
-	closedir(dp);
 	return index;
 }
 
@@ -104,6 +145,11 @@ FILE *subsurface_fopen(const char *path, const char *mode)
 void *subsurface_opendir(const char *path)
 {
 	return (void *)opendir(path);
+}
+
+int subsurface_access(const char *path, int mode)
+{
+	return access(path, mode);
 }
 
 struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *errorp)

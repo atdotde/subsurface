@@ -2,7 +2,6 @@
 #define PREFERENCES_H
 
 #include <QDialog>
-#include "dive.h"
 #include "pref.h"
 
 #include "ui_preferences.h"
@@ -15,18 +14,22 @@ public:
 	static PreferencesDialog *instance();
 	void showEvent(QShowEvent *);
 	void emitSettingsChanged();
+
 signals:
 	void settingsChanged();
 public
 slots:
 	void buttonClicked(QAbstractButton *button);
 	void on_chooseFile_clicked();
+	void on_resetSettings_clicked();
 	void syncSettings();
 	void loadSettings();
 	void restorePrefs();
 	void rememberPrefs();
 	void gflowChanged(int gf);
 	void gfhighChanged(int gf);
+	void proxyType_changed(int idx);
+	void on_btnUseDefaultFile_toggled(bool toggle);
 
 private:
 	explicit PreferencesDialog(QWidget *parent = 0, Qt::WindowFlags f = 0);

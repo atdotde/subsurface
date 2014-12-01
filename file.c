@@ -11,6 +11,9 @@
 #include "dive.h"
 #include "file.h"
 
+/* For SAMPLE_* */
+#include <libdivecomputer/parser.h>
+
 /* Crazy windows sh*t */
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -89,6 +92,9 @@ static int try_to_open_zip(const char *filename, struct memblock *mem)
 			struct zip_file *file = zip_fopen_index(zip, index, 0);
 			if (!file)
 				break;
+			/* skip parsing the divelogs.de pictures */
+			if (strstr(zip_get_name(zip, index, 0), "pictures/"))
+				continue;
 			zip_read(file, filename);
 			zip_fclose(file);
 			success++;
@@ -102,7 +108,7 @@ static int try_to_xslt_open_csv(const char *filename, struct memblock *mem, cons
 {
 	char *buf;
 
-	if (readfile(filename, mem) < 0)
+	if (mem->size == 0 && readfile(filename, mem) < 0)
 		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);
 
 	/* Surround the CSV file content with XML tags to enable XSLT
@@ -157,6 +163,7 @@ static int try_to_open_db(const char *filename, struct memblock *mem)
 {
 	sqlite3 *handle;
 	char dm4_test[] = "select count(*) from sqlite_master where type='table' and name='Dive' and sql like '%ProfileBlob%'";
+	char dm5_test[] = "select count(*) from sqlite_master where type='table' and name='Dive' and sql like '%SampleBlob%'";
 	char shearwater_test[] = "select count(*) from sqlite_master where type='table' and name='system' and sql like '%dbVersion%'";
 	int retval;
 
@@ -165,6 +172,14 @@ static int try_to_open_db(const char *filename, struct memblock *mem)
 	if (retval) {
 		fprintf(stderr, translate("gettextFromC", "Database connection failed '%s'.\n"), filename);
 		return 1;
+	}
+
+	/* Testing if DB schema resembles Suunto DM5 database format */
+	retval = sqlite3_exec(handle, dm5_test, &db_test_func, 0, NULL);
+	if (!retval) {
+		retval = parse_dm5_buffer(handle, filename, mem->buffer, mem->size, &dive_table);
+		sqlite3_close(handle);
+		return retval;
 	}
 
 	/* Testing if DB schema resembles Suunto DM4 database format */
@@ -223,7 +238,16 @@ timestamp_t parse_date(const char *date)
 enum csv_format {
 	CSV_DEPTH,
 	CSV_TEMP,
-	CSV_PRESSURE
+	CSV_PRESSURE,
+	POSEIDON_DEPTH,
+	POSEIDON_TEMP,
+	POSEIDON_SETPOINT,
+	POSEIDON_SENSOR1,
+	POSEIDON_SENSOR2,
+	POSEIDON_PRESSURE,
+	POSEIDON_O2CYLINDER,
+	POSEIDON_NDL,
+	POSEIDON_CEILING
 };
 
 static void add_sample_data(struct sample *sample, enum csv_format type, double val)
@@ -237,6 +261,33 @@ static void add_sample_data(struct sample *sample, enum csv_format type, double 
 		break;
 	case CSV_PRESSURE:
 		sample->cylinderpressure.mbar = psi_to_mbar(val * 4);
+		break;
+	case POSEIDON_DEPTH:
+		sample->depth.mm = val * 0.5 *1000;
+		break;
+	case POSEIDON_TEMP:
+		sample->temperature.mkelvin = C_to_mkelvin(val * 0.2);
+		break;
+	case POSEIDON_SETPOINT:
+		sample->setpoint.mbar = val * 10;
+		break;
+	case POSEIDON_SENSOR1:
+		sample->o2sensor[0].mbar = val * 10;
+		break;
+	case POSEIDON_SENSOR2:
+		sample->o2sensor[1].mbar = val * 10;
+		break;
+	case POSEIDON_PRESSURE:
+		sample->cylinderpressure.mbar = val * 1000;
+		break;
+	case POSEIDON_O2CYLINDER:
+		sample->o2cylinderpressure.mbar = val * 1000;
+		break;
+	case POSEIDON_NDL:
+		sample->ndl.seconds = val * 60;
+		break;
+	case POSEIDON_CEILING:
+		sample->stopdepth.mm = val * 1000;
 		break;
 	}
 }
@@ -320,16 +371,14 @@ static int open_by_filename(const char *filename, const char *fmt, struct memblo
 	/* CSV files */
 	if (!strcasecmp(fmt, "CSV"))
 		return 1;
-
-#if ONCE_COCHRAN_IS_SUPPORTED
 	/* Truly nasty intentionally obfuscated Cochran Anal software */
 	if (!strcasecmp(fmt, "CAN"))
 		return try_to_open_cochran(filename, mem);
-#endif
-
 	/* Cochran export comma-separated-value files */
 	if (!strcasecmp(fmt, "DPT"))
 		return try_to_open_csv(filename, mem, CSV_DEPTH);
+	if (!strcasecmp(fmt, "LVD"))
+		return try_to_open_liquivision(filename, mem);
 	if (!strcasecmp(fmt, "TMP"))
 		return try_to_open_csv(filename, mem, CSV_TEMP);
 	if (!strcasecmp(fmt, "HP1"))
@@ -382,44 +431,365 @@ int parse_file(const char *filename)
 	return 0;
 }
 
+#define MATCH(buffer, pattern) \
+	memcmp(buffer, pattern, strlen(pattern))
+
+char *parse_mkvi_value(const char *haystack, const char *needle)
+{
+	char *lineptr, *valueptr, *endptr, *ret = NULL;
+
+	if ((lineptr = strstr(haystack, needle)) != NULL) {
+		if ((valueptr = strstr(lineptr, ": ")) != NULL) {
+			valueptr += 2;
+		}
+		if ((endptr = strstr(lineptr, "\n")) != NULL) {
+			char terminator = '\n';
+			if (*(endptr - 1) == '\r') {
+				--endptr;
+				terminator = '\r';
+			}
+			*endptr = 0;
+			ret = strdup(valueptr);
+			*endptr = terminator;
+
+		}
+	}
+	return ret;
+}
+
+char *next_mkvi_key(const char *haystack)
+{
+	char *valueptr, *endptr, *ret = NULL;
+
+	if ((valueptr = strstr(haystack, "\n")) != NULL) {
+		valueptr += 1;
+	}
+	if ((endptr = strstr(valueptr, ": ")) != NULL) {
+		*endptr = 0;
+		ret = strdup(valueptr);
+		*endptr = ':';
+
+	}
+	return ret;
+}
+
+int parse_txt_file(const char *filename, const char *csv)
+{
+	struct memblock memtxt, memcsv;
+
+	if (readfile(filename, &memtxt) < 0) {
+		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);
+	}
+
+	/*
+	 * MkVI stores some information in .txt file but the whole profile and events are stored in .csv file. First
+	 * make sure the input .txt looks like proper MkVI file, then start parsing the .csv.
+	 */
+	if (MATCH(memtxt.buffer, "MkVI_Config") == 0) {
+		int d, m, y, he;
+		int hh = 0, mm = 0, ss = 0;
+		int prev_depth = 0, cur_sampletime = 0, prev_setpoint = -1, prev_ndl = -1;
+		bool has_depth = false, has_setpoint = false, has_ndl = false;
+		char *lineptr, *key, *value;
+		int o2cylinder_pressure = 0, cylinder_pressure = 0, cur_cylinder_index = 0;
+
+		struct dive *dive;
+		struct divecomputer *dc;
+		struct tm cur_tm;
+
+		if (sscanf(parse_mkvi_value(memtxt.buffer, "Dive started at"), "%d-%d-%d %d:%d:%d",
+					&y, &m, &d, &hh, &mm, &ss) != 6) {
+			return -1;
+		}
+
+		cur_tm.tm_year = y;
+		cur_tm.tm_mon = m - 1;
+		cur_tm.tm_mday = d;
+		cur_tm.tm_hour = hh;
+		cur_tm.tm_min = mm;
+		cur_tm.tm_sec = ss;
+
+		dive = alloc_dive();
+		dive->when = utc_mktime(&cur_tm);;
+		dive->dc.model = strdup("Poseidon MkVI Discovery");
+		value = parse_mkvi_value(memtxt.buffer, "Rig Serial number");
+		dive->dc.deviceid = atoi(value);
+		free(value);
+		dive->dc.dctype = CCR;
+		dive->dc.no_o2sensors = 2;
+
+		dive->cylinder[cur_cylinder_index].cylinder_use = OXYGEN;
+		dive->cylinder[cur_cylinder_index].type.size.mliter = 3000;
+		dive->cylinder[cur_cylinder_index].type.workingpressure.mbar = 200000;
+		dive->cylinder[cur_cylinder_index].type.description = strdup("3l Mk6");
+		dive->cylinder[cur_cylinder_index].gasmix.o2.permille = 1000;
+		cur_cylinder_index++;
+
+		dive->cylinder[cur_cylinder_index].cylinder_use = DILUENT;
+		dive->cylinder[cur_cylinder_index].type.size.mliter = 3000;
+		dive->cylinder[cur_cylinder_index].type.workingpressure.mbar = 200000;
+		dive->cylinder[cur_cylinder_index].type.description = strdup("3l Mk6");
+		value = parse_mkvi_value(memtxt.buffer, "Helium percentage");
+		he = atoi(value);
+		free(value);
+		value = parse_mkvi_value(memtxt.buffer, "Nitrogen percentage");
+		dive->cylinder[cur_cylinder_index].gasmix.o2.permille = (100 - atoi(value) - he) * 10;
+		free(value);
+		dive->cylinder[cur_cylinder_index].gasmix.he.permille = he * 10;
+		cur_cylinder_index++;
+
+		lineptr = strstr(memtxt.buffer, "Dive started at");
+		while (lineptr && *lineptr && (lineptr = strchr(lineptr, '\n')) && ++lineptr) {
+			key = next_mkvi_key(lineptr);
+			if (!key)
+				break;
+			value = parse_mkvi_value(lineptr, key);
+			if (!value) {
+				free(key);
+				break;
+			}
+			add_extra_data(&dive->dc, key, value);
+			free(key);
+			free(value);
+		}
+		dc = &dive->dc;
+
+		/*
+		 * Read samples from the CSV file. A sample contains all the lines with same timestamp. The CSV file has
+		 * the following format:
+		 *
+		 * timestamp, type, value
+		 *
+		 * And following fields are of interest to us:
+		 *
+		 * 	6	sensor1
+		 * 	7	sensor2
+		 * 	8	depth
+		 *	13	o2 tank pressure
+		 *	14	diluent tank pressure
+		 *	20	o2 setpoint
+		 *	39	water temp
+		 */
+
+		if (readfile(csv, &memcsv) < 0) {
+			return report_error(translate("gettextFromC", "Poseidon import failed: unable to read '%s'"), csv);
+		}
+		lineptr = memcsv.buffer;
+		for (;;) {
+			struct sample *sample;
+			int type;
+			int value;
+			int sampletime;
+			int gaschange = 0;
+
+			/* Collect all the information for one sample */
+			sscanf(lineptr, "%d,%d,%d", &cur_sampletime, &type, &value);
+
+			has_depth = false;
+			has_setpoint = false;
+			has_ndl = false;
+			sample = prepare_sample(dc);
+			sample->time.seconds = cur_sampletime;
+
+			do {
+				int i = sscanf(lineptr, "%d,%d,%d", &sampletime, &type, &value);
+				switch (i) {
+				case 3:
+					switch (type) {
+					case 0:
+						//Mouth piece position event: 0=OC, 1=CC, 2=UN, 3=NC
+						switch (value) {
+						case 0:
+							add_event(dc, cur_sampletime, 0, 0, 0,
+									QT_TRANSLATE_NOOP("gettextFromC", "Mouth piece position OC"));
+							break;
+						case 1:
+							add_event(dc, cur_sampletime, 0, 0, 0,
+									QT_TRANSLATE_NOOP("gettextFromC", "Mouth piece position CC"));
+							break;
+						case 2:
+							add_event(dc, cur_sampletime, 0, 0, 0,
+									QT_TRANSLATE_NOOP("gettextFromC", "Mouth piece position unknown"));
+							break;
+						case 3:
+							add_event(dc, cur_sampletime, 0, 0, 0,
+									QT_TRANSLATE_NOOP("gettextFromC", "Mouth piece position not connected"));
+							break;
+						}
+					case 3:
+						//Power Off event
+						add_event(dc, cur_sampletime, 0, 0, 0,
+								QT_TRANSLATE_NOOP("gettextFromC", "Power off"));
+						break;
+					case 4:
+						//Battery State of Charge in %
+#ifdef SAMPLE_EVENT_BATTERY
+						add_event(dc, cur_sampletime, SAMPLE_EVENT_BATTERY, 0,
+								value, QT_TRANSLATE_NOOP("gettextFromC", "battery"));
+#endif
+						break;
+					case 6:
+						//PO2 Cell 1 Average
+						add_sample_data(sample, POSEIDON_SENSOR1, value);
+						break;
+					case 7:
+						//PO2 Cell 2 Average
+						add_sample_data(sample, POSEIDON_SENSOR2, value);
+						break;
+					case 8:
+						//Depth * 2
+						has_depth = true;
+						prev_depth = value;
+						add_sample_data(sample, POSEIDON_DEPTH, value);
+						break;
+						//9 Max Depth * 2
+						//10 Ascent/Descent Rate * 2
+					case 11:
+						//Ascent Rate Alert >10 m/s
+						add_event(dc, cur_sampletime, SAMPLE_EVENT_ASCENT, 0, 0,
+								QT_TRANSLATE_NOOP("gettextFromC", "ascent"));
+						break;
+					case 13:
+						//O2 Tank Pressure
+						add_sample_data(sample, POSEIDON_O2CYLINDER, value);
+						if (!o2cylinder_pressure) {
+							dive->cylinder[0].sample_start.mbar = value * 1000;
+							o2cylinder_pressure = value;
+						} else
+							o2cylinder_pressure = value;
+						break;
+					case 14:
+						//Diluent Tank Pressure
+						add_sample_data(sample, POSEIDON_PRESSURE, value);
+						if (!cylinder_pressure) {
+							dive->cylinder[1].sample_start.mbar = value * 1000;
+							cylinder_pressure = value;
+						} else
+							cylinder_pressure = value;
+						break;
+						//16 Remaining dive time #1?
+						//17 related to O2 injection
+					case 20:
+						//PO2 Setpoint
+						has_setpoint = true;
+						prev_setpoint = value;
+						add_sample_data(sample, POSEIDON_SETPOINT, value);
+						break;
+					case 22:
+						//End of O2 calibration Event: 0 = OK, 2 = Failed, rest of dive setpoint 1.0
+						if (value == 2)
+							add_event(dc, cur_sampletime, 0, SAMPLE_FLAGS_END, 0,
+									QT_TRANSLATE_NOOP("gettextFromC", "O2 calibration failed"));
+						add_event(dc, cur_sampletime, 0, SAMPLE_FLAGS_END, 0,
+								QT_TRANSLATE_NOOP("gettextFromC", "O2 calibration"));
+						break;
+					case 25:
+						//25 Max Ascent depth
+						add_sample_data(sample, POSEIDON_CEILING, value);
+						break;
+					case 31:
+						//Start of O2 calibration Event
+						add_event(dc, cur_sampletime, 0, SAMPLE_FLAGS_BEGIN, 0,
+								QT_TRANSLATE_NOOP("gettextFromC", "O2 calibration"));
+						break;
+					case 37:
+						//Remaining dive time #2?
+						has_ndl = true;
+						prev_ndl = value;
+						add_sample_data(sample, POSEIDON_NDL, value);
+						break;
+					case 39:
+						// Water Temperature in Celcius
+						add_sample_data(sample, POSEIDON_TEMP, value);
+						break;
+					case 85:
+						//He diluent part in %
+						gaschange += value << 16;
+						break;
+					case 86:
+						//O2 diluent part in %
+						gaschange += value;
+						break;
+						//239 Unknown, maybe PO2 at sensor validation?
+						//240 Unknown, maybe PO2 at sensor validation?
+						//247 Unknown, maybe PO2 Cell 1 during pressure test
+						//248 Unknown, maybe PO2 Cell 2 during pressure test
+						//250 PO2 Cell 1
+						//251 PO2 Cell 2
+					default:
+						printf("Ignoring %d = %d\n", type, value);
+						break;
+					} /* sample types */
+					break;
+				case EOF:
+					break;
+				default:
+					printf("Unable to parse input: %s\n", lineptr);
+					break;
+				}
+
+				lineptr = strchr(lineptr, '\n');
+				if (!lineptr || !*lineptr)
+					break;
+				lineptr++;
+
+				/* Grabbing next sample time */
+				sscanf(lineptr, "%d,%d,%d", &cur_sampletime, &type, &value);
+			} while (sampletime == cur_sampletime);
+
+			if (gaschange)
+				add_event(dc, cur_sampletime, SAMPLE_EVENT_GASCHANGE2, 0, gaschange,
+						QT_TRANSLATE_NOOP("gettextFromC", "gaschange"));
+			if (!has_depth)
+				add_sample_data(sample, POSEIDON_DEPTH, prev_depth);
+			if (!has_setpoint)
+				add_sample_data(sample, POSEIDON_SETPOINT, prev_setpoint);
+			if (!has_ndl)
+				add_sample_data(sample, POSEIDON_NDL, prev_ndl);
+			if (cylinder_pressure)
+				dive->cylinder[1].sample_end.mbar = cylinder_pressure * 1000;
+			if (o2cylinder_pressure)
+				dive->cylinder[0].sample_end.mbar = o2cylinder_pressure * 1000;
+			finish_sample(dc);
+
+			if (!lineptr || !*lineptr)
+				break;
+		}
+		record_dive(dive);
+		return 1;
+	} else {
+		return report_error(translate("gettextFromC", "No matching DC found for file '%s'"), csv);
+	}
+
+	return 0;
+}
+
 #define MAXCOLDIGITS 3
 #define MAXCOLS 100
-int parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int unitidx)
+#define DATESTR 9
+#define TIMESTR 6
+void init_csv_file_parsing(char **params, char *timebuf, char *depthbuf, char *tempbuf, char *po2buf, char *cnsbuf, char *ndlbuf, char *ttsbuf, char *stopdepthbuf, char *pressurebuf, char *unitbuf, char *separator_index, time_t *now, struct tm *timep, char *curdate, char *curtime, int timef, int depthf, int tempf, int po2f, int cnsf, int ndlf, int ttsf, int stopdepthf, int pressuref, int sepidx, const char *csvtemplate, int unitidx)
 {
-	struct memblock mem;
 	int pnr = 0;
-	char *params[21];
-	char timebuf[MAXCOLDIGITS];
-	char depthbuf[MAXCOLDIGITS];
-	char tempbuf[MAXCOLDIGITS];
-	char po2buf[MAXCOLDIGITS];
-	char cnsbuf[MAXCOLDIGITS];
-	char stopdepthbuf[MAXCOLDIGITS];
-	char unitbuf[MAXCOLDIGITS];
-	char separator_index[MAXCOLDIGITS];
-	time_t now;
-	struct tm *timep;
-	char curdate[9];
-	char curtime[6];
-
-	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS)
-		return report_error(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
 
 	snprintf(timebuf, MAXCOLDIGITS, "%d", timef);
 	snprintf(depthbuf, MAXCOLDIGITS, "%d", depthf);
 	snprintf(tempbuf, MAXCOLDIGITS, "%d", tempf);
 	snprintf(po2buf, MAXCOLDIGITS, "%d", po2f);
 	snprintf(cnsbuf, MAXCOLDIGITS, "%d", cnsf);
+	snprintf(ndlbuf, MAXCOLDIGITS, "%d", ndlf);
+	snprintf(ttsbuf, MAXCOLDIGITS, "%d", ttsf);
 	snprintf(stopdepthbuf, MAXCOLDIGITS, "%d", stopdepthf);
+	snprintf(pressurebuf, MAXCOLDIGITS, "%d", pressuref);
 	snprintf(separator_index, MAXCOLDIGITS, "%d", sepidx);
 	snprintf(unitbuf, MAXCOLDIGITS, "%d", unitidx);
-	time(&now);
-	timep = localtime(&now);
-	strftime(curdate, sizeof(curdate), "%Y%m%d", timep);
+	time(now);
+	timep = localtime(now);
+	strftime(curdate, DATESTR, "%Y%m%d", timep);
 
 	/* As the parameter is numeric, we need to ensure that the leading zero
 	* is not discarded during the transform, thus prepend time with 1 */
-	strftime(curtime, sizeof(curtime), "1%H%M", timep);
+	strftime(curtime, TIMESTR, "1%H%M", timep);
 
 	params[pnr++] = "timeField";
 	params[pnr++] = timebuf;
@@ -431,8 +801,14 @@ int parse_csv_file(const char *filename, int timef, int depthf, int tempf, int p
 	params[pnr++] = po2buf;
 	params[pnr++] = "cnsField";
 	params[pnr++] = cnsbuf;
+	params[pnr++] = "ndlField";
+	params[pnr++] = ndlbuf;
+	params[pnr++] = "ttsField";
+	params[pnr++] = ttsbuf;
 	params[pnr++] = "stopdepthField";
 	params[pnr++] = stopdepthbuf;
+	params[pnr++] = "pressureField";
+	params[pnr++] = pressurebuf;
 	params[pnr++] = "date";
 	params[pnr++] = curdate;
 	params[pnr++] = "time";
@@ -442,9 +818,122 @@ int parse_csv_file(const char *filename, int timef, int depthf, int tempf, int p
 	params[pnr++] = "separatorIndex";
 	params[pnr++] = separator_index;
 	params[pnr++] = NULL;
+}
+
+int parse_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int ndlf, int ttsf, int stopdepthf, int pressuref, int sepidx, const char *csvtemplate, int unitidx)
+{
+	struct memblock mem;
+	char *params[27];
+	char timebuf[MAXCOLDIGITS];
+	char depthbuf[MAXCOLDIGITS];
+	char tempbuf[MAXCOLDIGITS];
+	char po2buf[MAXCOLDIGITS];
+	char cnsbuf[MAXCOLDIGITS];
+	char ndlbuf[MAXCOLDIGITS];
+	char ttsbuf[MAXCOLDIGITS];
+	char stopdepthbuf[MAXCOLDIGITS];
+	char pressurebuf[MAXCOLDIGITS];
+	char unitbuf[MAXCOLDIGITS];
+	char separator_index[MAXCOLDIGITS];
+	time_t now;
+	struct tm *timep;
+	char curdate[DATESTR];
+	char curtime[TIMESTR];
+
+	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || ndlf >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS || pressuref >= MAXCOLS)
+		return report_error(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
+
+	init_csv_file_parsing(params, timebuf, depthbuf, tempbuf, po2buf, cnsbuf,ndlbuf, ttsbuf, stopdepthbuf, pressurebuf, unitbuf, separator_index, &now, timep, curdate, curtime, timef, depthf, tempf, po2f, cnsf, ndlf, ttsf, stopdepthf, pressuref, sepidx, csvtemplate, unitidx);
 
 	if (filename == NULL)
 		return report_error("No CSV filename");
+
+	mem.size = 0;
+	if (try_to_xslt_open_csv(filename, &mem, csvtemplate))
+		return -1;
+
+	parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params);
+	free(mem.buffer);
+	return 0;
+}
+
+int parse_seabear_csv_file(const char *filename, int timef, int depthf, int tempf, int po2f, int cnsf, int ndlf, int ttsf, int stopdepthf, int pressuref, int sepidx, const char *csvtemplate, int unitidx)
+{
+	struct memblock mem;
+	char *params[27];
+	char timebuf[MAXCOLDIGITS];
+	char depthbuf[MAXCOLDIGITS];
+	char tempbuf[MAXCOLDIGITS];
+	char po2buf[MAXCOLDIGITS];
+	char cnsbuf[MAXCOLDIGITS];
+	char ndlbuf[MAXCOLDIGITS];
+	char ttsbuf[MAXCOLDIGITS];
+	char stopdepthbuf[MAXCOLDIGITS];
+	char pressurebuf[MAXCOLDIGITS];
+	char unitbuf[MAXCOLDIGITS];
+	char separator_index[MAXCOLDIGITS];
+	time_t now;
+	struct tm *timep;
+	char curdate[DATESTR];
+	char curtime[TIMESTR];
+	char *ptr, *ptr_old = NULL;
+	char *NL;
+
+	if (timef >= MAXCOLS || depthf >= MAXCOLS || tempf >= MAXCOLS || po2f >= MAXCOLS || cnsf >= MAXCOLS || ndlf >= MAXCOLS || cnsf >= MAXCOLS || stopdepthf >= MAXCOLS || pressuref >= MAXCOLS)
+		return report_error(translate("gettextFromC", "Maximum number of supported columns on CSV import is %d"), MAXCOLS);
+
+	init_csv_file_parsing(params, timebuf, depthbuf, tempbuf, po2buf, cnsbuf,ndlbuf, ttsbuf, stopdepthbuf, pressurebuf, unitbuf, separator_index, &now, timep, curdate, curtime, timef, depthf, tempf, po2f, cnsf, ndlf, ttsf, stopdepthf, pressuref, sepidx, csvtemplate, unitidx);
+
+	if (filename == NULL)
+		return report_error("No CSV filename");
+
+	if (readfile(filename, &mem) < 0)
+		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);
+
+	/* Determine NL (new line) character and the start of CSV data */
+	ptr = mem.buffer;
+	while ((ptr = strstr(ptr, "\r\n\r\n")) != NULL) {
+		ptr_old = ptr;
+		ptr += 1;
+		NL = "\r\n";
+	}
+
+	if (!ptr_old) {
+		while ((ptr = strstr(ptr, "\n\n")) != NULL) {
+			ptr_old = ptr;
+			ptr += 1;
+		}
+		ptr_old += 2;
+		NL = "\n";
+	} else
+		ptr_old += 4;
+
+	/*
+	 * On my current sample of Seabear DC log file, the date is
+	 * without any identifier. Thus we must search for the previous
+	 * line and step through from there.
+	 */
+	ptr = strstr(mem.buffer, "Serial number:");
+	if (ptr)
+		ptr = strstr(ptr, NL);
+
+	/* Write date and time values to params array */
+	if (ptr) {
+		ptr += strlen(NL) + 2;
+		memcpy(params[19], ptr, 4);
+		memcpy(params[19] + 4, ptr + 5, 2);
+		memcpy(params[19] + 6, ptr + 8, 2);
+		params[19][8] = 0;
+
+		params[21][0] = '1';
+		memcpy(params[21] + 1, ptr + 11, 2);
+		memcpy(params[21] + 3, ptr + 14, 2);
+		params[21][5] = 0;
+	}
+
+	/* Move the CSV data to the start of mem buffer */
+	memmove(mem.buffer, ptr_old, mem.size - (ptr_old - (char*)mem.buffer));
+	mem.size = (int)mem.size - (ptr_old - (char*)mem.buffer);
 
 	if (try_to_xslt_open_csv(filename, &mem, csvtemplate))
 		return -1;
@@ -497,11 +986,11 @@ int parse_manual_file(const char *filename, int sepidx, int units, int numberf, 
 	snprintf(unit, MAXCOLDIGITS, "%d", units);
 	time(&now);
 	timep = localtime(&now);
-	strftime(curdate, sizeof(curdate), "%Y%m%d", timep);
+	strftime(curdate, DATESTR, "%Y%m%d", timep);
 
 	/* As the parameter is numeric, we need to ensure that the leading zero
 	* is not discarded during the transform, thus prepend time with 1 */
-	strftime(curtime, sizeof(curtime), "1%H%M", timep);
+	strftime(curtime, TIMESTR, "1%H%M", timep);
 
 	params[pnr++] = "numberField";
 	params[pnr++] = numberbuf;
@@ -540,6 +1029,7 @@ int parse_manual_file(const char *filename, int sepidx, int units, int numberf, 
 	if (filename == NULL)
 		return report_error("No manual CSV filename");
 
+	mem.size = 0;
 	if (try_to_xslt_open_csv(filename, &mem, "manualCSV"))
 		return -1;
 

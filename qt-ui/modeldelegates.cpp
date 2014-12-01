@@ -1,10 +1,11 @@
 #include "modeldelegates.h"
-#include "../dive.h"
-#include "../divelist.h"
+#include "dive.h"
+#include "divelist.h"
 #include "starwidget.h"
 #include "models.h"
 #include "diveplanner.h"
 #include "simplewidgets.h"
+#include "gettextfromc.h"
 
 #include <QtDebug>
 #include <QPainter>
@@ -17,6 +18,7 @@
 #include <QKeyEvent>
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QTextDocument>
 
 QSize DiveListDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
@@ -31,6 +33,8 @@ static bool keyboardFinished = false;
 StarWidgetsDelegate::StarWidgetsDelegate(QWidget *parent) : QStyledItemDelegate(parent),
 	parentWidget(parent)
 {
+	const IconMetrics& metrics = defaultIconMetrics();
+	minStarSize = QSize(metrics.sz_small * TOTALSTARS + metrics.spacing * (TOTALSTARS - 1), metrics.sz_small);
 }
 
 void StarWidgetsDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -47,22 +51,33 @@ void StarWidgetsDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
 	int deltaY = option.rect.height() / 2 - StarWidget::starActive().height() / 2;
 	painter->save();
 	painter->setRenderHint(QPainter::Antialiasing, true);
+	const QPixmap active = QPixmap::fromImage(StarWidget::starActive());
+	const QPixmap inactive = QPixmap::fromImage(StarWidget::starInactive());
+	const IconMetrics& metrics = defaultIconMetrics();
+
 	for (int i = 0; i < rating; i++)
-		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y() + deltaY, StarWidget::starActive());
+		painter->drawPixmap(option.rect.x() + i * metrics.sz_small + metrics.spacing, option.rect.y() + deltaY, active);
 	for (int i = rating; i < TOTALSTARS; i++)
-		painter->drawPixmap(option.rect.x() + i * IMG_SIZE + SPACING, option.rect.y() + deltaY, StarWidget::starInactive());
+		painter->drawPixmap(option.rect.x() + i * metrics.sz_small + metrics.spacing, option.rect.y() + deltaY, inactive);
 	painter->restore();
 }
 
 QSize StarWidgetsDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-	return QSize(IMG_SIZE * TOTALSTARS + SPACING * (TOTALSTARS - 1), IMG_SIZE);
+	return minStarSize;
+}
+
+const QSize& StarWidgetsDelegate::starSize() const
+{
+	return minStarSize;
 }
 
 ComboBoxDelegate::ComboBoxDelegate(QAbstractItemModel *model, QObject *parent) : QStyledItemDelegate(parent), model(model)
 {
 	connect(this, SIGNAL(closeEditor(QWidget *, QAbstractItemDelegate::EndEditHint)),
 		this, SLOT(revertModelData(QWidget *, QAbstractItemDelegate::EndEditHint)));
+	connect(this, SIGNAL(closeEditor(QWidget *, QAbstractItemDelegate::EndEditHint)),
+		this, SLOT(fixTabBehavior()));
 }
 
 void ComboBoxDelegate::setEditorData(QWidget *editor, const QModelIndex &index) const
@@ -74,6 +89,7 @@ void ComboBoxDelegate::setEditorData(QWidget *editor, const QModelIndex &index) 
 		c->setCurrentIndex(i);
 	else
 		c->setEditText(data);
+	c->lineEdit()->setSelection(0, c->lineEdit()->text().length());
 }
 
 struct CurrSelected {
@@ -101,7 +117,6 @@ QWidget *ComboBoxDelegate::createEditor(QWidget *parent, const QStyleOptionViewI
 	connect(comboDelegate, SIGNAL(activated(QString)), this, SLOT(fakeActivation()));
 	connect(comboPopup, SIGNAL(entered(QModelIndex)), this, SLOT(testActivation(QModelIndex)));
 	connect(comboPopup, SIGNAL(activated(QModelIndex)), this, SLOT(fakeActivation()));
-	connect(this, SIGNAL(closeEditor(QWidget *, QAbstractItemDelegate::EndEditHint)), this, SLOT(fixTabBehavior()));
 	currCombo.comboEditor = comboDelegate;
 	currCombo.currRow = index.row();
 	currCombo.model = const_cast<QAbstractItemModel *>(index.model());
@@ -171,7 +186,7 @@ bool ComboBoxDelegate::eventFilter(QObject *object, QEvent *event)
 			QKeyEvent *ev = static_cast<QKeyEvent *>(event);
 			if (ev->key() == Qt::Key_Up || ev->key() == Qt::Key_Down) {
 				currCombo.ignoreSelection = true;
-				if (!currCombo.comboEditor->completer()->popup()->isVisible()){
+				if (!currCombo.comboEditor->completer()->popup()->isVisible()) {
 					currCombo.comboEditor->showPopup();
 					return true;
 				}
@@ -218,18 +233,19 @@ void TankInfoDelegate::setModelData(QWidget *editor, QAbstractItemModel *model, 
 	TankInfoModel *tanks = TankInfoModel::instance();
 	QModelIndexList matches = tanks->match(tanks->index(0, 0), Qt::DisplayRole, currCombo.activeText);
 	int row;
+	QString cylinderName = currCombo.activeText;
 	if (matches.isEmpty()) {
-		// we need to add this
 		tanks->insertRows(tanks->rowCount(), 1);
 		tanks->setData(tanks->index(tanks->rowCount() - 1, 0), currCombo.activeText);
 		row = tanks->rowCount() - 1;
 	} else {
 		row = matches.first().row();
+		cylinderName = matches.first().data().toString();
 	}
 	int tankSize = tanks->data(tanks->index(row, TankInfoModel::ML)).toInt();
 	int tankPressure = tanks->data(tanks->index(row, TankInfoModel::BAR)).toInt();
 
-	mymodel->setData(IDX(CylindersModel::TYPE), currCombo.activeText, Qt::EditRole);
+	mymodel->setData(IDX(CylindersModel::TYPE), cylinderName, Qt::EditRole);
 	mymodel->passInData(IDX(CylindersModel::WORKINGPRESS), tankPressure);
 	mymodel->passInData(IDX(CylindersModel::SIZE), tankSize);
 }
@@ -240,11 +256,8 @@ TankInfoDelegate::TankInfoDelegate(QObject *parent) : ComboBoxDelegate(TankInfoM
 
 void TankInfoDelegate::revertModelData(QWidget *widget, QAbstractItemDelegate::EndEditHint hint)
 {
-	if (
-#if !defined __APPLE__
-		hint == QAbstractItemDelegate::NoHint ||
-#endif
-		hint == QAbstractItemDelegate::RevertModelCache) {
+	if (hint == QAbstractItemDelegate::NoHint ||
+	    hint == QAbstractItemDelegate::RevertModelCache) {
 		CylindersModel *mymodel = qobject_cast<CylindersModel *>(currCombo.model);
 		mymodel->setData(IDX(CylindersModel::TYPE), currCylinderData.type, Qt::EditRole);
 		mymodel->passInData(IDX(CylindersModel::WORKINGPRESS), currCylinderData.pressure);
@@ -259,10 +272,36 @@ QWidget *TankInfoDelegate::createEditor(QWidget *parent, const QStyleOptionViewI
 	QWidget *delegate = ComboBoxDelegate::createEditor(parent, option, index);
 	CylindersModel *mymodel = qobject_cast<CylindersModel *>(currCombo.model);
 	cylinder_t *cyl = mymodel->cylinderAt(index);
-	currCylinderData.type = cyl->type.description;
+	currCylinderData.type = copy_string(cyl->type.description);
 	currCylinderData.pressure = cyl->type.workingpressure.mbar;
 	currCylinderData.size = cyl->type.size.mliter;
 	return delegate;
+}
+
+TankUseDelegate::TankUseDelegate(QObject *parent)
+{
+
+}
+
+QWidget *TankUseDelegate::createEditor(QWidget * parent, const QStyleOptionViewItem & option, const QModelIndex & index) const
+{
+	QComboBox *comboBox = new QComboBox(parent);
+	for (int i = 0; i < NUM_GAS_USE; i++)
+		comboBox->addItem(gettextFromC::instance()->trGettext(cylinderuse_text[i]));
+	return comboBox;
+}
+
+void TankUseDelegate::setEditorData(QWidget * editor, const QModelIndex & index) const
+{
+	QComboBox *comboBox = qobject_cast<QComboBox*>(editor);
+	QString indexString = index.data().toString();
+	comboBox->setCurrentIndex(cylinderuse_from_text(indexString.toUtf8().data()));
+}
+
+void TankUseDelegate::setModelData(QWidget * editor, QAbstractItemModel * model, const QModelIndex & index) const
+{
+	QComboBox *comboBox = qobject_cast<QComboBox*>(editor);
+	model->setData(index, comboBox->currentIndex());
 }
 
 struct RevertWeightData {
@@ -272,11 +311,8 @@ struct RevertWeightData {
 
 void WSInfoDelegate::revertModelData(QWidget *widget, QAbstractItemDelegate::EndEditHint hint)
 {
-	if (
-#if !defined __APPLE__
-		hint == QAbstractItemDelegate::NoHint ||
-#endif
-		hint == QAbstractItemDelegate::RevertModelCache) {
+	if (hint == QAbstractItemDelegate::NoHint ||
+	    hint == QAbstractItemDelegate::RevertModelCache) {
 		WeightModel *mymodel = qobject_cast<WeightModel *>(currCombo.model);
 		mymodel->setData(IDX(WeightModel::TYPE), currWeight.type, Qt::EditRole);
 		mymodel->passInData(IDX(WeightModel::WEIGHT), currWeight.weight);
@@ -314,7 +350,7 @@ QWidget *WSInfoDelegate::createEditor(QWidget *parent, const QStyleOptionViewIte
 	QWidget *editor = ComboBoxDelegate::createEditor(parent, option, index);
 	WeightModel *mymodel = qobject_cast<WeightModel *>(currCombo.model);
 	weightsystem_t *ws = mymodel->weightSystemAt(index);
-	currWeight.type = ws->description;
+	currWeight.type = copy_string(ws->description);
 	currWeight.weight = ws->weight.grams;
 	return editor;
 }
@@ -339,13 +375,13 @@ ProfilePrintDelegate::ProfilePrintDelegate(QObject *parent) : QStyledItemDelegat
 {
 }
 
-/* this method overrides the default table drawing method and places grid lines only at certain rows and columns */
-void ProfilePrintDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+static void paintRect(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index)
 {
 	const QRect rect(option.rect);
 	const int row = index.row();
 	const int col = index.column();
 
+	painter->save();
 	// grid color
 	painter->setPen(QPen(QColor(0xff999999)));
 	// horizontal lines
@@ -359,5 +395,76 @@ void ProfilePrintDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 		if (col == 4 || (col == 0 && row > 5))
 			painter->drawLine(rect.topRight(), rect.bottomRight());
 	}
+	painter->restore();
+}
+
+/* this method overrides the default table drawing method and places grid lines only at certain rows and columns */
+void ProfilePrintDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	paintRect(painter, option, index);
 	QStyledItemDelegate::paint(painter, option, index);
+}
+
+SpinBoxDelegate::SpinBoxDelegate(int min, int max, int step, QObject *parent):
+	QStyledItemDelegate(parent),
+	min(min),
+	max(max),
+	step(step)
+{
+}
+
+QWidget *SpinBoxDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	QSpinBox *w = qobject_cast<QSpinBox*>(QStyledItemDelegate::createEditor(parent, option, index));
+	w->setRange(min,max);
+	w->setSingleStep(step);
+	return w;
+}
+
+DoubleSpinBoxDelegate::DoubleSpinBoxDelegate(double min, double max, double step, QObject *parent):
+	QStyledItemDelegate(parent),
+	min(min),
+	max(max),
+	step(step)
+{
+}
+
+QWidget *DoubleSpinBoxDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	QDoubleSpinBox *w = qobject_cast<QDoubleSpinBox*>(QStyledItemDelegate::createEditor(parent, option, index));
+	w->setRange(min,max);
+	w->setSingleStep(step);
+	return w;
+}
+
+HTMLDelegate::HTMLDelegate(QObject *parent) : ProfilePrintDelegate(parent)
+{
+}
+
+void HTMLDelegate::paint(QPainter* painter, const QStyleOptionViewItem & option, const QModelIndex &index) const
+{
+	paintRect(painter, option, index);
+	QStyleOptionViewItemV4 options = option;
+	initStyleOption(&options, index);
+	painter->save();
+	QTextDocument doc;
+	doc.setHtml(options.text);
+	doc.setTextWidth(options.rect.width());
+	doc.setDefaultFont(options.font);
+	options.text.clear();
+	options.widget->style()->drawControl(QStyle::CE_ItemViewItem, &options, painter);
+	painter->translate(options.rect.left(), options.rect.top());
+	QRect clip(0, 0, options.rect.width(), options.rect.height());
+	doc.drawContents(painter, clip);
+	painter->restore();
+}
+
+QSize HTMLDelegate::sizeHint ( const QStyleOptionViewItem & option, const QModelIndex & index ) const
+{
+	QStyleOptionViewItemV4 options = option;
+	initStyleOption(&options, index);
+	QTextDocument doc;
+	doc.setHtml(options.text);
+	doc.setTextWidth(options.rect.width());
+	return QSize(doc.idealWidth(), doc.size().height());
 }

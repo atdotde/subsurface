@@ -40,10 +40,28 @@ public:
 		TISSUE_14,
 		TISSUE_15,
 		TISSUE_16,
+		PERCENTAGE_1,
+		PERCENTAGE_2,
+		PERCENTAGE_3,
+		PERCENTAGE_4,
+		PERCENTAGE_5,
+		PERCENTAGE_6,
+		PERCENTAGE_7,
+		PERCENTAGE_8,
+		PERCENTAGE_9,
+		PERCENTAGE_10,
+		PERCENTAGE_11,
+		PERCENTAGE_12,
+		PERCENTAGE_13,
+		PERCENTAGE_14,
+		PERCENTAGE_15,
+		PERCENTAGE_16,
 		PN2,
 		PHE,
 		PO2,
 		HEARTBEAT,
+		AMBPRESSURE,
+		GFLINE,
 		COLUMNS
 	};
 	explicit DivePlotDataModel(QObject *parent = 0);
@@ -54,7 +72,6 @@ public:
 	void clear();
 	void setDive(struct dive *d, const plot_info &pInfo);
 	const plot_info &data() const;
-	int id() const;
 	unsigned int dcShown() const;
 	double pheMax();
 	double pn2Max();
@@ -63,7 +80,7 @@ public:
 	void calculateDecompression();
 
 private:
-	plot_info pInfo;
+	struct plot_info pInfo;
 	int diveId;
 	unsigned int dcNr;
 };

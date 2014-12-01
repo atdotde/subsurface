@@ -1,6 +1,7 @@
 #include "subsurfacewebservices.h"
 #include "webservice.h"
 #include "mainwindow.h"
+#include "usersurvey.h"
 #include <libxml/parser.h>
 #include <zip.h>
 #include <errno.h>
@@ -28,73 +29,76 @@
 #include <QUrlQuery>
 #endif
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 struct dive_table gps_location_table;
 static bool merge_locations_into_dives(void);
-
-static bool is_automatic_fix(struct dive *gpsfix)
-{
-	if (gpsfix && gpsfix->location &&
-	    (!strcmp(gpsfix->location, "automatic fix") ||
-	     !strcmp(gpsfix->location, "Auto-created dive")))
-		return true;
-	return false;
-}
 
 #define SAME_GROUP 6 * 3600 // six hours
 //TODO: C Code. static functions are not good if we plan to have a test for them.
 static bool merge_locations_into_dives(void)
 {
-	int i, nr = 0, changed = 0;
-	struct dive *gpsfix, *last_named_fix = NULL, *dive;
+	int i, j, tracer=0, changed=0;
+	struct dive *gpsfix, *nextgpsfix, *dive;
 
 	sort_table(&gps_location_table);
 
-	for_each_gps_location(i, gpsfix) {
-		if (is_automatic_fix(gpsfix)) {
-			dive = find_dive_including(gpsfix->when);
-			if (dive && !dive_has_gps_location(dive)) {
-#if DEBUG_WEBSERVICE
-				struct tm tm;
-				utc_mkdate(gpsfix->when, &tm);
-				printf("found dive named %s @ %04d-%02d-%02d %02d:%02d:%02d\n",
-				       gpsfix->location,
-				       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-				       tm.tm_hour, tm.tm_min, tm.tm_sec);
-#endif
-				changed++;
-				copy_gps_location(gpsfix, dive);
-			}
-		} else {
-			if (last_named_fix && dive_within_time_range(last_named_fix, gpsfix->when, SAME_GROUP)) {
-				nr++;
-			} else {
-				nr = 1;
-				last_named_fix = gpsfix;
-			}
-			dive = find_dive_n_near(gpsfix->when, nr, SAME_GROUP);
-			if (dive) {
-				if (!dive_has_gps_location(dive)) {
-					copy_gps_location(gpsfix, dive);
-					changed++;
+	for_each_dive (i, dive) {
+		if (!dive_has_gps_location(dive)) {
+			for (j = tracer; (gpsfix = get_gps_location(j, &gps_location_table)) !=NULL; j++) {
+				if (dive_within_time_range (dive, gpsfix->when, SAME_GROUP)) {
+					/*
+					 * If position is fixed during dive. This is the good one.
+					 * Asign and mark position, and end gps_location loop
+					 */
+					if ((dive->when <= gpsfix->when && gpsfix->when <= dive->when + dive->duration.seconds)) {
+						copy_gps_location(gpsfix,dive);
+						changed++;
+						tracer = j;
+						break;
+					} else {
+						/*
+						 * If it is not, check if there are more position fixes in SAME_GROUP range
+						 */
+						if ((nextgpsfix = get_gps_location(j+1,&gps_location_table)) &&
+						    dive_within_time_range (dive, nextgpsfix->when, SAME_GROUP)) {
+							/*
+							 * If distance from gpsfix to end of dive is shorter than distance between
+							 * gpsfix and nextgpsfix, gpsfix is the good one. Asign, mark and end loop.
+							 * If not, simply fail and nextgpsfix will be evaluated in next iteration.
+							 */
+							if ((dive->when + dive->duration.seconds - gpsfix->when) < (nextgpsfix->when - gpsfix->when)) {
+								copy_gps_location(gpsfix,dive);
+								tracer = j;
+								break;
+							}
+						/*
+						 * If no more positions in range, the actual is the one. Asign, mark and end loop.
+						 */
+						} else {
+							copy_gps_location(gpsfix,dive);
+							changed++;
+							tracer = j;
+							break;
+						}
+					}
+				} else {
+					/* If position is out of SAME_GROUP range and in the future, mark position for
+					 * next dive iteration and end the gps_location loop
+					 */
+					if (gpsfix->when >= dive->when + dive->duration.seconds + SAME_GROUP) {
+						tracer = j;
+						break;
+					}
 				}
-				if (!dive->location) {
-					dive->location = strdup(gpsfix->location);
-					changed++;
-				}
-			} else {
-				struct tm tm;
-				utc_mkdate(gpsfix->when, &tm);
-#if DEBUG_WEBSERVICE
-				printf("didn't find dive matching gps fix named %s @ %04d-%02d-%02d %02d:%02d:%02d\n",
-				       gpsfix->location,
-				       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-				       tm.tm_hour, tm.tm_min, tm.tm_sec);
-#endif
 			}
 		}
 	}
 	return changed > 0;
 }
+
 //TODO: C-code.
 static void clear_table(struct dive_table *table)
 {
@@ -124,7 +128,7 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 
 
 	int error_code;
-	zip = zip_open(QFile::encodeName(tempfile), ZIP_CREATE, &error_code);
+	zip = zip_open(QFile::encodeName(QDir::toNativeSeparators(tempfile)), ZIP_CREATE, &error_code);
 	if (!zip) {
 		char buffer[1024];
 		zip_error_to_str(buffer, sizeof buffer, error_code, errno);
@@ -133,7 +137,9 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 	}
 
 	/* walk the dive list in chronological order */
-	for (int i = 0; i < dive_table.nr; i++) {
+	int i;
+	struct dive *dive;
+	for_each_dive (i, dive) {
 		FILE *f;
 		char filename[PATH_MAX];
 		int streamsize;
@@ -145,12 +151,12 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 		 * Get the i'th dive in XML format so we can process it.
 		 * We need to save to a file before we can reload it back into memory...
 		 */
-		struct dive *dive = get_dive(i);
-		if (!dive)
-			continue;
 		if (selected && !dive->selected)
 			continue;
-		f = tmpfile();
+		QString innerTmpFile = tempfile;
+		QString tmpSuffix = QString::number(qrand() % 9999) + ".tmp";
+		innerTmpFile.replace(".dld", tmpSuffix);
+		f = subsurface_fopen(QFile::encodeName(QDir::toNativeSeparators(innerTmpFile)), "w+");
 		if (!f) {
 			report_error(tr("cannot create temporary file: %s").toUtf8(), qt_error_string().toUtf8().data());
 			goto error_close_zip;
@@ -169,7 +175,7 @@ bool DivelogsDeWebServices::prepare_dives_for_divelogs(const QString &tempfile, 
 		}
 		membuf[streamsize] = 0;
 		fclose(f);
-
+		unlink(QFile::encodeName(QDir::toNativeSeparators(innerTmpFile)));
 		/*
 		 * Parse the memory buffer into XML document and
 		 * transform it to divelogs.de format, finally dumping
@@ -221,6 +227,7 @@ WebServices::WebServices(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f
 	ui.buttonBox->button(QDialogButtonBox::Apply)->setEnabled(false);
 	timeout.setSingleShot(true);
 	defaultApplyText = ui.buttonBox->button(QDialogButtonBox::Apply)->text();
+	userAgent = UserSurvey::getUserAgent();
 }
 
 void WebServices::hidePassword()
@@ -276,7 +283,7 @@ void WebServices::updateProgress(qint64 current, qint64 total)
 	}
 	ui.progressBar->setRange(0, total);
 	ui.progressBar->setValue(current);
-	ui.status->setText(tr("Transfering data..."));
+	ui.status->setText(tr("Transferring data..."));
 
 	// reset the timer: 30 seconds after we last got any data
 	timeout.start();
@@ -320,9 +327,10 @@ SubsurfaceWebServices::SubsurfaceWebServices(QWidget *parent, Qt::WindowFlags f)
 		ui.userID->setText(prefs.userid);
 	hidePassword();
 	hideUpload();
-	ui.progressBar->setFormat("Enter User ID and click Download");
+	ui.progressBar->setFormat(tr("Enter User ID and click Download"));
 	ui.progressBar->setRange(0, 1);
 	ui.progressBar->setValue(-1);
+	ui.progressBar->setAlignment(Qt::AlignCenter);
 	ui.saveUidLocal->setChecked(prefs.save_userid_local);
 	QShortcut *close = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_W), this);
 	connect(close, SIGNAL(activated()), this, SLOT(close()));
@@ -343,8 +351,8 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton *button)
 		if (merge_locations_into_dives()) {
 			mark_divelist_changed(true);
 			MainWindow::instance()->globe()->repopulateLabels();
-			MainWindow::instance()->globe()->centerOn(current_dive);
-			MainWindow::instance()->information()->updateDiveInfo(selected_dive);
+			MainWindow::instance()->globe()->centerOnCurrentDive();
+			MainWindow::instance()->information()->updateDiveInfo();
 		}
 
 		/* store last entered uid in config */
@@ -398,6 +406,7 @@ void SubsurfaceWebServices::startDownload()
 	QNetworkRequest request;
 	request.setUrl(url);
 	request.setRawHeader("Accept", "text/xml");
+	request.setRawHeader("User-Agent", userAgent.toUtf8());
 	reply = manager()->get(request);
 	ui.status->setText(tr("Connecting..."));
 	ui.progressBar->setEnabled(true);
@@ -442,7 +451,7 @@ void SubsurfaceWebServices::setStatusText(int status)
 	QString text;
 	switch (status) {
 	case DD_STATUS_ERROR_CONNECT:
-		text = tr("Connection Error: ");
+		text = tr("Connection error: ");
 		break;
 	case DD_STATUS_ERROR_ID:
 		text = tr("Invalid user identifier!");
@@ -451,7 +460,7 @@ void SubsurfaceWebServices::setStatusText(int status)
 		text = tr("Cannot parse response!");
 		break;
 	case DD_STATUS_OK:
-		text = tr("Download Success!");
+		text = tr("Download successful");
 		break;
 	}
 	ui.status->setText(text);
@@ -519,7 +528,7 @@ static DiveListResult parseDiveLogsDeDiveList(const QByteArray &xmlData)
 	 * </DiveDateReader>
 	 */
 	QXmlStreamReader reader(xmlData);
-	const QString invalidXmlError = DivelogsDeWebServices::tr("Invalid response from server");
+	const QString invalidXmlError = QObject::tr("Invalid response from server");
 	bool seenDiveDates = false;
 	DiveListResult result;
 	result.idCount = 0;
@@ -527,8 +536,8 @@ static DiveListResult parseDiveLogsDeDiveList(const QByteArray &xmlData)
 	if (reader.readNextStartElement() && reader.name() != "DiveDateReader") {
 		result.errorCondition = invalidXmlError;
 		result.errorDetails =
-		    DivelogsDeWebServices::tr("Expected XML tag 'DiveDateReader', got instead '%1")
-			.arg(reader.name().toString());
+			QObject::tr("Expected XML tag 'DiveDateReader', got instead '%1")
+				.arg(reader.name().toString());
 		goto out;
 	}
 
@@ -573,16 +582,16 @@ static DiveListResult parseDiveLogsDeDiveList(const QByteArray &xmlData)
 
 	if (!seenDiveDates) {
 		result.errorCondition = invalidXmlError;
-		result.errorDetails = DivelogsDeWebServices::tr("Expected XML tag 'DiveDates' not found");
+		result.errorDetails = QObject::tr("Expected XML tag 'DiveDates' not found");
 	}
 
 out:
 	if (reader.hasError()) {
 		// if there was an XML error, overwrite the result or other error conditions
 		result.errorCondition = invalidXmlError;
-		result.errorDetails = DivelogsDeWebServices::tr("Malformed XML response. Line %1: %2")
-					  .arg(reader.lineNumber())
-					  .arg(reader.errorString());
+		result.errorDetails = QObject::tr("Malformed XML response. Line %1: %2")
+						.arg(reader.lineNumber())
+						.arg(reader.errorString());
 	}
 	return result;
 }
@@ -602,11 +611,11 @@ void DivelogsDeWebServices::downloadDives()
 	exec();
 }
 
-void DivelogsDeWebServices::prepareDivesForUpload()
+void DivelogsDeWebServices::prepareDivesForUpload(bool selected)
 {
 	/* generate a random filename and create/open that file with zip_open */
 	QString filename = QDir::tempPath() + "/import-" + QString::number(qrand() % 99999999) + ".dld";
-	if (prepare_dives_for_divelogs(filename, true)) {
+	if (prepare_dives_for_divelogs(filename, selected)) {
 		QFile f(filename);
 		if (f.open(QIODevice::ReadOnly)) {
 			uploadDives((QIODevice *)&f);
@@ -675,6 +684,7 @@ void DivelogsDeWebServices::startUpload()
 	QNetworkRequest request;
 	request.setUrl(QUrl("https://divelogs.de/DivelogsDirectImport.php"));
 	request.setRawHeader("Accept", "text/xml, application/xml");
+	request.setRawHeader("User-Agent", userAgent.toUtf8());
 
 	QHttpPart part;
 	part.setRawHeader("Content-Disposition", "form-data; name=\"user\"");
@@ -706,6 +716,7 @@ void DivelogsDeWebServices::startDownload()
 	QNetworkRequest request;
 	request.setUrl(QUrl("https://divelogs.de/xml_available_dives.php"));
 	request.setRawHeader("Accept", "text/xml, application/xml");
+	request.setRawHeader("User-Agent", userAgent.toUtf8());
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
@@ -750,6 +761,7 @@ void DivelogsDeWebServices::listDownloadFinished()
 	QNetworkRequest request;
 	request.setUrl(QUrl("https://divelogs.de/DivelogsDirectExport.php"));
 	request.setRawHeader("Accept", "application/zip, */*");
+	request.setRawHeader("User-Agent", userAgent.toUtf8());
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
@@ -912,4 +924,19 @@ void DivelogsDeWebServices::buttonClicked(QAbstractButton *button)
 	default:
 		break;
 	}
+}
+
+UserSurveyServices::UserSurveyServices(QWidget *parent, Qt::WindowFlags f) : WebServices(parent, f)
+{
+
+}
+
+QNetworkReply* UserSurveyServices::sendSurvey(QString values)
+{
+	QNetworkRequest request;
+	request.setUrl(QString("http://subsurface-divelog.org/survey?%1").arg(values));
+	request.setRawHeader("Accept", "text/xml");
+	request.setRawHeader("User-Agent", userAgent.toUtf8());
+	reply = manager()->get(request);
+	return reply;
 }

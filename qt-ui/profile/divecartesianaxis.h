@@ -45,6 +45,7 @@ public:
 	void setTextVisible(bool arg1);
 	void setLinesVisible(bool arg1);
 	void setLineSize(qreal lineSize);
+	void setLine(const QLineF& line);
 	int unitSystem;
 public
 slots:
@@ -69,6 +70,7 @@ protected:
 	bool lineVisibility;
 	double labelScale;
 	qreal line_size;
+	bool changed;
 };
 
 class DepthAxis : public DiveCartesianAxis {
@@ -82,9 +84,6 @@ protected:
 private
 slots:
 	void settingsChanged();
-
-private:
-	bool showWithPPGraph;
 };
 
 class TimeAxis : public DiveCartesianAxis {
@@ -110,7 +109,7 @@ public:
 	void setModel(DivePlotDataModel *model);
 public
 slots:
-	void preferencesChanged();
+	void settingsChanged();
 
 private:
 	DivePlotDataModel *model;

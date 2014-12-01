@@ -82,7 +82,7 @@ static int uemis_convert_base64(char *base64, uint8_t **data)
 	datalen = (len / 4 + 1) * 3;
 	if (datalen < 0x123 + 0x25) {
 		/* less than header + 1 sample??? */
-		fprintf(stderr, "suspiciously short data block\n");
+		fprintf(stderr, "suspiciously short data block %d\n", datalen);
 	}
 	*data = malloc(datalen);
 	if (!*data) {
@@ -200,12 +200,12 @@ static void uemis_event(struct dive *dive, struct divecomputer *dc, struct sampl
 	if (flags[1] & 0x06) /* both bits 1 and 2 are a warning */
 		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "Speed Warning"));
 	if (flags[1] & 0x10)
-		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "PO2 Green Warning"));
+		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "pO₂ Green Warning"));
 #endif
 	if (flags[1] & 0x20)
-		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "PO2 Ascend Warning"));
+		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "pO₂ Ascend Warning"));
 	if (flags[1] & 0x40)
-		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "PO2 Ascend Alarm"));
+		add_event(dc, sample->time.seconds, 0, 0, 0, QT_TRANSLATE_NOOP("gettextFromC", "pO₂ Ascend Alarm"));
 	/* flags[2] reflects the deco / time bar
 	 * flags[3] reflects more display details on deco and pO2 */
 	if (flags[4] & 0x01)
@@ -293,9 +293,9 @@ void uemis_parse_divelog_binary(char *base64, void *datap)
 	struct divecomputer *dc = &dive->dc;
 	int template, gasoffset;
 	int active = 0;
+	char version[5];
 
 	datalen = uemis_convert_base64(base64, &data);
-
 	dive->dc.airtemp.mkelvin = C_to_mkelvin((*(uint16_t *)(data + 45)) / 10.0);
 	dive->dc.surface_pressure.mbar = *(uint16_t *)(data + 43);
 	if (*(uint8_t *)(data + 19))
@@ -340,13 +340,15 @@ void uemis_parse_divelog_binary(char *base64, void *datap)
 	/* first byte of divelog data is at offset 0x123 */
 	i = 0x123;
 	u_sample = (uemis_sample_t *)(data + i);
-	while ((i < datalen) && (u_sample->dive_time)) {
+	while ((i <= datalen) && (data[i] != 0 || data[i+1] != 0)) {
 		/* it seems that a dive_time of 0 indicates the end of the valid readings */
 		/* the SDA usually records more samples after the end of the dive --
 		 * we want to discard those, but not cut the dive short; sadly the dive
 		 * duration in the header is a) in minutes and b) up to 3 minutes short */
-		if (u_sample->dive_time > dive->dc.duration.seconds + 180)
-			break;
+		if (u_sample->dive_time > dive->dc.duration.seconds + 180) {
+			i += 0x25;
+			continue;
+		}
 		if (u_sample->active_tank != active) {
 			active = u_sample->active_tank;
 			add_gas_switch_event(dive, dc, u_sample->dive_time, active);
@@ -366,5 +368,24 @@ void uemis_parse_divelog_binary(char *base64, void *datap)
 	}
 	if (sample)
 		dive->dc.duration.seconds = sample->time.seconds - 1;
+
+	/* get data from the footer */
+	char buffer[24];
+
+	snprintf(version, sizeof(version), "%1u.%02u", data[18], data[17]);
+	add_extra_data(dc, "FW Version", version);
+	snprintf(buffer, sizeof(buffer), "%08x", *(uint32_t *)(data + 9));
+	add_extra_data(dc, "Serial", buffer);
+	snprintf(buffer, sizeof(buffer), "%d",*(uint16_t *)(data + i + 35));
+	add_extra_data(dc, "main battery after dive", buffer);
+	snprintf(buffer, sizeof(buffer), "%0u:%02u", FRACTION(*(uint16_t *)(data + i + 24), 60));
+	add_extra_data(dc, "no fly time", buffer);
+	snprintf(buffer, sizeof(buffer), "%0u:%02u", FRACTION(*(uint16_t *)(data + i + 26), 60));
+	add_extra_data(dc, "no dive time", buffer);
+	snprintf(buffer, sizeof(buffer), "%0u:%02u", FRACTION(*(uint16_t *)(data + i + 28), 60));
+	add_extra_data(dc, "desat time", buffer);
+	snprintf(buffer, sizeof(buffer), "%u",*(uint16_t *)(data + i + 30));
+	add_extra_data(dc, "allowed altitude", buffer);
+
 	return;
 }

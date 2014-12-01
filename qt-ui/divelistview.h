@@ -25,6 +25,7 @@ public:
 	void reload(DiveTripModel::Layout layout, bool forceSort = true);
 	bool eventFilter(QObject *, QEvent *);
 	void unselectDives();
+	void clearTripSelection();
 	void selectDive(int dive_table_idx, bool scrollto = false, bool toggle = false);
 	void selectDives(const QList<int> &newDiveSelection);
 	void rememberSelection();
@@ -36,7 +37,6 @@ slots:
 	void toggleColumnVisibilityByIndex();
 	void reloadHeaderActions();
 	void headerClicked(int);
-	void showSearchEdit();
 	void removeFromTrip();
 	void deleteDive();
 	void exportTeX();
@@ -49,12 +49,9 @@ slots:
 	void addToTripAbove();
 	void addToTripBelow();
 	void mergeDives();
-	void saveSelectedDivesAs();
-	void exportSelectedDivesAsUDDF();
-	void exportSelectedDivesAsCSV();
+	void renumberDives();
 	void shiftTimes();
 	void loadImages();
-	void uploadToDivelogsDE();
 	static QString lastUsedImageDir();
 
 signals:
@@ -66,8 +63,9 @@ private:
 	int sortColumn;
 	Qt::SortOrder currentOrder;
 	DiveTripModel::Layout currentLayout;
-	QLineEdit searchBox;
 	QModelIndex contextMenuIndex;
+	bool dontEmitDiveChangedSignal;
+	bool selectionSaved;
 
 	/* if dive_trip_t is null, there's no problem. */
 	QMultiHash<dive_trip_t *, int> selectedDives;
@@ -80,7 +78,7 @@ private:
 	void updateLastUsedImageDir(const QString &s);
 	void updateLastImageTimeOffset(int offset);
 	int lastImageTimeOffset();
-	void addToTrip(bool);
+	void addToTrip(int delta);
 };
 
 #endif // DIVELISTVIEW_H

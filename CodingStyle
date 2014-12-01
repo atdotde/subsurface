@@ -104,6 +104,12 @@ Basic rules
 	}
 	}
 
+- variable declarations
+  in C code we really like them to be at the beginning of a code block,
+  not interspersed in the middle.
+  in C++ we are a bit less strict about this - but still, try not to go
+  crazy.
+
 Sample Settings
 ===============
 
@@ -203,7 +209,7 @@ Vim
 ---------
 
 As everybody knows vim is a way better editor than emacs and thus needs to be
-in this file to. Put this into your .vimrc and this should produce something
+in this file too. Put this into your .vimrc and this should produce something
 close to our coding standards.
 
 " Subsurface coding style

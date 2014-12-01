@@ -1,10 +1,9 @@
 #ifndef DIVEPLANNER_H
 #define DIVEPLANNER_H
 
-#include <QGraphicsView>
 #include <QGraphicsPathItem>
-#include <QDialog>
 #include <QAbstractTableModel>
+#include <QAbstractButton>
 #include <QDateTime>
 
 #include "dive.h"
@@ -40,96 +39,77 @@ public:
 	void setPlanMode(Mode mode);
 	bool isPlanner();
 	void createSimpleDive();
+	void setupStartTime();
 	void clear();
 	Mode currentMode() const;
 	bool setRecalc(bool recalc);
 	bool recalcQ();
 	void tanksUpdated();
 	void rememberTanks();
-	bool tankInUse(int o2, int he);
-	void copyCylinders(struct dive *d);
+	bool tankInUse(struct gasmix gasmix);
+	void setupCylinders();
 	/**
 	 * @return the row number.
 	 */
 	void editStop(int row, divedatapoint newData);
 	divedatapoint at(int row);
 	int size();
-	struct diveplan getDiveplan();
+	struct diveplan &getDiveplan();
 	QStringList &getGasList();
 	QVector<QPair<int, int> > collectGases(dive *d);
 	int lastEnteredPoint();
+	void removeDeco();
 	static bool addingDeco;
 
 public
 slots:
-	int addStop(int millimeters = 0, int seconds = 0, int o2 = 0, int he = 0, int ccpoint = 0, bool entered = true);
+	int addStop(int millimeters = 0, int seconds = 0, struct gasmix *gas = 0, int ccpoint = 0, bool entered = true);
 	void addCylinder_clicked();
 	void setGFHigh(const int gfhigh);
+	void triggerGFHigh();
 	void setGFLow(const int ghflow);
+	void triggerGFLow();
 	void setSurfacePressure(int pressure);
-	void setBottomSac(int sac);
-	void setDecoSac(int sac);
+	void setSalinity(int salinity);
+	int getSurfacePressure();
+	void setBottomSac(double sac);
+	void setDecoSac(double sac);
 	void setStartTime(const QTime &t);
+	void setStartDate(const QDate &date);
 	void setLastStop6m(bool value);
-	void createPlan();
+	void setDropStoneMode(bool value);
+	void setVerbatim(bool value);
+	void setDisplayRuntime(bool value);
+	void setDisplayDuration(bool value);
+	void setDisplayTransitions(bool value);
+	void savePlan();
+	void saveDuplicatePlan();
 	void remove(const QModelIndex &index);
 	void cancelPlan();
 	void createTemporaryPlan();
 	void deleteTemporaryPlan();
 	void loadFromDive(dive *d);
-	void restoreBackupDive();
-	void emitCylinderModelEdited();
+	void emitDataChanged();
 
 signals:
 	void planCreated();
 	void planCanceled();
 	void cylinderModelEdited();
+	void startTimeChanged(QDateTime);
 
 private:
 	explicit DivePlannerPointsModel(QObject *parent = 0);
-	bool addGas(int o2, int he);
+	bool addGas(struct gasmix mix);
+	void createPlan(bool replanCopy);
 	struct diveplan diveplan;
 	Mode mode;
 	bool recalc;
 	QVector<divedatapoint> divepoints;
-	struct dive *tempDive;
-	struct dive backupDive;
-	void deleteTemporaryPlan(struct divedatapoint *dp);
 	QVector<sample> backupSamples; // For editing added dives.
-	struct dive *stagingDive;
 	QVector<QPair<int, int> > oldGases;
-};
-
-class Button : public QObject, public QGraphicsRectItem {
-	Q_OBJECT
-public:
-	Button(QObject *parent = 0, QGraphicsItem *itemParent = 0);
-	void setText(const QString &text);
-	void setPixmap(const QPixmap &pixmap);
-
-protected:
-	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
-signals:
-	void clicked();
-
-private:
-	QGraphicsPixmapItem *icon;
-	QGraphicsSimpleTextItem *text;
-};
-
-
-class ExpanderGraphics : public QGraphicsRectItem {
-public:
-	ExpanderGraphics(QGraphicsItem *parent = 0);
-
-	QGraphicsPixmapItem *icon;
-	Button *increaseBtn;
-	Button *decreaseBtn;
-
-private:
-	QGraphicsPixmapItem *bg;
-	QGraphicsPixmapItem *leftWing;
-	QGraphicsPixmapItem *rightWing;
+	QDateTime startTime;
+	int tempGFHigh;
+	int tempGFLow;
 };
 
 class DiveHandler : public QObject, public QGraphicsEllipseItem {
@@ -138,9 +118,14 @@ public:
 	DiveHandler();
 
 protected:
-	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 	void contextMenuEvent(QGraphicsSceneContextMenuEvent *event);
-
+	void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
+	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
+signals:
+	void moved();
+	void clicked();
+	void released();
 private:
 	int parentIndex();
 public
@@ -149,130 +134,55 @@ slots:
 	void changeGas();
 };
 
-class Ruler : public QGraphicsLineItem {
-public:
-	Ruler();
-	~Ruler();
-	void setMinimum(double minimum);
-	void setMaximum(double maximum);
-	void setTickInterval(double interval);
-	void setOrientation(Qt::Orientation orientation);
-	void setTickSize(qreal size);
-	void updateTicks();
-	double minimum() const;
-	double maximum() const;
-	qreal valueAt(const QPointF &p);
-	qreal percentAt(const QPointF &p);
-	qreal posAtValue(qreal value);
-	void setColor(const QColor &color);
-	void setTextColor(const QColor &color);
-	int unitSystem;
-
-private:
-	void eraseAll();
-
-	Qt::Orientation orientation;
-	QList<QGraphicsLineItem *> ticks;
-	QList<QGraphicsSimpleTextItem *> labels;
-	double min;
-	double max;
-	double interval;
-	double tickSize;
-	QColor textColor;
-};
-
-class DivePlannerGraphics : public QGraphicsView {
-	Q_OBJECT
-public:
-	DivePlannerGraphics(QWidget *parent = 0);
-
-protected:
-	virtual void mouseDoubleClickEvent(QMouseEvent *event);
-	virtual void showEvent(QShowEvent *event);
-	virtual void resizeEvent(QResizeEvent *event);
-	virtual void mouseMoveEvent(QMouseEvent *event);
-	virtual void mousePressEvent(QMouseEvent *event);
-	virtual void mouseReleaseEvent(QMouseEvent *event);
-	bool isPointOutOfBoundaries(const QPointF &point);
-	qreal fromPercent(qreal percent, Qt::Orientation orientation);
-public
-slots:
-	void settingsChanged();
-private
-slots:
-	void keyEscAction();
-	void keyDeleteAction();
-	void keyUpAction();
-	void keyDownAction();
-	void keyLeftAction();
-	void keyRightAction();
-	void increaseTime();
-	void increaseDepth();
-	void decreaseTime();
-	void decreaseDepth();
-	void drawProfile();
-	void pointInserted(const QModelIndex &, int start, int end);
-	void pointsRemoved(const QModelIndex &, int start, int end);
-
-private:
-	void moveActiveHandler(const QPointF &MappedPos, const int pos);
-
-	/* This are the lines of the plotted dive. */
-	QList<QGraphicsLineItem *> lines;
-
-	/* This is the user-entered handles. */
-	QList<DiveHandler *> handles;
-	QList<QGraphicsSimpleTextItem *> gases;
-
-	/* those are the lines that follows the mouse. */
-	QGraphicsLineItem *verticalLine;
-	QGraphicsLineItem *horizontalLine;
-
-	/* This is the handler that's being dragged. */
-	DiveHandler *activeDraggedHandler;
-
-	// When we start to move the handler, this pos is saved.
-	// so we can revert it later.
-	QPointF originalHandlerPos;
-
-	/* this is the background of the dive, the blue-gradient. */
-	QGraphicsPolygonItem *diveBg;
-
-	/* This is the bottom ruler - the x axis, and it's associated text */
-	Ruler *timeLine;
-	QGraphicsSimpleTextItem *timeString;
-
-	/* this is the left ruler, the y axis, and it's associated text. */
-	Ruler *depthLine;
-	QGraphicsSimpleTextItem *depthString;
-
-	/* Buttons */
-	ExpanderGraphics *depthHandler;
-	ExpanderGraphics *timeHandler;
-
-	int minMinutes; // this holds the minimum requested window time
-	int minDepth;   // this holds the minimum requested window depth
-	int dpMaxTime;  // this is the time of the dive calculated by the deco.
-
-	friend class DiveHandler;
-};
-
 #include "ui_diveplanner.h"
 
 class DivePlannerWidget : public QWidget {
 	Q_OBJECT
 public:
 	explicit DivePlannerWidget(QWidget *parent = 0, Qt::WindowFlags f = 0);
+	void setReplanButton(bool replan);
+public
+slots:
+	void setupStartTime(QDateTime startTime);
+	void settingsChanged();
+	void atmPressureChanged(const int pressure);
+	void heightChanged(const int height);
+	void salinityChanged(const double salinity);
+	void printDecoPlan();
 
+private:
+	Ui::DivePlanner ui;
+	QAbstractButton *replanButton;
+};
+
+#include "ui_plannerSettings.h"
+
+class PlannerSettingsWidget : public QWidget {
+	Q_OBJECT
+public:
+	explicit PlannerSettingsWidget(QWidget *parent = 0, Qt::WindowFlags f = 0);
+	virtual ~PlannerSettingsWidget();
 public
 slots:
 	void settingsChanged();
 	void atmPressureChanged(const QString &pressure);
-	void bottomSacChanged(const QString &bottomSac);
-	void decoSacChanged(const QString &decosac);
+	void bottomSacChanged(const double bottomSac);
+	void decoSacChanged(const double decosac);
+	void printDecoPlan();
+	void setAscRate75(int rate);
+	void setAscRate50(int rate);
+	void setAscRateStops(int rate);
+	void setAscRateLast6m(int rate);
+	void setDescRate(int rate);
+	void setBottomPo2(double po2);
+	void setDecoPo2(double po2);
+	void setBackgasBreaks(bool dobreaks);
 
 private:
-	Ui::DivePlanner ui;
+	Ui::plannerSettingsWidget ui;
+	void updateUnitsUI();
 };
+
+QString dpGasToStr(const divedatapoint &p);
 
 #endif // DIVEPLANNER_H

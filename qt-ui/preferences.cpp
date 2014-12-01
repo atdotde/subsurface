@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QSortFilterProxyModel>
 #include <QShortcut>
+#include <QNetworkProxy>
 
 PreferencesDialog *PreferencesDialog::instance()
 {
@@ -18,6 +19,13 @@ PreferencesDialog *PreferencesDialog::instance()
 PreferencesDialog::PreferencesDialog(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f)
 {
 	ui.setupUi(this);
+	ui.proxyType->clear();
+	ui.proxyType->addItem(tr("No proxy"), QNetworkProxy::NoProxy);
+	ui.proxyType->addItem(tr("System proxy"), QNetworkProxy::DefaultProxy);
+	ui.proxyType->addItem(tr("HTTP proxy"), QNetworkProxy::HttpProxy);
+	ui.proxyType->addItem(tr("SOCKS proxy"), QNetworkProxy::Socks5Proxy);
+	ui.proxyType->setCurrentIndex(-1);
+	connect(ui.proxyType, SIGNAL(currentIndexChanged(int)), this, SLOT(proxyType_changed(int)));
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton *)), this, SLOT(buttonClicked(QAbstractButton *)));
 	connect(ui.gflow, SIGNAL(valueChanged(int)), this, SLOT(gflowChanged(int)));
 	connect(ui.gfhigh, SIGNAL(valueChanged(int)), this, SLOT(gfhighChanged(int)));
@@ -54,7 +62,7 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.pheThreshold->setValue(prefs.pp_graphs.phe_threshold);
 	ui.po2Threshold->setValue(prefs.pp_graphs.po2_threshold);
 	ui.pn2Threshold->setValue(prefs.pp_graphs.pn2_threshold);
-	ui.maxppo2->setValue(prefs.modppO2);
+	ui.maxpo2->setValue(prefs.modpO2);
 	ui.red_ceiling->setChecked(prefs.redceiling);
 	ui.units_group->setEnabled(ui.personalize->isChecked());
 
@@ -95,7 +103,7 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.show_average_depth->setChecked(prefs.show_average_depth);
 	ui.vertical_speed_minutes->setChecked(prefs.units.vertical_speed_time == units::MINUTES);
 	ui.vertical_speed_seconds->setChecked(prefs.units.vertical_speed_time == units::SECONDS);
-	ui.velocitySlider->setValue(prefs.animation);
+	ui.velocitySlider->setValue(prefs.animation_speed);
 
 	QSortFilterProxyModel *filterModel = new QSortFilterProxyModel();
 	filterModel->setSourceModel(LanguageModel::instance());
@@ -117,6 +125,14 @@ void PreferencesDialog::setUiFromPrefs()
 		ui.languageView->setCurrentIndex(languages.first());
 
 	s.endGroup();
+
+	ui.proxyHost->setText(prefs.proxy_host);
+	ui.proxyPort->setValue(prefs.proxy_port);
+	ui.proxyAuthRequired->setChecked(prefs.proxy_auth);
+	ui.proxyUsername->setText(prefs.proxy_user);
+	ui.proxyPassword->setText(prefs.proxy_pass);
+	ui.proxyType->setCurrentIndex(ui.proxyType->findData(prefs.proxy_type));
+	ui.btnUseDefaultFile->setChecked(prefs.use_default_file);
 }
 
 void PreferencesDialog::restorePrefs()
@@ -138,42 +154,54 @@ void PreferencesDialog::rememberPrefs()
 	if (v.isValid())                                            \
 		prefs.units.field = (v.toInt() == (t)) ? (t) : (f); \
 	else                                                        \
-	prefs.units.field = default_prefs.units.field
+		prefs.units.field = default_prefs.units.field
 
 #define GET_BOOL(name, field)                           \
 	v = s.value(QString(name));                     \
 	if (v.isValid())                                \
-		prefs.field = v.toInt() ? true : false; \
+		prefs.field = v.toBool();               \
 	else                                            \
-	prefs.field = default_prefs.field
+		prefs.field = default_prefs.field
 
 #define GET_DOUBLE(name, field)             \
 	v = s.value(QString(name));         \
 	if (v.isValid())                    \
 		prefs.field = v.toDouble(); \
 	else                                \
-	prefs.field = default_prefs.field
+		prefs.field = default_prefs.field
 
 #define GET_INT(name, field)             \
 	v = s.value(QString(name));      \
 	if (v.isValid())                 \
 		prefs.field = v.toInt(); \
 	else                             \
-	prefs.field = default_prefs.field
+		prefs.field = default_prefs.field
+
+#define GET_INT_DEF(name, field, defval)                                             \
+	v = s.value(QString(name));                                      \
+	if (v.isValid())                                                 \
+		prefs.field = v.toInt(); \
+	else                                                             \
+		prefs.field = defval
 
 #define GET_TXT(name, field)                                             \
 	v = s.value(QString(name));                                      \
 	if (v.isValid())                                                 \
 		prefs.field = strdup(v.toString().toUtf8().constData()); \
 	else                                                             \
-	prefs.field = default_prefs.field
+		prefs.field = default_prefs.field
 
-#define GET_TXT(name, field)                                             \
-	v = s.value(QString(name));                                      \
-	if (v.isValid())                                                 \
-		prefs.field = strdup(v.toString().toUtf8().constData()); \
+#define SAVE_OR_REMOVE_SPECIAL(_setting, _default, _compare, _value)     \
+	if (_compare != _default)                                        \
+		s.setValue(_setting, _value);                            \
 	else                                                             \
-	prefs.field = default_prefs.field
+		s.remove(_setting)
+
+#define SAVE_OR_REMOVE(_setting, _default, _value)                       \
+	if (_value != _default)                                          \
+		s.setValue(_setting, _value);                            \
+	else                                                             \
+		s.remove(_setting)
 
 void PreferencesDialog::syncSettings()
 {
@@ -184,22 +212,23 @@ void PreferencesDialog::syncSettings()
 
 	// Graph
 	s.beginGroup("TecDetails");
-	s.setValue("phethreshold", ui.pheThreshold->value());
-	s.setValue("po2threshold", ui.po2Threshold->value());
-	s.setValue("pn2threshold", ui.pn2Threshold->value());
-	s.setValue("modppO2", ui.maxppo2->value());
-	SB("redceiling", ui.red_ceiling);
-	s.setValue("gflow", ui.gflow->value());
-	s.setValue("gfhigh", ui.gfhigh->value());
-	SB("gf_low_at_maxdepth", ui.gf_low_at_maxdepth);
-	SB("display_unused_tanks", ui.display_unused_tanks);
-	SB("show_average_depth", ui.show_average_depth);
+	SAVE_OR_REMOVE("phethreshold", default_prefs.pp_graphs.phe_threshold, ui.pheThreshold->value());
+	SAVE_OR_REMOVE("po2threshold", default_prefs.pp_graphs.po2_threshold, ui.po2Threshold->value());
+	SAVE_OR_REMOVE("pn2threshold", default_prefs.pp_graphs.pn2_threshold, ui.pn2Threshold->value());
+	SAVE_OR_REMOVE("modpO2", default_prefs.modpO2, ui.maxpo2->value());
+	SAVE_OR_REMOVE("redceiling", default_prefs.redceiling, ui.red_ceiling->isChecked());
+	SAVE_OR_REMOVE("gflow", default_prefs.gflow, ui.gflow->value());
+	SAVE_OR_REMOVE("gfhigh", default_prefs.gfhigh, ui.gfhigh->value());
+	SAVE_OR_REMOVE("gf_low_at_maxdepth", default_prefs.gf_low_at_maxdepth, ui.gf_low_at_maxdepth->isChecked());
+	SAVE_OR_REMOVE("display_unused_tanks", default_prefs.display_unused_tanks, ui.display_unused_tanks->isChecked());
+	SAVE_OR_REMOVE("show_average_depth", default_prefs.show_average_depth, ui.show_average_depth->isChecked());
 	s.endGroup();
 
 	// Units
 	s.beginGroup("Units");
-	QString unitSystem = ui.metric->isChecked() ? "metric" : (ui.imperial->isChecked() ? "imperial" : "personal");
-	s.setValue("unit_system", unitSystem);
+	QString unitSystem[] = {"metric", "imperial", "personal"};
+	short unitValue = ui.metric->isChecked() ? METRIC : (ui.imperial->isChecked() ? IMPERIAL : PERSONALIZE);
+	SAVE_OR_REMOVE_SPECIAL("unit_system", default_prefs.unit_system, unitValue, unitSystem[unitValue]);
 	s.setValue("temperature", ui.fahrenheit->isChecked() ? units::FAHRENHEIT : units::CELSIUS);
 	s.setValue("length", ui.feet->isChecked() ? units::FEET : units::METERS);
 	s.setValue("pressure", ui.psi->isChecked() ? units::PSI : units::BAR);
@@ -212,11 +241,12 @@ void PreferencesDialog::syncSettings()
 	s.beginGroup("GeneralSettings");
 	s.setValue("default_filename", ui.defaultfilename->text());
 	s.setValue("default_cylinder", ui.default_cylinder->currentText());
+	s.setValue("use_default_file", ui.btnUseDefaultFile->isChecked());
 	s.endGroup();
 
 	s.beginGroup("Display");
-	s.setValue("divelist_font", ui.font->currentFont());
-	s.setValue("font_size", ui.fontsize->value());
+	SAVE_OR_REMOVE_SPECIAL("divelist_font", system_divelist_default_font, ui.font->currentFont().toString(), ui.font->currentFont());
+	SAVE_OR_REMOVE("font_size", system_divelist_default_font_size, ui.fontsize->value());
 	s.setValue("displayinvalid", ui.displayinvalid->isChecked());
 	s.endGroup();
 	s.sync();
@@ -236,7 +266,16 @@ void PreferencesDialog::syncSettings()
 
 	// Animation
 	s.beginGroup("Animations");
-	s.setValue("animation_speed",ui.velocitySlider->value());
+	s.setValue("animation_speed", ui.velocitySlider->value());
+	s.endGroup();
+
+	s.beginGroup("Network");
+	s.setValue("proxy_type", ui.proxyType->itemData(ui.proxyType->currentIndex()).toInt());
+	s.setValue("proxy_host", ui.proxyHost->text());
+	s.setValue("proxy_port", ui.proxyPort->value());
+	SB("proxy_auth", ui.proxyAuthRequired);
+	s.setValue("proxy_user", ui.proxyUsername->text());
+	s.setValue("proxy_pass", ui.proxyPassword->text());
 	s.endGroup();
 
 	loadSettings();
@@ -280,7 +319,7 @@ void PreferencesDialog::loadSettings()
 	GET_DOUBLE("pn2threshold", pp_graphs.pn2_threshold);
 	GET_DOUBLE("phethreshold", pp_graphs.phe_threshold);
 	GET_BOOL("mod", mod);
-	GET_DOUBLE("modppO2", modppO2);
+	GET_DOUBLE("modpO2", modpO2);
 	GET_BOOL("ead", ead);
 	GET_BOOL("redceiling", redceiling);
 	GET_BOOL("dcceiling", dcceiling);
@@ -289,6 +328,8 @@ void PreferencesDialog::loadSettings()
 	GET_BOOL("calcndltts", calcndltts);
 	GET_BOOL("calcalltissues", calcalltissues);
 	GET_BOOL("hrgraph", hrgraph);
+	GET_BOOL("tankbar", tankbar);
+	GET_BOOL("percentagegraph", percentagegraph);
 	GET_INT("gflow", gflow);
 	GET_INT("gfhigh", gfhigh);
 	GET_BOOL("gf_low_at_maxdepth", gf_low_at_maxdepth);
@@ -302,22 +343,45 @@ void PreferencesDialog::loadSettings()
 	s.beginGroup("GeneralSettings");
 	GET_TXT("default_filename", default_filename);
 	GET_TXT("default_cylinder", default_cylinder);
+	GET_BOOL("use_default_file", use_default_file);
 	s.endGroup();
 
 	s.beginGroup("Display");
-	QFont defaultFont = s.value("divelist_font", qApp->font()).value<QFont>();
-	defaultFont.setPointSizeF(s.value("font_size", qApp->font().pointSizeF()).toFloat());
+	// get the font from the settings or our defaults
+	// respect the system default font size if none is explicitly set
+	QFont defaultFont = s.value("divelist_font", prefs.divelist_font).value<QFont>();
+	if (IS_FP_SAME(system_divelist_default_font_size, -1.0)) {
+		prefs.font_size = qApp->font().pointSizeF();
+		system_divelist_default_font_size = prefs.font_size; // this way we don't save it on exit
+	}
+	prefs.font_size = s.value("font_size", prefs.font_size).toFloat();
+	// painful effort to ignore previous default fonts on Windows - ridiculous
+	QString fontName = defaultFont.toString();
+	if (fontName.contains(","))
+		fontName = fontName.left(fontName.indexOf(","));
+	if (subsurface_ignore_font(fontName.toUtf8().constData())) {
+		defaultFont = QFont(prefs.divelist_font);
+	} else {
+		free((void *)prefs.divelist_font);
+		prefs.divelist_font = strdup(fontName.toUtf8().constData());
+	}
+	defaultFont.setPointSizeF(prefs.font_size);
 	qApp->setFont(defaultFont);
-
-	GET_TXT("divelist_font", divelist_font);
-	GET_INT("font_size", font_size);
-	if (prefs.font_size < 0)
-		prefs.font_size = defaultFont.pointSizeF();
 	GET_INT("displayinvalid", display_invalid_dives);
 	s.endGroup();
 
 	s.beginGroup("Animations");
-	GET_INT("animation_speed", animation);
+	GET_INT("animation_speed", animation_speed);
+	s.endGroup();
+
+	s.beginGroup("Network");
+	GET_INT_DEF("proxy_type", proxy_type, QNetworkProxy::DefaultProxy);
+	GET_TXT("proxy_host", proxy_host);
+	GET_INT("proxy_port", proxy_port);
+	GET_BOOL("proxy_auth", proxy_auth);
+	GET_TXT("proxy_user", proxy_user);
+	GET_TXT("proxy_pass", proxy_pass);
+	s.endGroup();
 }
 
 void PreferencesDialog::buttonClicked(QAbstractButton *button)
@@ -344,13 +408,62 @@ void PreferencesDialog::buttonClicked(QAbstractButton *button)
 void PreferencesDialog::on_chooseFile_clicked()
 {
 	QFileInfo fi(system_default_filename());
-	QString choosenFileName = QFileDialog::getOpenFileName(this, tr("Open Default Log File"), fi.absolutePath(), tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
+	QString choosenFileName = QFileDialog::getOpenFileName(this, tr("Open default log file"), fi.absolutePath(), tr("Subsurface XML files (*.ssrf *.xml *.XML)"));
 
 	if (!choosenFileName.isEmpty())
 		ui.defaultfilename->setText(choosenFileName);
 }
 
+void PreferencesDialog::on_resetSettings_clicked()
+{
+	QSettings s;
+
+	QMessageBox response(this);
+	response.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+	response.setDefaultButton(QMessageBox::Cancel);
+	response.setWindowTitle(tr("Warning"));
+	response.setText(tr("If you click OK, all settings of Subsurface will be reset to their default values. This will be applied immediately."));
+	response.setWindowModality(Qt::WindowModal);
+
+	int result = response.exec();
+	if (result == QMessageBox::Ok) {
+		prefs = default_prefs;
+		setUiFromPrefs();
+		Q_FOREACH (QString key, s.allKeys()) {
+			s.remove(key);
+		}
+		syncSettings();
+		close();
+	}
+}
+
 void PreferencesDialog::emitSettingsChanged()
 {
 	emit settingsChanged();
+}
+
+void PreferencesDialog::proxyType_changed(int idx)
+{
+	if (idx == -1) {
+		return;
+	}
+
+	int proxyType = ui.proxyType->itemData(idx).toInt();
+	bool hpEnabled = (proxyType == QNetworkProxy::Socks5Proxy || proxyType == QNetworkProxy::HttpProxy);
+	ui.proxyHost->setEnabled(hpEnabled);
+	ui.proxyPort->setEnabled(hpEnabled);
+	ui.proxyAuthRequired->setEnabled(hpEnabled);
+	ui.proxyUsername->setEnabled(hpEnabled & ui.proxyAuthRequired->isChecked());
+	ui.proxyPassword->setEnabled(hpEnabled & ui.proxyAuthRequired->isChecked());
+	ui.proxyAuthRequired->setChecked(ui.proxyAuthRequired->isChecked());
+}
+
+void PreferencesDialog::on_btnUseDefaultFile_toggled(bool toggle)
+{
+	if (toggle) {
+		ui.defaultfilename->setText(system_default_filename());
+		ui.defaultfilename->setEnabled(false);
+	} else {
+		ui.defaultfilename->setEnabled(true);
+	}
 }

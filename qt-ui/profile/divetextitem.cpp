@@ -1,5 +1,6 @@
 #include "divetextitem.h"
 #include "animationfunctions.h"
+#include "mainwindow.h"
 
 #include <QPropertyAnimation>
 #include <QApplication>
@@ -61,11 +62,11 @@ void DiveTextItem::updateText()
 	QFont fnt(qApp->font());
 	if ((size = fnt.pixelSize()) > 0) {
 		// set in pixels - so the scale factor may not make a difference if it's too close to 1
-		size *= scale;
+		size *= scale * MainWindow::instance()->graphics()->getFontPrintScale();
 		fnt.setPixelSize(size);
 	} else {
 		size = fnt.pointSizeF();
-		size *= scale;
+		size *= scale * MainWindow::instance()->graphics()->getFontPrintScale();
 		fnt.setPointSizeF(size);
 	}
 	QFontMetrics fm(fnt);
@@ -92,14 +93,4 @@ void DiveTextItem::updateText()
 	textItem = new QGraphicsPathItem(textPath, this);
 	textItem->setBrush(brush);
 	textItem->setPen(Qt::NoPen);
-}
-
-void DiveTextItem::animatedHide()
-{
-	Animations::hide(this);
-}
-
-void DiveTextItem::animateMoveTo(qreal x, qreal y)
-{
-	Animations::moveTo(this, x, y);
 }

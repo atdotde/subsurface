@@ -298,10 +298,21 @@
           <xsl:value-of select="./@tank"/>
         </xsl:variable>
         <xsl:variable name="idx">
-          <xsl:value-of select="//equipment_used/tank_used[@id=$tank_idx]/gas_ref/@ref"/>
+          <xsl:value-of select="../../equipment_used/tank_used[@id=$tank_idx]/gas_ref/@ref"/>
         </xsl:variable>
 
-        <event name="gaschange" type="11">
+        <xsl:variable name="type">
+          <xsl:choose>
+            <xsl:when test="translate(//gas_def/gas_mix[@id=$idx]/o2, ',', '.') &gt; 0">
+              <xsl:value-of select="25"/> <!-- SAMPLE_EVENT_GASCHANGE2 -->
+            </xsl:when>
+            <xsl:otherwise>
+              <xsl:value-of select="11"/> <!-- SAMPLE_EVENT_GASCHANGE -->
+            </xsl:otherwise>
+          </xsl:choose>
+        </xsl:variable>
+
+        <event name="gaschange" type="{$type}">
           <xsl:attribute name="time">
             <xsl:call-template name="timeConvert">
               <xsl:with-param name="timeSec">
@@ -313,7 +324,7 @@
           <xsl:attribute name="value">
             <xsl:call-template name="gasConvert">
               <xsl:with-param name="mix">
-                <xsl:value-of select="//gas_def/gas_mix[@id=$idx]/o2"/>
+                <xsl:value-of select="translate(//gas_def/gas_mix[@id=$idx]/o2, ',', '.')"/>
               </xsl:with-param>
             </xsl:call-template>
           </xsl:attribute>
@@ -327,7 +338,18 @@
           <xsl:value-of select="./@ref"/>
         </xsl:variable>
 
-        <event name="gaschange" type="11">
+        <xsl:variable name="type">
+          <xsl:choose>
+            <xsl:when test="translate(//gasdefinitions/mix[@id=$idx]/he|//u:gasdefinitions/u:mix[@id=$idx]/u:he|//u1:gasdefinitions/u1:mix[@id=$idx]/u1:he, ',', '.') &gt; 0">
+              <xsl:value-of select="25"/> <!-- SAMPLE_EVENT_GASCHANGE2 -->
+            </xsl:when>
+            <xsl:otherwise>
+              <xsl:value-of select="11"/> <!-- SAMPLE_EVENT_GASCHANGE -->
+            </xsl:otherwise>
+          </xsl:choose>
+        </xsl:variable>
+
+        <event name="gaschange" type="{$type}">
           <xsl:attribute name="time">
             <xsl:call-template name="timeConvert">
               <xsl:with-param name="timeSec">
@@ -339,7 +361,7 @@
           <xsl:attribute name="value">
             <xsl:call-template name="gasConvert">
               <xsl:with-param name="mix">
-                <xsl:value-of select="//gasdefinitions/mix[@id=$idx]/o2|//u:gasdefinitions/u:mix[@id=$idx]/u:o2|//u1:gasdefinitions/u1:mix[@id=$idx]/u1:o2"/>
+                <xsl:value-of select="translate(//gasdefinitions/mix[@id=$idx]/o2|//u:gasdefinitions/u:mix[@id=$idx]/u:o2|//u1:gasdefinitions/u1:mix[@id=$idx]/u1:o2, ',', '.')"/>
               </xsl:with-param>
             </xsl:call-template>
           </xsl:attribute>
@@ -432,7 +454,7 @@
 
           <xsl:if test="cns|u:cns|u1:cns &gt; 0">
             <xsl:attribute name="cns">
-              <xsl:value-of select="concat(cns|u:cns|u1:cns, ' C')"/>
+              <xsl:value-of select="cns|u:cns|u1:cns"/>
             </xsl:attribute>
           </xsl:if>
 
@@ -443,6 +465,39 @@
                   <xsl:value-of select="setpo2|u:setpo2|u1:setpo2"/>
                 </xsl:with-param>
               </xsl:call-template>
+            </xsl:attribute>
+          </xsl:if>
+
+          <xsl:if test="nodecotime|u:nodecotime|u1:nodecotime &gt; 0">
+            <xsl:attribute name="ndl">
+              <xsl:call-template name="timeConvert">
+                <xsl:with-param name="timeSec">
+                  <xsl:value-of select="nodecotime|u:nodecotime|u1:nodecotime"/>
+                </xsl:with-param>
+              </xsl:call-template>
+            </xsl:attribute>
+          </xsl:if>
+
+          <xsl:if test="decostop|u:decostop|u1:decostop">
+            <xsl:attribute name="stoptime">
+              <xsl:call-template name="timeConvert">
+                <xsl:with-param name="timeSec">
+                  <xsl:value-of select="decostop/@duration|u:decostop/@duration|u1:decostop/@duration"/>
+                </xsl:with-param>
+              </xsl:call-template>
+            </xsl:attribute>
+            <xsl:attribute name="stopdepth">
+              <xsl:value-of select="decostop/@decodepth|u:decostop/@decodepth|u1:decostop/@decodepth"/>
+            </xsl:attribute>
+            <xsl:attribute name="in_deco">
+              <xsl:choose>
+                <xsl:when test="decostop/@kind|u:decostop/@kind|u1:decostop/@kind != 'mandatory'">
+                  <xsl:value-of select="0"/>
+                </xsl:when>
+                <xsl:otherwise>
+                  <xsl:value-of select="1"/>
+                </xsl:otherwise>
+              </xsl:choose>
             </xsl:attribute>
           </xsl:if>
         </sample>

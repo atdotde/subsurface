@@ -1,95 +1,19 @@
 #include "qthelper.h"
 #include "qt-gui.h"
+#include "gettextfromc.h"
+#include "dive.h"
+#include "statistics.h"
+#include <exif.h>
+#include "file.h"
+#include <QFile>
 #include <QRegExp>
 #include <QDir>
-
+#include <QMap>
 #include <QDebug>
 #include <QSettings>
 #include <libxslt/documents.h>
 
-#define tr(_arg) QObject::tr(_arg)
-
-const char *default_dive_computer_vendor;
-const char *default_dive_computer_product;
-const char *default_dive_computer_device;
-DiveComputerList dcList;
-
-DiveComputerList::DiveComputerList()
-{
-}
-
-DiveComputerList::~DiveComputerList()
-{
-}
-
-bool DiveComputerNode::operator==(const DiveComputerNode &a) const
-{
-	return this->model == a.model &&
-	       this->deviceId == a.deviceId &&
-	       this->firmware == a.firmware &&
-	       this->serialNumber == a.serialNumber &&
-	       this->nickName == a.nickName;
-}
-
-bool DiveComputerNode::operator!=(const DiveComputerNode &a) const
-{
-	return !(*this == a);
-}
-
-bool DiveComputerNode::changesValues(const DiveComputerNode &b) const
-{
-	if (this->model != b.model || this->deviceId != b.deviceId) {
-		qDebug("DiveComputerNodes were not for the same DC");
-		return false;
-	}
-	return (b.firmware != "" && this->firmware != b.firmware) ||
-	       (b.serialNumber != "" && this->serialNumber != b.serialNumber) ||
-	       (b.nickName != "" && this->nickName != b.nickName);
-}
-
-const DiveComputerNode *DiveComputerList::getExact(QString m, uint32_t d)
-{
-	for (QMap<QString, DiveComputerNode>::iterator it = dcMap.find(m); it != dcMap.end() && it.key() == m; ++it)
-		if (it->deviceId == d)
-			return &*it;
-	return NULL;
-}
-
-const DiveComputerNode *DiveComputerList::get(QString m)
-{
-	QMap<QString, DiveComputerNode>::iterator it = dcMap.find(m);
-	if (it != dcMap.end())
-		return &*it;
-	return NULL;
-}
-
-void DiveComputerList::addDC(QString m, uint32_t d, QString n, QString s, QString f)
-{
-	if (m == "" || d == 0)
-		return;
-	const DiveComputerNode *existNode = this->getExact(m, d);
-	DiveComputerNode newNode(m, d, s, f, n);
-	if (existNode) {
-		if (newNode.changesValues(*existNode)) {
-			if (n != "" && existNode->nickName != n)
-				qDebug("new nickname %s for DC model %s deviceId 0x%x", n.toUtf8().data(), m.toUtf8().data(), d);
-			if (f != "" && existNode->firmware != f)
-				qDebug("new firmware version %s for DC model %s deviceId 0x%x", f.toUtf8().data(), m.toUtf8().data(), d);
-			if (s != "" && existNode->serialNumber != s)
-				qDebug("new serial number %s for DC model %s deviceId 0x%x", s.toUtf8().data(), m.toUtf8().data(), d);
-		} else {
-			return;
-		}
-		dcMap.remove(m, *existNode);
-	}
-	dcMap.insert(m, newNode);
-}
-
-void DiveComputerList::rmDC(QString m, uint32_t d)
-{
-	const DiveComputerNode *existNode = this->getExact(m, d);
-	dcMap.remove(m, *existNode);
-}
+#define translate(_context, arg) trGettext(arg)
 
 QString weight_string(int weight_in_grams)
 {
@@ -109,6 +33,32 @@ QString weight_string(int weight_in_grams)
 	return (str);
 }
 
+QString printGPSCoords(int lat, int lon)
+{
+	unsigned int latdeg, londeg;
+	unsigned int latmin, lonmin;
+	double latsec, lonsec;
+	QString lath, lonh, result;
+
+	if (!lat && !lon)
+		return QString();
+
+	lath = lat >= 0 ? translate("gettextFromC", "N") : translate("gettextFromC", "S");
+	lonh = lon >= 0 ? translate("gettextFromC", "E") : translate("gettextFromC", "W");
+	lat = abs(lat);
+	lon = abs(lon);
+	latdeg = lat / 1000000;
+	londeg = lon / 1000000;
+	latmin = (lat % 1000000) * 60;
+	lonmin = (lon % 1000000) * 60;
+	latsec = (latmin % 1000000) * 60;
+	lonsec = (lonmin % 1000000) * 60;
+	result.sprintf("%u%s%02d\'%06.3f\"%s %u%s%02d\'%06.3f\"%s",
+		       latdeg, UTF8_DEGREE, latmin / 1000000, latsec / 1000000, lath.toUtf8().data(),
+		       londeg, UTF8_DEGREE, lonmin / 1000000, lonsec / 1000000, lonh.toUtf8().data());
+	return result;
+}
+
 bool parseGpsText(const QString &gps_text, double *latitude, double *longitude)
 {
 	enum {
@@ -119,9 +69,14 @@ bool parseGpsText(const QString &gps_text, double *latitude, double *longitude)
 	} gpsStyle = ISO6709D;
 	int eastWest = 4;
 	int northSouth = 1;
+	QString trHemisphere[4];
+	trHemisphere[0] = translate("gettextFromC", "N");
+	trHemisphere[1] = translate("gettextFromC", "S");
+	trHemisphere[2] = translate("gettextFromC", "E");
+	trHemisphere[3] = translate("gettextFromC", "W");
 	QString regExp;
 	/* an empty string is interpreted as 0.0,0.0 and therefore "no gps location" */
-	if (gps_text.trimmed() == "") {
+	if (gps_text.trimmed().isEmpty()) {
 		*latitude = 0.0;
 		*longitude = 0.0;
 		return true;
@@ -136,39 +91,39 @@ bool parseGpsText(const QString &gps_text, double *latitude, double *longitude)
 		gpsStyle = ISO6709D;
 		regExp = QString("(\\d+)[" UTF8_DEGREE "\\s](\\d+)[\'\\s](\\d+)([,\\.](\\d+))?[\"\\s]([NS%1%2])"
 				 "\\s*(\\d+)[" UTF8_DEGREE "\\s](\\d+)[\'\\s](\\d+)([,\\.](\\d+))?[\"\\s]([EW%3%4])")
-			     .arg(tr("N"))
-			     .arg(tr("S"))
-			     .arg(tr("E"))
-			     .arg(tr("W"));
+				 .arg(trHemisphere[0])
+				 .arg(trHemisphere[1])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3]);
 	} else if (gps_text.count(QChar('"')) == 2) {
 		gpsStyle = SECONDS;
 		regExp = QString("\\s*([NS%1%2])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)[\'\\s]+(\\d+)([,\\.](\\d+))?[^EW%3%4]*"
 				 "([EW%5%6])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)[\'\\s]+(\\d+)([,\\.](\\d+))?")
-			     .arg(tr("N"))
-			     .arg(tr("S"))
-			     .arg(tr("E"))
-			     .arg(tr("W"))
-			     .arg(tr("E"))
-			     .arg(tr("W"));
+				 .arg(trHemisphere[0])
+				 .arg(trHemisphere[1])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3]);
 	} else if (gps_text.count(QChar('\'')) == 2) {
 		gpsStyle = MINUTES;
 		regExp = QString("\\s*([NS%1%2])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)([,\\.](\\d+))?[^EW%3%4]*"
 				 "([EW%5%6])\\s*(\\d+)[" UTF8_DEGREE "\\s]+(\\d+)([,\\.](\\d+))?")
-			     .arg(tr("N"))
-			     .arg(tr("S"))
-			     .arg(tr("E"))
-			     .arg(tr("W"))
-			     .arg(tr("E"))
-			     .arg(tr("W"));
+				 .arg(trHemisphere[0])
+				 .arg(trHemisphere[1])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3]);
 	} else {
 		gpsStyle = DECIMAL;
 		regExp = QString("\\s*([-NS%1%2]?)\\s*(\\d+)[,\\.](\\d+)[^-EW%3%4\\d]*([-EW%5%6]?)\\s*(\\d+)[,\\.](\\d+)")
-			     .arg(tr("N"))
-			     .arg(tr("S"))
-			     .arg(tr("E"))
-			     .arg(tr("W"))
-			     .arg(tr("E"))
-			     .arg(tr("W"));
+				 .arg(trHemisphere[0])
+				 .arg(trHemisphere[1])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3])
+				 .arg(trHemisphere[2])
+				 .arg(trHemisphere[3]);
 	}
 	QRegExp r(regExp);
 	if (r.indexIn(gps_text) != -1) {
@@ -201,9 +156,9 @@ bool parseGpsText(const QString &gps_text, double *latitude, double *longitude)
 			*longitude = (r.cap(5) + QString(".") + r.cap(6)).toDouble();
 			break;
 		}
-		if (r.cap(northSouth) == "S" || r.cap(northSouth) == tr("S") || r.cap(northSouth) == "-")
+		if (r.cap(northSouth) == "S" || r.cap(northSouth) == trHemisphere[1] || r.cap(northSouth) == "-")
 			*latitude *= -1.0;
-		if (r.cap(eastWest) == "W" || r.cap(eastWest) == tr("W") || r.cap(eastWest) == "-")
+		if (r.cap(eastWest) == "W" || r.cap(eastWest) == trHemisphere[3] || r.cap(eastWest) == "-")
 			*longitude *= -1.0;
 		// qDebug("%s -> %8.5f / %8.5f", gps_text.toLocal8Bit().data(), *latitude, *longitude);
 		return true;
@@ -211,10 +166,13 @@ bool parseGpsText(const QString &gps_text, double *latitude, double *longitude)
 	return false;
 }
 
-bool gpsHasChanged(struct dive *dive, struct dive *master, const QString &gps_text, bool *parsed)
+bool gpsHasChanged(struct dive *dive, struct dive *master, const QString &gps_text, bool *parsed_out)
 {
 	double latitude, longitude;
 	int latudeg, longudeg;
+	bool ignore;
+	bool *parsed = parsed_out ?: &ignore;
+	*parsed = true;
 
 	/* if we have a master and the dive's gps address is different from it,
 	 * don't change the dive */
@@ -240,8 +198,9 @@ bool gpsHasChanged(struct dive *dive, struct dive *master, const QString &gps_te
 QList<int> getDivesInTrip(dive_trip_t *trip)
 {
 	QList<int> ret;
-	for (int i = 0; i < dive_table.nr; i++) {
-		struct dive *d = get_dive(i);
+	int i;
+	struct dive *d;
+	for_each_dive (i, d) {
 		if (d->divetrip == trip) {
 			ret.push_back(get_divenr(d));
 		}
@@ -253,7 +212,7 @@ QList<int> getDivesInTrip(dive_trip_t *trip)
 // it doesn't change during the life time of a Subsurface session
 // oh, and it has no meaning whatsoever - that's why we have the
 // silly initial number and increment by 3 :-)
-int getUniqID(struct dive *d)
+int dive_getUniqID(struct dive *d)
 {
 	static QSet<int> ids;
 	static int maxId = 83529;
@@ -271,28 +230,6 @@ int getUniqID(struct dive *d)
 	Q_ASSERT(!ids.contains(id));
 	ids.insert(id);
 	return id;
-}
-
-extern "C" void create_device_node(const char *model, uint32_t deviceid, const char *serial, const char *firmware, const char *nickname)
-{
-	dcList.addDC(model, deviceid, nickname, serial, firmware);
-}
-
-extern "C" bool compareDC(const DiveComputerNode &a, const DiveComputerNode &b)
-{
-	return a.deviceId < b.deviceId;
-}
-
-extern "C" void call_for_each_dc(void *f, void (*callback)(void *, const char *, uint32_t,
-						const char *, const char *, const char *))
-{
-	QList<DiveComputerNode> values = dcList.dcMap.values();
-	qSort(values.begin(), values.end(), compareDC);
-	for (int i = 0; i < values.size(); i++) {
-		const DiveComputerNode *node = &values.at(i);
-		callback(f, node->model.toUtf8().data(), node->deviceId, node->nickName.toUtf8().data(),
-			 node->serialNumber.toUtf8().data(), node->firmware.toUtf8().data());
-	}
 }
 
 
@@ -329,79 +266,78 @@ extern "C" xsltStylesheetPtr get_stylesheet(const char *name)
 	return xslt;
 }
 
-extern "C" int is_default_dive_computer(const char *vendor, const char *product)
+extern "C" void picture_load_exif_data(struct picture *p, timestamp_t *timestamp)
 {
-	return default_dive_computer_vendor && !strcmp(vendor, default_dive_computer_vendor) &&
-	       default_dive_computer_product && !strcmp(product, default_dive_computer_product);
+	EXIFInfo exif;
+	memblock mem;
+
+	if (readfile(p->filename, &mem) <= 0)
+		goto picture_load_exit;
+	if (exif.parseFrom((const unsigned char *)mem.buffer, (unsigned)mem.size) != PARSE_EXIF_SUCCESS)
+		goto picture_load_exit;
+	*timestamp = exif.epoch();
+	p->longitude.udeg= lrint(1000000.0 * exif.GeoLocation.Longitude);
+	p->latitude.udeg  = lrint(1000000.0 * exif.GeoLocation.Latitude);
+
+picture_load_exit:
+	free(mem.buffer);
+	return;
 }
 
-extern "C" int is_default_dive_computer_device(const char *name)
+extern "C" char *get_file_name(const char *fileName)
 {
-	return default_dive_computer_device && !strcmp(name, default_dive_computer_device);
+	QFileInfo fileInfo(fileName);
+	return strdup(fileInfo.fileName().toUtf8());
 }
 
-void set_default_dive_computer(const char *vendor, const char *product)
+extern "C" void copy_image_and_overwrite(const char *cfileName, const char *cnewName)
 {
-	QSettings s;
-
-	if (!vendor || !*vendor)
-		return;
-	if (!product || !*product)
-		return;
-	if (is_default_dive_computer(vendor, product))
-		return;
-	if (default_dive_computer_vendor)
-		free((void *)default_dive_computer_vendor);
-	if (default_dive_computer_product)
-		free((void *)default_dive_computer_product);
-	default_dive_computer_vendor = strdup(vendor);
-	default_dive_computer_product = strdup(product);
-	s.beginGroup("DiveComputer");
-	s.setValue("dive_computer_vendor", vendor);
-	s.setValue("dive_computer_product", product);
-	s.endGroup();
+	QString fileName = QString::fromUtf8(cfileName);
+	QString newName = QString::fromUtf8(cnewName);
+	newName += QFileInfo(cfileName).fileName();
+	QFile file(newName);
+	if (file.exists())
+		file.remove();
+	QFile::copy(fileName, newName);
 }
 
-void set_default_dive_computer_device(const char *name)
+extern "C" bool string_sequence_contains(const char *string_sequence, const char *text)
 {
-	QSettings s;
+	if (same_string(text, "") || same_string(string_sequence, ""))
+		return false;
 
-	if (!name || !*name)
-		return;
-	if (is_default_dive_computer_device(name))
-		return;
-	if (default_dive_computer_device)
-		free((void *)default_dive_computer_device);
-	default_dive_computer_device = strdup(name);
-	s.beginGroup("DiveComputer");
-	s.setValue("dive_computer_device", name);
-	s.endGroup();
-}
-
-extern "C" void set_dc_nickname(struct dive *dive)
-{
-	if (!dive)
-		return;
-
-	struct divecomputer *dc = &dive->dc;
-
-	while (dc) {
-		if (dc->model && *dc->model && dc->deviceid &&
-		    !dcList.getExact(dc->model, dc->deviceid)) {
-			// we don't have this one, yet
-			const DiveComputerNode *existNode = dcList.get(dc->model);
-			if (existNode) {
-				// we already have this model but a different deviceid
-				QString simpleNick(dc->model);
-				if (dc->deviceid == 0)
-					simpleNick.append(" (unknown deviceid)");
-				else
-					simpleNick.append(" (").append(QString::number(dc->deviceid, 16)).append(")");
-				dcList.addDC(dc->model, dc->deviceid, simpleNick);
-			} else {
-				dcList.addDC(dc->model, dc->deviceid);
-			}
-		}
-		dc = dc->next;
+	QString stringSequence(string_sequence);
+	QStringList strings = stringSequence.split(",", QString::SkipEmptyParts);
+	Q_FOREACH (const QString& string, strings) {
+		if (string.trimmed().compare(QString(text).trimmed(), Qt::CaseInsensitive) == 0)
+			return true;
 	}
+	return false;
+}
+
+static bool lessThan(const QPair<QString, int> &a, const QPair<QString, int> &b)
+{
+	return a.second < b.second;
+}
+
+void selectedDivesGasUsed(QVector<QPair<QString, int> > &gasUsedOrdered)
+{
+	int i, j;
+	struct dive *d;
+	QMap<QString, int> gasUsed;
+	for_each_dive (i, d) {
+		if (!d->selected)
+			continue;
+		volume_t diveGases[MAX_CYLINDERS] = {};
+		get_gas_used(d, diveGases);
+		for (j = 0; j < MAX_CYLINDERS; j++)
+			if (diveGases[j].mliter) {
+				QString gasName = gasname(&d->cylinder[j].gasmix);
+				gasUsed[gasName] += diveGases[j].mliter;
+			}
+	}
+	Q_FOREACH(const QString& gas, gasUsed.keys()) {
+		gasUsedOrdered.append(qMakePair(gas, gasUsed[gas]));
+	}
+	qSort(gasUsedOrdered.begin(), gasUsedOrdered.end(), lessThan);
 }

@@ -10,6 +10,7 @@ exists(.git/HEAD): {
 	VERSION_SCRIPT = $$PWD/scripts/get-version
 	# always use linux here -------------------vvv	so we get the true full version
 	FULL_VERSION = "`$$VERSION_SCRIPT linux`"
+	VERSION = $$system("sh scripts/get-version full || echo $${VERSION}")
 	PRODVERSION_STRING = $$system("sh scripts/get-version win $$FULL_VERSION || echo $${VERSION}.0.0-git")
 	VERSION_STRING = $$system("sh scripts/get-version linux $$FULL_VERSION || echo $${VERSION}-git")
 	version_h.depends = $$VERSION_SCRIPT $$PWD/.git/$$system("$$SET_GIT_DIR=$$PWD/.git git rev-parse --symbolic-full-name HEAD")
@@ -23,4 +24,5 @@ exists(.git/HEAD): {
 	# This is probably a package
 	FULL_VERSION = $$VERSION
 	system(echo \\$${LITERAL_HASH}define VERSION_STRING \\\"$$VERSION\\\" > $$VERSION_FILE)
+	QMAKE_CLEAN += $$VERSION_FILE
 }

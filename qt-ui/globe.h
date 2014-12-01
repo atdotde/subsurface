@@ -4,9 +4,12 @@
 
 #include <marble/MarbleWidget.h>
 #include <marble/GeoDataCoordinates.h>
-#include <marble/GeoDataDocument.h>
 
 #include <QHash>
+
+namespace Marble{
+	class GeoDataDocument;
+}
 
 class KMessageWidget;
 using namespace Marble;
@@ -19,7 +22,7 @@ public:
 	GlobeGPS(QWidget *parent);
 	void reload();
 	void repopulateLabels();
-	void centerOn(struct dive *dive);
+	void centerOnCurrentDive();
 	bool eventFilter(QObject *, QEvent *);
 
 protected:
@@ -32,13 +35,16 @@ private:
 	KMessageWidget *messageWidget;
 	QTimer *fixZoomTimer;
 	int currentZoomLevel;
+	bool needResetZoom;
 	bool editingDiveLocation;
+	bool doubleClick;
 
 public
 slots:
 	void changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::Unit);
 	void mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit);
 	void fixZoom();
+	void zoomOutForNoGPS();
 	void prepareForGetDiveCoordinates();
 };
 
@@ -52,9 +58,10 @@ public:
 	GlobeGPS(QWidget *parent);
 	void reload();
 	void repopulateLabels();
-	void centerOn(struct dive* dive);
-	bool eventFilter(QObject*, QEvent*);
-public slots:
+	void centerOnCurrentDive();
+	bool eventFilter(QObject *, QEvent *);
+public
+slots:
 	void prepareForGetDiveCoordinates();
 };
 

@@ -11,36 +11,10 @@
 // global pointers for our translation
 extern QTranslator *qtTranslator, *ssrfTranslator;
 
-class DiveComputerNode {
-public:
-	DiveComputerNode(QString m, uint32_t d, QString s, QString f, QString n)
-	    : model(m), deviceId(d), serialNumber(s), firmware(f), nickName(n) {};
-	bool operator==(const DiveComputerNode &a) const;
-	bool operator!=(const DiveComputerNode &a) const;
-	bool changesValues(const DiveComputerNode &b) const;
-	QString model;
-	uint32_t deviceId;
-	QString serialNumber;
-	QString firmware;
-	QString nickName;
-};
-
-class DiveComputerList {
-public:
-	DiveComputerList();
-	~DiveComputerList();
-	const DiveComputerNode *getExact(QString m, uint32_t d);
-	const DiveComputerNode *get(QString m);
-	void addDC(QString m, uint32_t d, QString n = "", QString s = "", QString f = "");
-	void rmDC(QString m, uint32_t d);
-	DiveComputerNode matchDC(QString m, uint32_t d);
-	DiveComputerNode matchModel(QString m);
-	QMultiMap<QString, class DiveComputerNode> dcMap;
-	QMultiMap<QString, class DiveComputerNode> dcWorkingMap;
-};
-
 QString weight_string(int weight_in_grams);
-bool gpsHasChanged(struct dive *dive, struct dive *master, const QString &gps_text, bool *parsed);
-
+bool gpsHasChanged(struct dive *dive, struct dive *master, const QString &gps_text, bool *parsed_out = 0);
+QString printGPSCoords(int lat, int lon);
 QList<int> getDivesInTrip(dive_trip_t *trip);
+QString gasToStr(struct gasmix gas);
+
 #endif // QTHELPER_H

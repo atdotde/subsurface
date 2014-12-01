@@ -29,6 +29,7 @@ class ProfileGraphicsView;
 class QWebView;
 class QSettings;
 class UpdateManager;
+class UserManual;
 
 enum MainWindowTitleFormat {
 	MWTF_DEFAULT,
@@ -41,10 +42,6 @@ public:
 	enum {
 		COLLAPSED,
 		EXPANDED
-	};
-	enum StackWidgetIndexes {
-		PROFILE,
-		PLANNERPROFILE
 	};
 	enum InfoWidgetIndexes {
 		MAINTAB,
@@ -76,11 +73,15 @@ public:
 	void enableDcShortcuts();
 	void loadFiles(const QStringList files);
 	void importFiles(const QStringList importFiles);
+	void importTxtFiles(const QStringList fileNames);
 	void cleanUpEmpty();
 	void setToolButtonsEnabled(bool enabled);
 	ProfileWidget2 *graphics() const;
 	void setLoadedWithFiles(bool filesFromCommandLine);
 	bool filesFromCommandLine() const;
+	void setPlanNotes(const char *notes);
+	void printPlan();
+	void checkSurvey(QSettings *s);
 private
 slots:
 	/* file menu action */
@@ -90,9 +91,6 @@ slots:
 	void on_actionSave_triggered();
 	void on_actionSaveAs_triggered();
 	void on_actionClose_triggered();
-	void on_actionExportUDDF_triggered();
-	void on_actionExport_CSV_triggered();
-	void on_actionExportHTMLworldmap_triggered();
 	void on_actionPrint_triggered();
 	void on_actionPreferences_triggered();
 	void on_actionQuit_triggered();
@@ -118,11 +116,10 @@ slots:
 	void on_actionFullScreen_triggered(bool checked);
 
 	/* other menu actions */
-	void on_actionSelectEvents_triggered();
-	void on_actionInputPlan_triggered();
 	void on_actionAboutSubsurface_triggered();
 	void on_actionUserManual_triggered();
 	void on_actionDivePlanner_triggered();
+	void on_actionReplanDive_triggered();
 	void on_action_Check_for_Updates_triggered();
 
 	void current_dive_changed(int divenr);
@@ -131,42 +128,55 @@ slots:
 	void on_actionImportDiveLog_triggered();
 
 	/* TODO: Move those slots below to it's own class */
-	void on_profCalcAllTissues_clicked(bool triggered);
-	void on_profCalcCeiling_clicked(bool triggered);
-	void on_profDcCeiling_clicked(bool triggered);
-	void on_profEad_clicked(bool triggered);
-	void on_profIncrement3m_clicked(bool triggered);
-	void on_profMod_clicked(bool triggered);
-	void on_profNdl_tts_clicked(bool triggered);
-	void on_profPO2_clicked(bool triggered);
-	void on_profPhe_clicked(bool triggered);
-	void on_profPn2_clicked(bool triggered);
-	void on_profHR_clicked(bool triggered);
-	void on_profRuler_clicked(bool triggered);
-	void on_profSAC_clicked(bool triggered);
-	void on_profScaled_clicked(bool triggered);
+	void on_profCalcAllTissues_triggered(bool triggered);
+	void on_profCalcCeiling_triggered(bool triggered);
+	void on_profDcCeiling_triggered(bool triggered);
+	void on_profEad_triggered(bool triggered);
+	void on_profIncrement3m_triggered(bool triggered);
+	void on_profMod_triggered(bool triggered);
+	void on_profNdl_tts_triggered(bool triggered);
+	void on_profPO2_triggered(bool triggered);
+	void on_profPhe_triggered(bool triggered);
+	void on_profPn2_triggered(bool triggered);
+	void on_profHR_triggered(bool triggered);
+	void on_profRuler_triggered(bool triggered);
+	void on_profSAC_triggered(bool triggered);
+	void on_profScaled_triggered(bool triggered);
+	void on_profTogglePicture_triggered(bool triggered);
+	void on_profTankbar_triggered(bool triggered);
+	void on_profTissues_triggered(bool triggered);
+	void on_actionExport_triggered();
+	void on_copy_triggered();
+	void on_paste_triggered();
+	void on_actionFilterTags_triggered();
+	void on_actionConfigure_Dive_Computer_triggered();
 
 protected:
 	void closeEvent(QCloseEvent *);
 
 public
 slots:
+	void turnOffNdlTts();
 	void readSettings();
-	void refreshDisplay(bool recreateDiveList = true);
+	void refreshDisplay(bool doRecreateDiveList = true);
+	void recreateDiveList();
 	void showProfile();
 	void editCurrentDive();
+	void planCanceled();
+	void planCreated();
+	void setEnabledToolbar(bool arg1);
 
 private:
 	Ui::MainWindow ui;
 	QAction *actionNextDive;
 	QAction *actionPreviousDive;
-	QMainWindow *helpView;
-	QTreeView *yearlyStats;
-	QAbstractItemModel *yearlyStatsModel;
+	UserManual *helpView;
 	CurrentState state;
 	QString filter();
 	static MainWindow *m_Instance;
 	bool askSaveChanges();
+	bool okToClose(QString message);
+	void closeCurrentFile();
 	void writeSettings();
 	int file_save();
 	int file_save_as();
@@ -176,8 +186,13 @@ private:
 	void updateLastUsedDir(const QString &s);
 	bool filesAsArguments;
 	UpdateManager *updateManager;
-};
 
-MainWindow *mainWindow();
+	bool plannerStateClean();
+	void setupForAddAndPlan(const char *model);
+	QDialog *survey;
+	struct dive copyPasteDive;
+	struct dive_components what;
+	QList<QAction *> profileToolbarActions;
+};
 
 #endif // MAINWINDOW_H

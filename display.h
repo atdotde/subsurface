@@ -35,16 +35,18 @@ typedef enum {
 
 extern struct divecomputer *select_dc(struct dive *);
 
-struct options {
-	enum {
+struct print_options {
+	enum print_type {
 		PRETTY,
 		TABLE,
-		TWOPERPAGE
+		TWOPERPAGE,
+		ONEPERPAGE
 	} type;
-	int print_selected;
-	int color_selected;
+	bool print_selected;
+	bool color_selected;
 	bool notes_up;
-	int profile_height, notes_height, tanks_height;
+	bool landscape;
+	int margins[4]; // left, top, right, bottom
 };
 
 extern unsigned int dc_number;
@@ -55,11 +57,18 @@ extern int is_default_dive_computer_device(const char *);
 extern int is_default_dive_computer(const char *, const char *);
 
 typedef void (*device_callback_t)(const char *name, void *userdata);
-int enumerate_devices(device_callback_t callback, void *userdata);
+
+#define DC_TYPE_SERIAL 1
+#define DC_TYPE_UEMIS 2
+#define DC_TYPE_OTHER 3
+
+int enumerate_devices(device_callback_t callback, void *userdata, int dc_type);
 
 extern const char *default_dive_computer_vendor;
 extern const char *default_dive_computer_product;
 extern const char *default_dive_computer_device;
+
+#define AMB_PERCENTAGE 50.0
 
 #ifdef __cplusplus
 }

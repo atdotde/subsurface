@@ -15,6 +15,8 @@
 //  */
 #include "graphicsview-common.h"
 #include "divelineitem.h"
+#include "diveprofileitem.h"
+#include "display.h"
 
 class RulerItem2;
 struct dive;
@@ -34,12 +36,18 @@ class DiveProfileItem;
 class TimeAxis;
 class DiveTemperatureItem;
 class DiveHeartrateItem;
+class PercentageItem;
 class DiveGasPressureItem;
 class DiveCalculatedCeiling;
 class DiveCalculatedTissue;
 class PartialPressureGasItem;
 class PartialGasPressureAxis;
 class AbstractProfilePolygonItem;
+class TankItem;
+class DiveHandler;
+class QGraphicsSimpleTextItem;
+class QModelIndex;
+class DivePictureItem;
 
 class ProfileWidget2 : public QGraphicsView {
 	Q_OBJECT
@@ -63,29 +71,61 @@ public:
 	};
 
 	ProfileWidget2(QWidget *parent = 0);
-	void plotDives(QList<dive *> dives);
-	void replot();
+	void plotDive(struct dive *d = 0, bool force = false);
 	virtual bool eventFilter(QObject *, QEvent *);
 	void setupItem(AbstractProfilePolygonItem *item, DiveCartesianAxis *hAxis, DiveCartesianAxis *vAxis, DivePlotDataModel *model, int vData, int hData, int zValue);
 	void setPrintMode(bool mode, bool grayscale = false);
+	bool getPrintMode();
+	bool isPointOutOfBoundaries(const QPointF &point) const;
+	bool isPlanner();
+	bool isAddOrPlanner();
+	double getFontPrintScale();
+	void setFontPrintScale(double scale);
+	void clearHandlers();
+	State currentState;
 
 public
 slots: // Necessary to call from QAction's signals.
 	void settingsChanged();
 	void setEmptyState();
 	void setProfileState();
+	void setPlanState();
+	void setAddState();
 	void changeGas();
+	void addSetpointChange();
 	void addBookmark();
 	void hideEvents();
 	void unhideEvents();
 	void removeEvent();
 	void editName();
+	void makeFirstDC();
+	void deleteCurrentDC();
+	void pointInserted(const QModelIndex &parent, int start, int end);
+	void pointsRemoved(const QModelIndex &, int start, int end);
+	void plotPictures();
+	void replot();
 
+	/* this is called for every move on the handlers. maybe we can speed up this a bit? */
+	void recreatePlannedDive();
+
+	/* key press handlers */
+	void keyEscAction();
+	void keyDeleteAction();
+	void keyUpAction();
+	void keyDownAction();
+	void keyLeftAction();
+	void keyRightAction();
+
+	void divePlannerHandlerClicked();
+	void divePlannerHandlerReleased();
 protected:
 	virtual void resizeEvent(QResizeEvent *event);
 	virtual void wheelEvent(QWheelEvent *event);
 	virtual void mouseMoveEvent(QMouseEvent *event);
 	virtual void contextMenuEvent(QContextMenuEvent *event);
+	virtual void mouseDoubleClickEvent(QMouseEvent *event);
+	virtual void mousePressEvent(QMouseEvent *event);
+	virtual void mouseReleaseEvent(QMouseEvent *event);
 
 private: /*methods*/
 	void fixBackgroundPos();
@@ -94,10 +134,11 @@ private: /*methods*/
 	void setupItemSizes();
 	void addItemsToScene();
 	void setupItemOnScene();
+	void disconnectTemporaryConnections();
+	struct plot_data *getEntryFromPos(QPointF pos);
 
 private:
 	DivePlotDataModel *dataModel;
-	State currentState;
 	int zoomLevel;
 	qreal zoomFactor;
 	DivePixmapItem *background;
@@ -107,7 +148,7 @@ private:
 	// All those here should probably be merged into one structure,
 	// So it's esyer to replicate for more dives later.
 	// In the meantime, keep it here.
-	struct plot_info *plotInfo;
+	struct plot_info plotInfo;
 	DepthAxis *profileYAxis;
 	PartialGasPressureAxis *gasYAxis;
 	TemperatureAxis *temperatureAxis;
@@ -127,9 +168,30 @@ private:
 	PartialPressureGasItem *po2GasItem;
 	DiveCartesianAxis *heartBeatAxis;
 	DiveHeartrateItem *heartBeatItem;
+	DiveCartesianAxis *percentageAxis;
+	QList<DivePercentageItem *> allPercentages;
+	DiveAmbPressureItem *ambPressureItem;
+	DiveGFLineItem *gflineItem;
+	DiveLineItem *mouseFollowerVertical;
+	DiveLineItem *mouseFollowerHorizontal;
 	RulerItem2 *rulerItem;
+	TankItem *tankItem;
 	bool isGrayscale;
 	bool printMode;
+
+	//specifics for ADD and PLAN
+	QList<DiveHandler *> handles;
+	QList<QGraphicsSimpleTextItem *> gases;
+	QList<DivePictureItem*> pictures;
+	void repositionDiveHandlers();
+	int fixHandlerIndex(DiveHandler *activeHandler);
+	friend class DiveHandler;
+	QHash<Qt::Key, QAction *> actionsForKeys;
+	bool shouldCalculateMaxTime;
+	bool shouldCalculateMaxDepth;
+	int maxtime;
+	int maxdepth;
+	double fontPrintScale;
 };
 
 #endif // PROFILEWIDGET2_H

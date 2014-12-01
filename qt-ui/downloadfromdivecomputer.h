@@ -5,9 +5,11 @@
 #include <QThread>
 #include <QHash>
 #include <QMap>
-#include <QStringListModel>
+
 #include "../libdivecomputer.h"
 #include "ui_downloadfromdivecomputer.h"
+
+class QStringListModel;
 
 class DownloadThread : public QThread {
 	Q_OBJECT
@@ -42,7 +44,7 @@ slots:
 	void on_cancel_clicked();
 	void on_search_clicked();
 	void on_vendor_currentIndexChanged(const QString &vendor);
-	void on_product_currentIndexChanged();
+	void on_product_currentIndexChanged(const QString &product);
 
 	void onDownloadThreadFinished();
 	void updateProgressBar();
@@ -68,7 +70,7 @@ private:
 	QStringListModel *vendorModel;
 	QStringListModel *productModel;
 	void fill_computer_list();
-	void fill_device_list();
+	void fill_device_list(int dc_type);
 	QString logFile;
 	QString dumpFile;
 	QTimer *timer;

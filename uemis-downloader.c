@@ -37,6 +37,10 @@
 #define UEMIS_MAX_TIMEOUT 2000000 /* 2s */
 #endif
 
+#ifdef UEMIS_DEBUG
+#define debugfile stderr
+#endif
+
 static char *param_buff[NUM_PARAM_BUFS];
 static char *reqtxt_path;
 static int reqtxt_file;
@@ -45,7 +49,7 @@ static int number_of_files;
 static char *mbuf = NULL;
 static int mbuf_size = 0;
 
-static int nr_divespots = 0;
+static int nr_divespots = -1;
 
 /* helper function to parse the Uemis data structures */
 static void uemis_ts(char *buffer, void *_when)
@@ -116,6 +120,17 @@ static struct dive *uemis_start_dive(uint32_t deviceid)
 	return dive;
 }
 
+static void record_uemis_dive(device_data_t *devdata, struct dive *dive)
+{
+	if (devdata->create_new_trip) {
+		if (!devdata->trip)
+			devdata->trip = create_and_hookup_trip_from_dive(dive);
+		else
+			add_dive_to_trip(dive, devdata->trip);
+	}
+	record_dive(dive);
+}
+
 /* send text to the importer progress bar */
 static void uemis_info(const char *fmt, ...)
 {
@@ -176,7 +191,7 @@ static char *build_filename(const char *path, const char *name)
 	int len = strlen(path) + strlen(name) + 2;
 	char *buf = malloc(len);
 #if WIN32
-	snprintf(buf, len, "%s\%s", path, name);
+	snprintf(buf, len, "%s\\%s", path, name);
 #else
 	snprintf(buf, len, "%s/%s", path, name);
 #endif
@@ -336,6 +351,11 @@ static bool next_file(int max)
 	return true;
 }
 
+/* try and do a quick decode - without trying to get to fancy in case the data
+ * straddles a block boundary...
+ * we are parsing something that looks like this:
+ * object_id{int{2{date{ts{2011-04-05T12:38:04{duration{float{12.000...
+ */
 static char *first_object_id_val(char *buf)
 {
 	char *object, *bufend;
@@ -345,7 +365,7 @@ static char *first_object_id_val(char *buf)
 	object = strstr(buf, "object_id");
 	if (object && object + 14 < bufend) {
 		/* get the value */
-		char tmp[10];
+		char tmp[36];
 		char *p = object + 14;
 		char *t = tmp;
 
@@ -358,6 +378,18 @@ static char *first_object_id_val(char *buf)
 		while (p < bufend && *p != '{' && t < tmp + 9)
 			*t++ = *p++;
 		if (*p == '{') {
+			/* found the object_id - let's quickly look for the date */
+			if (strncmp(p, "{date{ts{", 9) == 0 && strstr(p, "{duration{") != NULL) {
+				/* cool - that was easy */
+				*t++ = ',';
+				*t++ = ' ';
+				/* skip the 9 characters we just found and take the date, ignoring the seconds
+				 * and replace the silly 'T' in the middle with a space */
+				strncpy(t, p + 9, 16);
+				if (*(t + 10) == 'T')
+					*(t + 10) = ' ';
+				t += 16;
+			}
 			*t = '\0';
 			return strdup(tmp);
 		}
@@ -374,9 +406,9 @@ static void show_progress(char *buf, const char *what)
 	if (val) {
 /* let the user know what we are working on */
 #if UEMIS_DEBUG & 2
-		fprintf(debugfile, "reading %s %s\n", what, val);
+		fprintf(stderr, "reading %s %s %s\n", what, val, buf);
 #endif
-		uemis_info(translate("gettextFromC", "Reading %s %s"), what, val);
+		uemis_info(translate("gettextFromC", "%s %s"), what, val);
 		free(val);
 	}
 }
@@ -417,11 +449,11 @@ static bool uemis_get_answer(const char *path, char *request, int n_param_in,
 		answer_in_mbuf = true;
 		str_append_with_delim(sb, "");
 		if (!strcmp(request, "getDivelogs"))
-			what = translate("gettextFromC", "divelog entry id");
+			what = translate("gettextFromC", "divelog #");
 		else if (!strcmp(request, "getDivespot"))
-			what = translate("gettextFromC", "divespot data id");
+			what = translate("gettextFromC", "divespot #");
 		else if (!strcmp(request, "getDive"))
-			what = translate("gettextFromC", "more data dive id");
+			what = translate("gettextFromC", "details for #");
 	}
 	str_append_with_delim(sb, "");
 	file_length = strlen(sb);
@@ -503,7 +535,7 @@ static bool uemis_get_answer(const char *path, char *request, int n_param_in,
 				if (lseek(ans_file, 3, SEEK_CUR) == -1)
 					goto fs_error;
 				buf = malloc(size - 2);
-				if ((r = read(ans_file, buf, size - 3) != size - 3)) {
+				if ((r = read(ans_file, buf, size - 3)) != size - 3) {
 					free(buf);
 					goto fs_error;
 				}
@@ -660,7 +692,7 @@ static void parse_tag(struct dive *dive, char *tag, char *val)
  * index into yet another data store that we read out later. In order to
  * correctly populate the location and gps data from that we need to remember
  * the adresses of those fields for every dive that references the divespot. */
-static void process_raw_buffer(uint32_t deviceid, char *inbuf, char **max_divenr, bool keep_number, int *for_dive)
+static bool process_raw_buffer(device_data_t *devdata, uint32_t deviceid, char *inbuf, char **max_divenr, bool keep_number, int *for_dive)
 {
 	char *buf = strdup(inbuf);
 	char *tp, *bp, *tag, *type, *val;
@@ -672,6 +704,9 @@ static void process_raw_buffer(uint32_t deviceid, char *inbuf, char **max_divenr
 	int s, nr_sections = 0;
 	struct dive *dive = NULL;
 
+#if UEMIS_DEBUG & 4
+	fprintf(debugfile, "p_r_b %s\n", inbuf);
+#endif
 	if (for_dive)
 		*for_dive = -1;
 	bp = buf + 1;
@@ -680,24 +715,36 @@ static void process_raw_buffer(uint32_t deviceid, char *inbuf, char **max_divenr
 		/* this is a divelog */
 		log = true;
 		tp = next_token(&bp);
-		if (strcmp(tp, "1.0") != 0) {
+		/* is it a valid entry or nothing ? */
+		if (strcmp(tp, "1.0") != 0 || strstr(inbuf, "divelog{1.0{{{{")) {
 			free(buf);
-			return;
+			return false;
 		}
 	} else if (strcmp(tp, "dive") == 0) {
 		/* this is dive detail */
 		tp = next_token(&bp);
 		if (strcmp(tp, "1.0") != 0) {
 			free(buf);
-			return;
+			return false;
 		}
 	} else {
 		/* don't understand the buffer */
 		free(buf);
-		return;
+		return false;
 	}
-	if (log)
+	if (log) {
 		dive = uemis_start_dive(deviceid);
+	} else {
+		/* remember, we don't know if this is the right entry,
+		 * so first test if this is even a valid entry */
+		if (strstr(inbuf, "deleted{bool{true")) {
+#if UEMIS_DEBUG & 4
+			fprintf(debugfile, "p_r_b entry deleted\n");
+#endif
+			/* oops, this one isn't valid, suggest to try the previous one */
+			return false;
+		}
+	}
 	while (!done) {
 		/* the valid buffer ends with a series of delimiters */
 		if (bp >= endptr - 2 || !strcmp(bp, "{{"))
@@ -732,7 +779,7 @@ static void process_raw_buffer(uint32_t deviceid, char *inbuf, char **max_divenr
 				dive->number = atoi(val);
 		} else if (!log && !strcmp(tag, "logfilenr")) {
 			/* this one tells us which dive we are adding data to */
-			dive = get_dive_by_diveid(atoi(val), deviceid);
+			dive = get_dive_by_uemis_diveid(atoi(val), deviceid);
 			if (for_dive)
 				*for_dive = atoi(val);
 		} else if (!log && dive && !strcmp(tag, "divespot_id")) {
@@ -748,21 +795,23 @@ static void process_raw_buffer(uint32_t deviceid, char *inbuf, char **max_divenr
 		 * be a short read because of some error */
 		if (done && ++bp < endptr && *bp != '{' && strstr(bp, "{{")) {
 			done = false;
-			record_dive(dive);
+			record_uemis_dive(devdata, dive);
 			mark_divelist_changed(true);
 			dive = uemis_start_dive(deviceid);
 		}
 	}
 	if (log) {
 		if (dive->dc.diveid) {
-			record_dive(dive);
+			record_uemis_dive(devdata, dive);
 			mark_divelist_changed(true);
 		} else { /* partial dive */
 			free(dive);
+			free(buf);
+			return false;
 		}
 	}
 	free(buf);
-	return;
+	return true;
 }
 
 static char *uemis_get_divenr(char *deviceidstr)
@@ -772,24 +821,26 @@ static char *uemis_get_divenr(char *deviceidstr)
 	char divenr[10];
 
 	deviceid = atoi(deviceidstr);
-	for (i = 0; i < dive_table.nr; i++) {
-		struct divecomputer *dc = &dive_table.dives[i]->dc;
-		while (dc) {
+	struct dive *d;
+	for_each_dive (i, d) {
+		struct divecomputer *dc;
+		for_each_dc(d, dc) {
 			if (dc->model && !strcmp(dc->model, "Uemis Zurich") &&
 			    (dc->deviceid == 0 || dc->deviceid == 0x7fffffff || dc->deviceid == deviceid) &&
 			    dc->diveid > maxdiveid)
 				maxdiveid = dc->diveid;
-			dc = dc->next;
 		}
 	}
 	snprintf(divenr, 10, "%d", maxdiveid);
 	return strdup(divenr);
 }
 
-const char *do_uemis_import(const char *mountpath, short force_download)
+const char *do_uemis_import(device_data_t *data)
 {
+	const char *mountpath = data->devname;
+	short force_download = data->force_download;
 	char *newmax = NULL;
-	int start, end, i, offset;
+	int start, end = -2, i, offset;
 	uint32_t deviceidnr;
 	char objectid[10];
 	char *deviceid = NULL;
@@ -827,12 +878,20 @@ const char *do_uemis_import(const char *mountpath, short force_download)
 		newmax = strdup("0");
 	start = atoi(newmax);
 	for (;;) {
+#if UEMIS_DEBUG & 4
+		fprintf(debugfile, "d_u_i inner loop start %d end %d newmax %s\n", start, end, newmax);
+#endif
 		param_buff[2] = newmax;
 		param_buff[3] = 0;
 		success = uemis_get_answer(mountpath, "getDivelogs", 3, 0, &result);
 		/* process the buffer we have assembled */
 		if (mbuf)
-			process_raw_buffer(deviceidnr, mbuf, &newmax, keep_number, NULL);
+			if (!process_raw_buffer(data, deviceidnr, mbuf, &newmax, keep_number, NULL)) {
+				/* if no dives were downloaded, mark end appropriately */
+				if (end == -2)
+					end = start - 1;
+				success = false;
+			}
 		if (once) {
 			char *t = first_object_id_val(mbuf);
 			if (t && atoi(t) > start)
@@ -840,6 +899,9 @@ const char *do_uemis_import(const char *mountpath, short force_download)
 			free(t);
 			once = false;
 		}
+#if UEMIS_DEBUG & 4
+		fprintf(debugfile, "d_u_i after download and parse start %d end %d newmax %s\n", start, end, newmax);
+#endif
 		/* if the user clicked cancel, exit gracefully */
 		if (import_thread_cancelled)
 			goto bail;
@@ -855,8 +917,10 @@ const char *do_uemis_import(const char *mountpath, short force_download)
 		endptr = strstr(mbuf, "{{{");
 		if (endptr)
 			*(endptr + 2) = '\0';
+		/* last object_id we parsed */
+		sscanf(newmax, "%d", &end);
 	}
-	if (sscanf(newmax, "%d", &end) != 1)
+	if (end == -2 && sscanf(newmax, "%d", &end) != 1)
 		end = start;
 #if UEMIS_DEBUG & 2
 	fprintf(debugfile, "done: read from object_id %d to %d\n", start, end);
@@ -877,13 +941,22 @@ const char *do_uemis_import(const char *mountpath, short force_download)
 		success = uemis_get_answer(mountpath, "getDive", 3, 0, &result);
 		if (mbuf) {
 			int divenr;
-			process_raw_buffer(deviceidnr, mbuf, &newmax, false, &divenr);
-			if (divenr > -1 && divenr != i) {
-				offset = i - divenr;
+			(void)process_raw_buffer(data, deviceidnr, mbuf, &newmax, false, &divenr);
 #if UEMIS_DEBUG & 2
-				fprintf(debugfile, "got dive %d -> trying again with offset %d\n", divenr, offset);
+			fprintf(debugfile, "got dive %d, looking for dive %d\n", divenr, i);
+#endif
+			if (divenr != i) {
+				if (divenr == -1) {
+					offset--;
+				} else {
+					offset += i - divenr;
+				}
+#if UEMIS_DEBUG & 2
+				fprintf(debugfile, " -> trying again with offset %d\n", offset);
 #endif
 				i = start - 1;
+				if (i + offset < 0)
+					break;
 				continue;
 			}
 		}

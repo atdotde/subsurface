@@ -8,7 +8,10 @@
   <xsl:param name="po2Field" select="po2Field"/>
   <xsl:param name="cnsField" select="cnsField"/>
   <xsl:param name="otuField" select="otuField"/>
+  <xsl:param name="ndlField" select="ndlField"/>
+  <xsl:param name="ttsField" select="ttsField"/>
   <xsl:param name="stopdepthField" select="stopdepthField"/>
+  <xsl:param name="pressureField" select="pressureField"/>
   <xsl:param name="date" select="date"/>
   <xsl:param name="time" select="time"/>
   <xsl:param name="units" select="units"/>
@@ -102,6 +105,11 @@
                 </xsl:with-param>
               </xsl:call-template>
             </xsl:when>
+            <xsl:when test="substring-after(substring-after($value, ':'), ':') = ''">
+              <!-- We assume time format m:s -->
+
+              <xsl:value-of select="substring-before($value, ':') * 60 + substring-after($value, ':')" />
+            </xsl:when>
             <xsl:otherwise>
               <!-- We assume time format h:m:s -->
 
@@ -177,6 +185,24 @@
           </xsl:attribute>
         </xsl:if>
 
+        <xsl:if test="$ndlField >= 0">
+          <xsl:attribute name="ndl">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$ndlField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$ttsField >= 0">
+          <xsl:attribute name="tts">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$ttsField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
+          </xsl:attribute>
+        </xsl:if>
+
         <xsl:if test="$stopdepthField >= 0">
           <xsl:variable name="stopdepth">
             <xsl:call-template name="getFieldByIndex">
@@ -200,6 +226,15 @@
               <xsl:when test="$stopdepth > 0">1</xsl:when>
               <xsl:otherwise>0</xsl:otherwise>
             </xsl:choose>
+          </xsl:attribute>
+        </xsl:if>
+
+        <xsl:if test="$pressureField >= 0">
+          <xsl:attribute name="pressure">
+            <xsl:call-template name="getFieldByIndex">
+              <xsl:with-param name="index" select="$pressureField"/>
+              <xsl:with-param name="line" select="$line"/>
+            </xsl:call-template>
           </xsl:attribute>
         </xsl:if>
       </sample>

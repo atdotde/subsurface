@@ -1,11 +1,12 @@
 #include "tagwidget.h"
 #include <QPair>
-#include <QDebug>
 #include <QAbstractItemView>
 #include <QSettings>
+#include <QCompleter>
 #include <QFont>
+#include "mainwindow.h"
 
-TagWidget::TagWidget(QWidget *parent) : GroupedLineEdit(parent), m_completer(NULL)
+TagWidget::TagWidget(QWidget *parent) : GroupedLineEdit(parent), m_completer(NULL), lastFinishedTag(false)
 {
 	connect(this, SIGNAL(cursorPositionChanged()), this, SLOT(reparse()));
 	connect(this, SIGNAL(textChanged()), this, SLOT(reparse()));
@@ -18,7 +19,7 @@ TagWidget::TagWidget(QWidget *parent) : GroupedLineEdit(parent), m_completer(NUL
 		addColor(QColor(Qt::red).lighter(120));
 		addColor(QColor(Qt::green).lighter(120));
 		addColor(QColor(Qt::blue).lighter(120));
-	} else if (l <= 0.6) { // moderated dark text. get a somewhat brigth background
+	} else if (l <= 0.6) { // moderated dark text. get a somewhat bright background
 		addColor(QColor(Qt::red).lighter(60));
 		addColor(QColor(Qt::green).lighter(60));
 		addColor(QColor(Qt::blue).lighter(60));
@@ -66,50 +67,17 @@ QPair<int, int> TagWidget::getCursorTagPosition()
 	return qMakePair(start, end);
 }
 
-enum ParseState {
-	FINDSTART,
-	FINDEND
-};
-
 void TagWidget::highlight()
 {
-	int i = 0, start = 0, end = 0;
-	ParseState state = FINDEND;
 	removeAllBlocks();
-
-	while (i < text().length()) {
-		if (text().at(i) == ',') {
-			if (state == FINDSTART) {
-				/* Detect empty tags */
-			} else if (state == FINDEND) {
-				/* Found end of tag */
-				if (i > 1) {
-					if (text().at(i - 1) != '\\') {
-						addBlock(start, end);
-						state = FINDSTART;
-					}
-				} else {
-					state = FINDSTART;
-				}
-			}
-		} else if (text().at(i) == ' ') {
-			/* Handled */
-		} else {
-			/* Found start of tag */
-			if (state == FINDSTART) {
-				state = FINDEND;
-				start = i;
-			} else if (state == FINDEND) {
-				end = i;
-			}
-		}
-		i++;
-	}
-	if (state == FINDEND) {
-		if (end < start)
-			end = text().length() - 1;
-		if (text().length() > 0)
-			addBlock(start, end);
+	int lastPos = 0;
+	Q_FOREACH (const QString& s, text().split(QChar(','), QString::SkipEmptyParts)) {
+		QString trimmed = s.trimmed();
+		if (trimmed.isEmpty())
+			continue;
+		int start = text().indexOf(trimmed, lastPos);
+		addBlock(start, trimmed.size() + start);
+		lastPos = trimmed.size() + start;
 	}
 }
 
@@ -137,13 +105,13 @@ void TagWidget::reparse()
 	}
 }
 
-void TagWidget::completionSelected(const QString& completion)
+void TagWidget::completionSelected(const QString &completion)
 {
 	completionHighlighted(completion);
 	emit textChanged();
 }
 
-void TagWidget::completionHighlighted(const QString& completion)
+void TagWidget::completionHighlighted(const QString &completion)
 {
 	QPair<int, int> pos = getCursorTagPosition();
 	setText(text().remove(pos.first, pos.second - pos.first).insert(pos.first, completion));
@@ -157,7 +125,7 @@ void TagWidget::setCursorPosition(int position)
 	blockSignals(false);
 }
 
-void TagWidget::setText(const QString& text)
+void TagWidget::setText(const QString &text)
 {
 	blockSignals(true);
 	GroupedLineEdit::setText(text);
@@ -176,6 +144,7 @@ void TagWidget::keyPressEvent(QKeyEvent *e)
 {
 	QPair<int, int> pos;
 	QAbstractItemView *popup;
+	bool finishedTag = false;
 	switch (e->key()) {
 	case Qt::Key_Escape:
 		pos = getCursorTagPosition();
@@ -183,7 +152,7 @@ void TagWidget::keyPressEvent(QKeyEvent *e)
 			setText(text().remove(pos.first, pos.second - pos.first));
 			setCursorPosition(pos.first);
 		}
-		popup= m_completer->popup();
+		popup = m_completer->popup();
 		if (popup)
 			popup->hide();
 		return;
@@ -199,18 +168,38 @@ void TagWidget::keyPressEvent(QKeyEvent *e)
 			if (popup)
 				popup->hide();
 		}
+		finishedTag = true;
+		break;
+	case Qt::Key_Comma: { /* if this is the last key, and the previous string is empty, ignore the comma. */
+		QString temp = text();
+		if (temp.split(QChar(',')).last().trimmed().isEmpty()){
+			e->ignore();
+			return;
+		}
+	  }
 	}
-	if (e->key() == Qt::Key_Tab || e->key() == Qt::Key_Return) { // let's pretend this is a comma instead
+	if (e->key() == Qt::Key_Tab && lastFinishedTag) {		    // if we already end in comma, go to next/prev field
+		MainWindow::instance()->information()->nextInputField(e);   // by sending the key event to the MainTab widget
+	} else if (e->key() == Qt::Key_Tab || e->key() == Qt::Key_Return) { // otherwise let's pretend this is a comma instead
 		QKeyEvent fakeEvent(e->type(), Qt::Key_Comma, e->modifiers(), QString(","));
-		GroupedLineEdit::keyPressEvent(&fakeEvent);
+		keyPressEvent(&fakeEvent);
 	} else {
 		GroupedLineEdit::keyPressEvent(e);
 	}
+	lastFinishedTag = finishedTag;
 }
 
 void TagWidget::wheelEvent(QWheelEvent *event)
 {
 	if (hasFocus()) {
 		GroupedLineEdit::wheelEvent(event);
+	}
+}
+
+void TagWidget::fixPopupPosition(int delta)
+{
+	if(m_completer->popup()->isVisible()){
+		QRect toGlobal = m_completer->popup()->geometry();
+		m_completer->popup()->setGeometry(toGlobal.x(), toGlobal.y() + delta +10, toGlobal.width(), toGlobal.height());
 	}
 }

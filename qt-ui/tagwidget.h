@@ -2,8 +2,9 @@
 #define TAGWIDGET_H
 
 #include "groupedlineedit.h"
-#include <QCompleter>
 #include <QPair>
+
+class QCompleter;
 
 class TagWidget : public GroupedLineEdit {
 	Q_OBJECT
@@ -12,21 +13,22 @@ public:
 	void setCompleter(QCompleter *completer);
 	QPair<int, int> getCursorTagPosition();
 	void highlight();
-	void setText(const QString& text);
+	void setText(const QString &text);
 	void clear();
 	void setCursorPosition(int position);
 	void wheelEvent(QWheelEvent *event);
+	void fixPopupPosition(int delta);
 public
 slots:
 	void reparse();
-	void completionSelected(const QString& text);
-	void completionHighlighted(const QString& text);
+	void completionSelected(const QString &text);
+	void completionHighlighted(const QString &text);
 
 protected:
 	void keyPressEvent(QKeyEvent *e);
-
 private:
 	QCompleter *m_completer;
+	bool lastFinishedTag;
 };
 
 #endif // TAGWIDGET_H

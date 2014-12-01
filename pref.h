@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include "units.h"
+
 /* can't use 'bool' for the boolean values - different size in C and C++ */
 typedef struct
 {
@@ -23,7 +25,7 @@ struct preferences {
 	double font_size;
 	partial_pressure_graphs_t pp_graphs;
 	short mod;
-	double modppO2;
+	double modpO2;
 	short ead;
 	short dcceiling;
 	short redceiling;
@@ -33,7 +35,7 @@ struct preferences {
 	short calcndltts;
 	short gflow;
 	short gfhigh;
-	short animation;
+	int animation_speed;
 	bool gf_low_at_maxdepth;
 	short display_invalid_dives;
 	short unit_system;
@@ -43,8 +45,32 @@ struct preferences {
 	short show_average_depth;
 	short zoomed_plot;
 	short hrgraph;
+	short percentagegraph;
+	short rulergraph;
+	short tankbar;
 	short save_userid_local;
 	char *userid;
+	int ascrate75;
+	int ascrate50;
+	int ascratestops;
+	int ascratelast6m;
+	int descrate;
+	int bottompo2;
+	int decopo2;
+	int proxy_type;
+	char *proxy_host;
+	int proxy_port;
+	short proxy_auth;
+	char *proxy_user;
+	char *proxy_pass;
+	bool doo2breaks;
+	bool drop_stone_mode;
+	int bottomsac;
+	int decosac;
+	int o2consumption; // ml per min
+	int pscr_ratio; // dump ratio times 1000
+	bool show_pictures_in_profile;
+	bool use_default_file;
 };
 enum unit_system_values {
 	METRIC,
@@ -56,16 +82,11 @@ extern struct preferences prefs, default_prefs;
 
 #define PP_GRAPHS_ENABLED (prefs.pp_graphs.po2 || prefs.pp_graphs.pn2 || prefs.pp_graphs.phe)
 
-extern void subsurface_set_conf(const char *name, const char *value);
-extern void subsurface_set_conf_bool(const char *name, bool value);
-extern void subsurface_set_conf_int(const char *name, int value);
-
-extern const char system_divelist_default_font[];
-extern const int system_divelist_default_font_size;
+extern const char *system_divelist_default_font;
+extern double system_divelist_default_font_size;
 extern const char *system_default_filename();
-
-extern void load_preferences(void);
-extern void save_preferences(void);
+extern bool subsurface_ignore_font(const char *font);
+extern void subsurface_OS_pref_setup();
 
 #ifdef __cplusplus
 }

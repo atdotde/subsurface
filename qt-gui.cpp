@@ -29,7 +29,6 @@
 #include <QSettings>
 #include <QDesktopWidget>
 #include <QStyle>
-#include <QDebug>
 #include <QMap>
 #include <QMultiMap>
 #include <QNetworkProxy>
@@ -48,18 +47,12 @@ static MainWindow *window = NULL;
 
 int error_count;
 const char *existing_filename;
+static QString shortDateFormat;
+static QString dateFormat;
+static QString timeFormat;
+static QLocale loc;
 
-const char *getSetting(QSettings &s, QString name)
-{
-	QVariant v;
-	v = s.value(name);
-	if (v.isValid()) {
-		return strdup(v.toString().toUtf8().data());
-	}
-	return NULL;
-}
-
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && QT_VERSION < 0x050000
 static QByteArray encodeUtf8(const QString &fname)
 {
 	return fname.toUtf8();
@@ -76,36 +69,15 @@ void init_qt(int *argcp, char ***argvp)
 	application = new QApplication(*argcp, *argvp);
 }
 
-void init_ui(void)
+QString uiLanguage(QLocale *callerLoc)
 {
-	QVariant v;
-	// tell Qt to use system proxies
-	// note: on Linux, "system" == "environment variables"
-	QNetworkProxyFactory::setUseSystemConfiguration(true);
-
-#if QT_VERSION < 0x050000
-	// ask QString in Qt 4 to interpret all char* as UTF-8,
-	// like Qt 5 does.
-	// 106 is "UTF-8", this is faster than lookup by name
-	// [http://www.iana.org/assignments/character-sets/character-sets.xml]
-	QTextCodec::setCodecForCStrings(QTextCodec::codecForMib(106));
-#ifdef Q_OS_WIN
-	QFile::setDecodingFunction(decodeUtf8);
-	QFile::setEncodingFunction(encodeUtf8);
-#endif
-#endif
-	QCoreApplication::setOrganizationName("Subsurface");
-	QCoreApplication::setOrganizationDomain("subsurface.hohndel.org");
-	QCoreApplication::setApplicationName("Subsurface");
-	// find plugins installed in the application directory (without this SVGs don't work on Windows)
-	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
-
 	QSettings s;
 	s.beginGroup("Language");
-	QLocale loc;
 
 	if (!s.value("UseSystemLanguage", true).toBool()) {
 		loc = QLocale(s.value("UiLanguage", QLocale().uiLanguages().first()).toString());
+	} else {
+		loc = QLocale(QLocale().uiLanguages().first());
 	}
 
 	QString uiLang = loc.uiLanguages().first();
@@ -117,11 +89,73 @@ void init_ui(void)
 		loc = loc2;
 		uiLang = loc2.uiLanguages().first();
 	}
+	if (callerLoc)
+		*callerLoc = loc;
+
+	// the short format is fine
+	// the long format uses long weekday and month names, so replace those with the short ones
+	// for time we don't want the time zone designator and don't want leading zeroes on the hours
+	shortDateFormat = loc.dateFormat(QLocale::ShortFormat);
+	dateFormat = loc.dateFormat(QLocale::LongFormat);
+	dateFormat.replace("dddd,", "ddd").replace("dddd", "ddd").replace("MMMM", "MMM");
+	// special hack for Swedish as our switching from long weekday names to short weekday names
+	// messes things up there
+	dateFormat.replace("'en' 'den' d:'e'", " d");
+	timeFormat = loc.timeFormat();
+	timeFormat.replace("(t)", "").replace(" t", "").replace("t", "").replace("hh", "h").replace("HH", "H").replace("'kl'.", "");
+	timeFormat.replace(".ss", "").replace(":ss", "").replace("ss", "");
+	return uiLang;
+}
+
+QLocale getLocale()
+{
+	return loc;
+}
+
+QString getDateFormat()
+{
+	return dateFormat;
+}
+
+void init_ui(void)
+{
+	// tell Qt to use system proxies
+	// note: on Linux, "system" == "environment variables"
+	QNetworkProxyFactory::setUseSystemConfiguration(true);
+
+#if QT_VERSION < 0x050000
+	// ask QString in Qt 4 to interpret all char* as UTF-8,
+	// like Qt 5 does.
+	// 106 is "UTF-8", this is faster than lookup by name
+	// [http://www.iana.org/assignments/character-sets/character-sets.xml]
+	QTextCodec::setCodecForCStrings(QTextCodec::codecForMib(106));
+	// and for reasons I can't understand, I need to do the same again for tr
+	// even though that clearly uses C strings as well...
+	QTextCodec::setCodecForTr(QTextCodec::codecForMib(106));
+#ifdef Q_OS_WIN
+	QFile::setDecodingFunction(decodeUtf8);
+	QFile::setEncodingFunction(encodeUtf8);
+#endif
+#else
+	// for Win32 and Qt5 we try to set the locale codec to UTF-8.
+	// this makes QFile::encodeName() work.
+#ifdef Q_OS_WIN
+	QTextCodec::setCodecForLocale(QTextCodec::codecForMib(106));
+#endif
+#endif
+	QCoreApplication::setOrganizationName("Subsurface");
+	QCoreApplication::setOrganizationDomain("subsurface.hohndel.org");
+	QCoreApplication::setApplicationName("Subsurface");
+	// find plugins installed in the application directory (without this SVGs don't work on Windows)
+	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
+	QLocale loc;
+	QString uiLang = uiLanguage(&loc);
+	QLocale::setDefault(loc);
 
 	// we don't have translations for English - if we don't check for this
 	// Qt will proceed to load the second language in preference order - not what we want
 	// on Linux this tends to be en-US, but on the Mac it's just en
-	if (!uiLang.startsWith("en")) {
+	if (!uiLang.startsWith("en") || uiLang.startsWith("en-GB")) {
 		qtTranslator = new QTranslator;
 		if (qtTranslator->load(loc, "qt", "_", QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
 			application->installTranslator(qtTranslator);
@@ -137,15 +171,7 @@ void init_ui(void)
 			qDebug() << "can't find Subsurface localization for locale" << uiLang;
 		}
 	}
-
-	s.beginGroup("DiveComputer");
-	default_dive_computer_vendor = getSetting(s, "dive_computer_vendor");
-	default_dive_computer_product = getSetting(s, "dive_computer_product");
-	default_dive_computer_device = getSetting(s, "dive_computer_device");
-	s.endGroup();
-
 	window = new MainWindow();
-	window->loadRecentFiles(&s);
 	if (existing_filename && existing_filename[0] != '\0')
 		window->setTitle(MWTF_FILENAME);
 	else
@@ -162,10 +188,8 @@ void exit_ui(void)
 {
 	delete window;
 	delete application;
-	if (existing_filename)
-		free((void *)existing_filename);
-	if (default_dive_computer_device)
-		free((void *)default_dive_computer_device);
+	free((void *)existing_filename);
+	free((void *)default_dive_computer_device);
 }
 
 void set_filename(const char *filename, bool force)
@@ -182,9 +206,8 @@ void set_filename(const char *filename, bool force)
 const QString get_dc_nickname(const char *model, uint32_t deviceid)
 {
 	const DiveComputerNode *existNode = dcList.getExact(model, deviceid);
-	if (!existNode)
-		return QString();
-	else if (!existNode->nickName.isEmpty())
+
+	if (existNode && !existNode->nickName.isEmpty())
 		return existNode->nickName;
 	else
 		return model;
@@ -197,7 +220,7 @@ QString get_depth_string(int mm, bool showunit, bool showdecimal)
 		return QString("%1%2").arg(meters, 0, 'f', (showdecimal && meters < 20.0) ? 1 : 0).arg(showunit ? translate("gettextFromC", "m") : "");
 	} else {
 		double feet = mm_to_feet(mm);
-		return QString("%1%2").arg(feet, 0, 'f', showdecimal ? 1 : 0).arg(showunit ? translate("gettextFromC", "ft") : "");
+		return QString("%1%2").arg(feet, 0, 'f', 0).arg(showunit ? translate("gettextFromC", "ft") : "");
 	}
 }
 
@@ -285,25 +308,27 @@ QString get_temp_unit()
 		return QString(UTF8_DEGREE "F");
 }
 
-QString get_volume_string(volume_t volume, bool showunit, unsigned int mbar)
+QString get_volume_string(volume_t volume, bool showunit, int mbar)
 {
-	if (prefs.units.volume == units::LITER) {
-		double liter = volume.mliter / 1000.0;
-		return QString("%1%2").arg(liter, 0, 'f', liter >= 40.0 ? 0 : 1).arg(showunit ? translate("gettextFromC", "l") : "");
-	} else {
-		double cuft = ml_to_cuft(volume.mliter);
-		if (mbar)
-			cuft *= bar_to_atm(mbar / 1000.0);
-		return QString("%1%2").arg(cuft, 0, 'f', cuft >= 20.0 ? 0 : (cuft >= 2.0 ? 1 : 2)).arg(showunit ? translate("gettextFromC", "cuft") : "");
+	const char *unit;
+	int decimals;
+	double value = get_volume_units(volume.mliter, &decimals, &unit);
+	if (mbar) {
+		// we are showing a tank size
+		// fix the weird imperial way of denominating size and provide
+		// reasonable number of decimals
+		if (prefs.units.volume == units::CUFT)
+			value *= bar_to_atm(mbar / 1000.0);
+		decimals = (value > 20.0) ? 0 : (value > 2.0) ? 1 : 2;
 	}
+	return QString("%1%2").arg(value, 0, 'f', decimals).arg(showunit ? unit : "");
 }
 
 QString get_volume_unit()
 {
-	if (prefs.units.volume == units::LITER)
-		return "l";
-	else
-		return "cuft";
+	const char *unit;
+	(void) get_volume_units(0, NULL, &unit);
+	return QString(unit);
 }
 
 QString get_pressure_string(pressure_t pressure, bool showunit)
@@ -356,10 +381,14 @@ QString getSubsurfaceDataPath(QString folderToFind)
 	return QString("");
 }
 
-int gettimezoneoffset()
+int gettimezoneoffset(timestamp_t when)
 {
-	QDateTime dt1 = QDateTime::currentDateTime();
-	QDateTime dt2 = dt1.toUTC();
+	QDateTime dt1, dt2;
+	if (when == 0)
+		dt1 = QDateTime::currentDateTime();
+	else
+		dt1 = QDateTime::fromMSecsSinceEpoch(when * 1000);
+	dt2 = dt1.toUTC();
 	dt1.setTimeSpec(Qt::UTC);
 	return dt2.secsTo(dt1);
 }
@@ -369,7 +398,7 @@ int parseTemperatureToMkelvin(const QString &text)
 	int mkelvin;
 	QString numOnly = text;
 	numOnly.replace(",", ".").remove(QRegExp("[^-0-9.]"));
-	if (numOnly == "")
+	if (numOnly.isEmpty())
 		return 0;
 	double number = numOnly.toDouble();
 	switch (prefs.units.temperature) {
@@ -387,27 +416,22 @@ int parseTemperatureToMkelvin(const QString &text)
 
 QString get_dive_date_string(timestamp_t when)
 {
-	struct tm tm;
-	utc_mkdate(when, &tm);
-	return translate("gettextFromC", "%1, %2 %3, %4 %5:%6")
-	    .arg(weekday(tm.tm_wday))
-	    .arg(monthname(tm.tm_mon))
-	    .arg(tm.tm_mday)
-	    .arg(tm.tm_year + 1900)
-	    .arg(tm.tm_hour, 2, 10, QChar('0'))
-	    .arg(tm.tm_min, 2, 10, QChar('0'));
+	QDateTime ts;
+	ts.setMSecsSinceEpoch(when * 1000L);
+	return loc.toString(ts.toUTC(), dateFormat + " " + timeFormat);
 }
 
 QString get_short_dive_date_string(timestamp_t when)
 {
-	struct tm tm;
-	utc_mkdate(when, &tm);
-	return translate("gettextFromC", "%1 %2, %3\n%4:%5")
-	    .arg(monthname(tm.tm_mon))
-	    .arg(tm.tm_mday)
-	    .arg(tm.tm_year + 1900)
-	    .arg(tm.tm_hour, 2, 10, QChar('0'))
-	    .arg(tm.tm_min, 2, 10, QChar('0'));
+	QDateTime ts;
+	ts.setMSecsSinceEpoch(when * 1000L);
+	return loc.toString(ts.toUTC(), shortDateFormat + " " + timeFormat);
+}
+
+const char *get_dive_date_c_string(timestamp_t when)
+{
+	QString text = get_dive_date_string(when);
+	return strdup(text.toUtf8().data());
 }
 
 QString get_trip_date_string(timestamp_t when, int nr)
@@ -416,11 +440,11 @@ QString get_trip_date_string(timestamp_t when, int nr)
 	utc_mkdate(when, &tm);
 	if (nr != 1)
 		return translate("gettextFromC", "%1 %2 (%3 dives)")
-		    .arg(monthname(tm.tm_mon))
-		    .arg(tm.tm_year + 1900)
-		    .arg(nr);
+			.arg(monthname(tm.tm_mon))
+			.arg(tm.tm_year + 1900)
+			.arg(nr);
 	else
 		return translate("gettextFromC", "%1 %2 (1 dive)")
-		    .arg(monthname(tm.tm_mon))
-		    .arg(tm.tm_year + 1900);
+			.arg(monthname(tm.tm_mon))
+			.arg(tm.tm_year + 1900);
 }

@@ -10,7 +10,6 @@
 #include "ui_webservices.h"
 
 class QAbstractButton;
-class QNetworkReply;
 class QHttpMultiPart;
 
 class WebServices : public QDialog {
@@ -44,6 +43,7 @@ protected:
 	QTimer timeout;
 	QByteArray downloadedData;
 	QString defaultApplyText;
+	QString userAgent;
 };
 
 class SubsurfaceWebServices : public WebServices {
@@ -71,7 +71,7 @@ class DivelogsDeWebServices : public WebServices {
 public:
 	static DivelogsDeWebServices *instance();
 	void downloadDives();
-	void prepareDivesForUpload();
+	void prepareDivesForUpload(bool selected);
 
 private
 slots:
@@ -96,6 +96,20 @@ private:
 	QHttpMultiPart *multipart;
 	QTemporaryFile zipFile;
 	bool uploadMode;
+};
+
+class UserSurveyServices : public WebServices {
+	Q_OBJECT
+public:
+	QNetworkReply* sendSurvey(QString values);
+	explicit UserSurveyServices(QWidget *parent = 0, Qt::WindowFlags f = 0);
+private
+slots:
+	// need to declare them as no ops or Qt4 is unhappy
+	virtual void startDownload() { }
+	virtual void startUpload() { }
+	virtual void buttonClicked(QAbstractButton *button) { }
+
 };
 
 #ifdef __cplusplus

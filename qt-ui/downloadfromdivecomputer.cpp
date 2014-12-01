@@ -1,9 +1,10 @@
 #include "downloadfromdivecomputer.h"
-
+#include "../divecomputer.h"
 #include "../libdivecomputer.h"
 #include "../helpers.h"
 #include "../display.h"
 #include "../divelist.h"
+
 #include "mainwindow.h"
 #include <cstdlib>
 #include <QThread>
@@ -33,8 +34,7 @@ struct mydescriptor {
 	unsigned int model;
 };
 
-namespace DownloadFromDcGlobal
-{
+namespace DownloadFromDcGlobal {
 	const char *err_string;
 };
 
@@ -55,7 +55,6 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget *parent, Qt::WindowFlags f) :
 
 	progress_bar_text = "";
 
-	fill_device_list();
 	fill_computer_list();
 
 	ui.chooseDumpFile->setEnabled(ui.dumpToFile->isChecked());
@@ -73,7 +72,6 @@ DownloadFromDCWidget::DownloadFromDCWidget(QWidget *parent, Qt::WindowFlags f) :
 		if (default_dive_computer_product)
 			ui.product->setCurrentIndex(ui.product->findText(default_dive_computer_product));
 	}
-	connect(ui.product, SIGNAL(currentIndexChanged(int)), this, SLOT(on_product_currentIndexChanged()), Qt::UniqueConnection);
 	if (default_dive_computer_device)
 		ui.device->setEditText(default_dive_computer_device);
 
@@ -93,8 +91,8 @@ void DownloadFromDCWidget::updateProgressBar()
 		ui.progressBar->setFormat(progress_bar_text);
 	} else {
 		ui.progressBar->setFormat("%p%");
-		ui.progressBar->setValue(progress_bar_fraction * 100);
 	}
+	ui.progressBar->setValue(progress_bar_fraction * 100);
 }
 
 void DownloadFromDCWidget::updateState(states state)
@@ -103,7 +101,7 @@ void DownloadFromDCWidget::updateState(states state)
 		return;
 
 	if (state == INITIAL) {
-		fill_device_list();
+		fill_device_list(DC_TYPE_OTHER);
 		ui.progressBar->hide();
 		markChildrenAsEnabled();
 		timer->stop();
@@ -175,6 +173,7 @@ void DownloadFromDCWidget::updateState(states state)
 
 void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString &vendor)
 {
+	int dcType = DC_TYPE_SERIAL;
 	QAbstractItemModel *currentModel = ui.product->model();
 	if (!currentModel)
 		return;
@@ -182,15 +181,19 @@ void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString &vendor)
 	productModel = new QStringListModel(productList[vendor]);
 	ui.product->setModel(productModel);
 
+	if (vendor == QString("Uemis"))
+		dcType = DC_TYPE_UEMIS;
+	fill_device_list(dcType);
+
 	// Memleak - but deleting gives me a crash.
 	//currentModel->deleteLater();
 }
 
-void DownloadFromDCWidget::on_product_currentIndexChanged()
+void DownloadFromDCWidget::on_product_currentIndexChanged(const QString &product)
 {
 	// Set up the DC descriptor
 	dc_descriptor_t *descriptor = NULL;
-	descriptor = descriptorLookup[ui.vendor->currentText() + ui.product->currentText()];
+	descriptor = descriptorLookup[ui.vendor->currentText() + product];
 
 	// call dc_descriptor_get_transport to see if the dc_transport_t is DC_TRANSPORT_SERIAL
 	if (dc_descriptor_get_transport(descriptor) == DC_TRANSPORT_SERIAL) {
@@ -242,7 +245,7 @@ void DownloadFromDCWidget::fill_computer_list()
 	if (!productList["Uemis"].contains("Zurich"))
 		productList["Uemis"].push_back("Zurich");
 
-	descriptorLookup[QString("UemisZurich")] = (dc_descriptor_t *)mydescriptor;
+	descriptorLookup["UemisZurich"] = (dc_descriptor_t *)mydescriptor;
 
 	qSort(vendorList);
 }
@@ -254,7 +257,6 @@ void DownloadFromDCWidget::on_search_clicked()
 								    tr("Find Uemis dive computer"),
 								    QDir::homePath(),
 								    QFileDialog::ShowDirsOnly);
-		qDebug() << dirName;
 		if (ui.device->findText(dirName) == -1)
 			ui.device->addItem(dirName);
 		ui.device->setEditText(dirName);
@@ -282,6 +284,8 @@ void DownloadFromDCWidget::on_ok_clicked()
 
 	data.descriptor = descriptorLookup[ui.vendor->currentText() + ui.product->currentText()];
 	data.force_download = ui.forceDownload->isChecked();
+	data.create_new_trip = ui.createNewTrip->isChecked();
+	data.trip = NULL;
 	data.deviceid = data.diveid = 0;
 	set_default_dive_computer(data.vendor, data.product);
 	set_default_dive_computer_device(data.devname);
@@ -322,8 +326,7 @@ void DownloadFromDCWidget::pickLogFile()
 	logFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer download logfile"),
 					       filename, tr("Log files (*.log)"));
 	if (!logFile.isEmpty()) {
-		if (logfile_name)
-			free(logfile_name);
+		free(logfile_name);
 		logfile_name = strdup(logFile.toUtf8().data());
 	}
 }
@@ -351,8 +354,7 @@ void DownloadFromDCWidget::pickDumpFile()
 	dumpFile = QFileDialog::getSaveFileName(this, tr("Choose file for divecomputer binary dump file"),
 						filename, tr("Dump files (*.bin)"));
 	if (!dumpFile.isEmpty()) {
-		if (dumpfile_name)
-			free(dumpfile_name);
+		free(dumpfile_name);
 		dumpfile_name = strdup(dumpFile.toUtf8().data());
 	}
 }
@@ -380,10 +382,23 @@ void DownloadFromDCWidget::onDownloadThreadFinished()
 			// down in the dive_table
 			for (int i = dive_table.nr - 1; i >= previousLast; i--)
 				delete_single_dive(i);
-		} else {
+		} else if (dive_table.nr) {
+			int uniqId, idx;
+			// remember the last downloaded dive (on most dive computers this will be the chronologically
+			// first new dive) and select it again after processing all the dives
+			MainWindow::instance()->dive_list()->unselectDives();
+			uniqId = get_dive(dive_table.nr - 1)->id;
 			process_dives(true, preferDownloaded());
+			// after process_dives does any merging or resorting needed, we need
+			// to recreate the model for the dive list so we can select the newest dive
+			MainWindow::instance()->recreateDiveList();
+			idx = get_idx_by_uniq_id(uniqId);
+			// this shouldn't be necessary - but there are reports that somehow existing dives stay selected
+			// (but not visible as selected)
+			MainWindow::instance()->dive_list()->unselectDives();
+			MainWindow::instance()->dive_list()->selectDive(idx, true);
 		}
-	} else if (currentState == CANCELLING || currentState == CANCELLED){
+	} else if (currentState == CANCELLING || currentState == CANCELLED) {
 		if (import_thread_cancelled) {
 			// walk backwards so we don't keep moving the dives
 			// down in the dive_table
@@ -400,6 +415,7 @@ void DownloadFromDCWidget::markChildrenAsDisabled()
 	ui.vendor->setDisabled(true);
 	ui.product->setDisabled(true);
 	ui.forceDownload->setDisabled(true);
+	ui.createNewTrip->setDisabled(true);
 	ui.preferDownloaded->setDisabled(true);
 	ui.ok->setDisabled(true);
 	ui.search->setDisabled(true);
@@ -415,6 +431,7 @@ void DownloadFromDCWidget::markChildrenAsEnabled()
 	ui.vendor->setDisabled(false);
 	ui.product->setDisabled(false);
 	ui.forceDownload->setDisabled(false);
+	ui.createNewTrip->setDisabled(false);
 	ui.preferDownloaded->setDisabled(false);
 	ui.ok->setDisabled(false);
 	ui.cancel->setDisabled(false);
@@ -431,11 +448,11 @@ static void fillDeviceList(const char *name, void *data)
 	comboBox->addItem(name);
 }
 
-void DownloadFromDCWidget::fill_device_list()
+void DownloadFromDCWidget::fill_device_list(int dc_type)
 {
 	int deviceIndex;
 	ui.device->clear();
-	deviceIndex = enumerate_devices(fillDeviceList, ui.device);
+	deviceIndex = enumerate_devices(fillDeviceList, ui.device, dc_type);
 	if (deviceIndex >= 0)
 		ui.device->setCurrentIndex(deviceIndex);
 }
@@ -460,7 +477,7 @@ void DownloadThread::run()
 	const char *errorText;
 	import_thread_cancelled = false;
 	if (!strcmp(data->vendor, "Uemis"))
-		errorText = do_uemis_import(data->devname, data->force_download);
+		errorText = do_uemis_import(data);
 	else
 		errorText = do_libdivecomputer_import(data);
 	if (errorText)

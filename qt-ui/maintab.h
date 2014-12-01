@@ -11,31 +11,14 @@
 #include <QDialog>
 #include <QMap>
 
-#include "models.h"
 #include "ui_maintab.h"
 #include "completionmodels.h"
+#include "dive.h"
 
+class WeightModel;
+class CylindersModel;
+class ExtraDataModel;
 class QCompleter;
-struct dive;
-
-struct NotesBackup {
-	QString airtemp;
-	QString watertemp;
-	QString datetime;
-	QString location;
-	QString coordinates;
-	degrees_t latitude;
-	degrees_t longitude;
-	QString notes;
-	QString buddy;
-	QString suit;
-	int rating;
-	int visibility;
-	QString divemaster;
-	QString tags;
-	cylinder_t cylinders[MAX_CYLINDERS];
-	weightsystem_t weightsystem[MAX_WEIGHTSYSTEMS];
-};
 
 struct Completers {
 	QCompleter *location;
@@ -53,7 +36,8 @@ public:
 		DIVE,
 		TRIP,
 		ADD,
-		MANUALLY_ADDED_DIVE
+		MANUALLY_ADDED_DIVE,
+		IGNORE
 	};
 
 	MainTab(QWidget *parent);
@@ -62,18 +46,25 @@ public:
 	void clearInfo();
 	void clearEquipment();
 	void reload();
-	bool eventFilter(QObject *, QEvent *);
 	void initialUiSetup();
 	bool isEditing();
 	void updateCoordinatesText(qreal lat, qreal lon);
+	void nextInputField(QKeyEvent *event);
+	void showAndTriggerEditSelective(struct dive_components what);
+
+signals:
+	void addDiveFinished();
+	void dateTimeChanged();
+
 public
 slots:
 	void addCylinder_clicked();
 	void addWeight_clicked();
-	void updateDiveInfo(int dive = selected_dive);
+	void updateDiveInfo(bool clear = false);
 	void acceptChanges();
 	void rejectChanges();
 	void on_location_textChanged(const QString &text);
+	void on_location_editingFinished();
 	void on_coordinates_textChanged(const QString &text);
 	void on_divemaster_textChanged();
 	void on_buddy_textChanged();
@@ -81,8 +72,9 @@ slots:
 	void on_notes_textChanged();
 	void on_airtemp_textChanged(const QString &text);
 	void on_watertemp_textChanged(const QString &text);
-	void validate_temp_field(QLineEdit *tempField,const QString &text);
-	void on_dateTimeEdit_dateTimeChanged(const QDateTime &datetime);
+	void validate_temp_field(QLineEdit *tempField, const QString &text);
+	void on_dateEdit_dateChanged(const QDate &date);
+	void on_timeEdit_timeChanged(const QTime & time);
 	void on_rating_valueChanged(int value);
 	void on_visibility_valueChanged(int value);
 	void on_tagWidget_textChanged();
@@ -96,31 +88,30 @@ slots:
 	void enableEdition(EditMode newEditMode = NONE);
 	void toggleTriggeredColumn();
 	void updateTextLabels(bool showUnits = true);
-
+	void escDetected(void);
+	void photoDoubleClicked(const QString filePath);
+	void removeSelectedPhotos();
 private:
 	Ui::MainTab ui;
 	WeightModel *weightModel;
 	CylindersModel *cylindersModel;
-	QMap<dive *, NotesBackup> notesBackup;
+	ExtraDataModel *extraDataModel;
 	EditMode editMode;
-
 	BuddyCompletionModel buddyModel;
 	DiveMasterCompletionModel diveMasterModel;
 	LocationCompletionModel locationModel;
 	SuitCompletionModel suitModel;
 	TagCompletionModel tagModel;
-
-	/* since the multi-edition of the equipment is fairly more
-	 * complex than a single item, because it involves a Qt
-	 * Model to edit things, we are copying the first selected
-	 * dive to this structure, making all editions there,
-	 * then applying the changes on the other dives.*/
-	struct dive multiEditEquipmentPlaceholder;
+	DivePictureModel *divePictureModel;
 	Completers completers;
+	bool modified;
+	bool copyPaste;
 	void resetPallete();
 	void saveTags();
-	QString printGPSCoords(int lat, int lon);
 	void updateGpsCoordinates(const struct dive *dive);
+	void markChangedWidget(QWidget *w);
+	dive_trip_t *currentTrip;
+	dive_trip_t displayedTrip;
 };
 
 #endif // MAINTAB_H

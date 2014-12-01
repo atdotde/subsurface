@@ -11,12 +11,13 @@
 #include <QCoreApplication>
 #include <QStringList>
 #include <QStringListModel>
+#include <QSortFilterProxyModel>
+
+#include "metrics.h"
 
 #include "../dive.h"
 #include "../divelist.h"
-#include "../qthelper.h"
-
-QFont defaultModelFont();
+#include "../divecomputer.h"
 
 // Encapsulates Boilerplate.
 class CleanerTableModel : public QAbstractTableModel {
@@ -88,6 +89,9 @@ private:
 	QString biggerEntry;
 };
 
+/* Retrieve the trash icon pixmap, common to most table models */
+const QPixmap &trashIcon();
+
 /* Encapsulation of the Cylinder Model, that presents the
  * Current cylinders that are used on a dive. */
 class CylindersModel : public CleanerTableModel {
@@ -102,9 +106,8 @@ public:
 		END,
 		O2,
 		HE,
-#ifdef ENABLE_PLANNER
 		DEPTH,
-#endif
+		USE,
 		COLUMNS
 	};
 
@@ -118,8 +121,8 @@ public:
 	void passInData(const QModelIndex &index, const QVariant &value);
 	void add();
 	void clear();
-	void update();
-	void setDive(struct dive *d);
+	void updateDive();
+	void copyFromDive(struct dive *d);
 	cylinder_t *cylinderAt(const QModelIndex &index);
 	bool changed;
 
@@ -128,7 +131,6 @@ slots:
 	void remove(const QModelIndex &index);
 
 private:
-	struct dive *current;
 	int rows;
 };
 
@@ -152,8 +154,7 @@ public:
 	void passInData(const QModelIndex &index, const QVariant &value);
 	void add();
 	void clear();
-	void update();
-	void setDive(struct dive *d);
+	void updateDive();
 	weightsystem_t *weightSystemAt(const QModelIndex &index);
 	bool changed;
 
@@ -162,7 +163,25 @@ slots:
 	void remove(const QModelIndex &index);
 
 private:
-	struct dive *current;
+	int rows;
+};
+
+/* extra data model for additional dive computer data */
+class ExtraDataModel : public CleanerTableModel {
+	Q_OBJECT
+public:
+	enum Column {
+		KEY,
+		VALUE
+	};
+	explicit ExtraDataModel(QObject *parent = 0);
+	/*reimp*/ QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+	/*reimp*/ int rowCount(const QModelIndex &parent = QModelIndex()) const;
+
+	void clear();
+	void updateDive();
+
+private:
 	int rows;
 };
 
@@ -196,7 +215,7 @@ struct DiveItem : public TreeItem {
 		TOTALWEIGHT,
 		SUIT,
 		CYLINDER,
-		NITROX,
+		GAS,
 		SAC,
 		OTU,
 		MAXCNS,
@@ -211,6 +230,7 @@ struct DiveItem : public TreeItem {
 	QString displayDate() const;
 	QString displayDuration() const;
 	QString displayDepth() const;
+	QString displayDepthWithUnit() const;
 	QString displayTemperature() const;
 	QString displayWeight() const;
 	QString displaySac() const;
@@ -221,7 +241,6 @@ struct TripItem;
 
 class TreeModel : public QAbstractItemModel {
 	Q_OBJECT
-
 public:
 	TreeModel(QObject *parent = 0);
 	virtual ~TreeModel();
@@ -249,7 +268,7 @@ public:
 		TOTALWEIGHT,
 		SUIT,
 		CYLINDER,
-		NITROX,
+		GAS,
 		SAC,
 		OTU,
 		MAXCNS,
@@ -385,7 +404,7 @@ class ProfilePrintModel : public QAbstractTableModel {
 
 private:
 	int diveId;
-	QString truncateString(char *str, const int maxlen) const;
+	double fontSize;
 
 public:
 	ProfilePrintModel(QObject *parent = 0);
@@ -393,6 +412,7 @@ public:
 	int columnCount(const QModelIndex &parent = QModelIndex()) const;
 	QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 	void setDive(struct dive *divePtr);
+	void setFontsize(double size);
 };
 
 class GasSelectionModel : public QStringListModel {
@@ -419,4 +439,5 @@ private:
 
 	QStringList languages;
 };
+
 #endif // MODELS_H

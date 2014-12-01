@@ -7,26 +7,39 @@
 #include <math.h>
 #include <zip.h>
 #include <sqlite3.h>
+#include <string.h>
 
 /* Windows has no MIN/MAX macros - so let's just roll our own */
 #define MIN(x, y) ({                \
-	typeof(x) _min1 = (x);          \
-	typeof(y) _min2 = (y);          \
+	__typeof__(x) _min1 = (x);          \
+	__typeof__(y) _min2 = (y);          \
 	(void) (&_min1 == &_min2);      \
 	_min1 < _min2 ? _min1 : _min2; })
 
 #define MAX(x, y) ({                \
-	typeof(x) _max1 = (x);          \
-	typeof(y) _max2 = (y);          \
+	__typeof__(x) _max1 = (x);          \
+	__typeof__(y) _max2 = (y);          \
 	(void) (&_max1 == &_max2);      \
 	_max1 > _max2 ? _max1 : _max2; })
 
-#define IS_FP_SAME(_a, _b) (fabs((_a) - (_b)) < 0.000001 * MAX(fabs(_a), fabs(_b)))
+#define IS_FP_SAME(_a, _b) (fabs((_a) - (_b)) <= 0.000001 * MAX(fabs(_a), fabs(_b)))
+
+static inline int same_string(const char *a, const char *b)
+{
+	return !strcmp(a ?: "", b ?: "");
+}
+
+static inline char *copy_string(const char *s)
+{
+	return s ? strdup(s) : NULL;
+}
 
 #include <libxml/tree.h>
 #include <libxslt/transform.h>
+#include <libxslt/xsltutils.h>
 
 #include "sha1.h"
+#include "units.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,95 +47,11 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-#define O2_IN_AIR 209 // permille
-#define N2_IN_AIR 781
-#define O2_DENSITY 1429 // mg/Liter
-#define N2_DENSITY 1251
-#define HE_DENSITY 179
-#define SURFACE_PRESSURE 1013 // mbar
-#define SURFACE_PRESSURE_STRING "1013"
-#define ZERO_C_IN_MKELVIN 273150 // mKelvin
+enum dive_comp_type {OC, CCR, PSCR, NUM_DC_TYPE};	// Flags (Open-circuit and Closed-circuit-rebreather) for setting dive computer type
+enum cylinderuse {OC_GAS, DILUENT, OXYGEN, NUM_GAS_USE}; // The different uses for cylinders
 
-/* Salinity is expressed in weight in grams per 10l */
-#define SEAWATER_SALINITY 10300
-#define FRESHWATER_SALINITY 10000
-
-/*
- * Some silly typedefs to make our units very explicit.
- *
- * Also, the units are chosen so that values can be expressible as
- * integers, so that we never have FP rounding issues. And they
- * are small enough that converting to/from imperial units doesn't
- * really matter.
- *
- * We also strive to make '0' a meaningless number saying "not
- * initialized", since many values are things that may not have
- * been reported (eg cylinder pressure or temperature from dive
- * computers that don't support them). But sometimes -1 is an even
- * more explicit way of saying "not there".
- *
- * Thus "millibar" for pressure, for example, or "millikelvin" for
- * temperatures. Doing temperatures in celsius or fahrenheit would
- * make for loss of precision when converting from one to the other,
- * and using millikelvin is SI-like but also means that a temperature
- * of '0' is clearly just a missing temperature or cylinder pressure.
- *
- * Also strive to use units that can not possibly be mistaken for a
- * valid value in a "normal" system without conversion. If the max
- * depth of a dive is '20000', you probably didn't convert from mm on
- * output, or if the max depth gets reported as "0.2ft" it was either
- * a really boring dive, or there was some missing input conversion,
- * and a 60-ft dive got recorded as 60mm.
- *
- * Doing these as "structs containing value" means that we always
- * have to explicitly write out those units in order to get at the
- * actual value. So there is hopefully little fear of using a value
- * in millikelvin as Fahrenheit by mistake.
- *
- * We don't actually use these all yet, so maybe they'll change, but
- * I made a number of types as guidelines.
- */
-typedef int64_t timestamp_t;
-
-typedef struct
-{
-	int seconds;
-} duration_t;
-
-typedef struct
-{
-	int mm;
-} depth_t;
-
-typedef struct
-{
-	int mbar;
-} pressure_t;
-
-typedef struct
-{
-	int mkelvin;
-} temperature_t;
-
-typedef struct
-{
-	int mliter;
-} volume_t;
-
-typedef struct
-{
-	int permille;
-} fraction_t;
-
-typedef struct
-{
-	int grams;
-} weight_t;
-
-typedef struct
-{
-	int udeg;
-} degrees_t;
+extern const char *cylinderuse_text[];
+extern const char *dctype_text[];
 
 struct gasmix {
 	fraction_t o2;
@@ -142,7 +71,10 @@ typedef struct
 	struct gasmix gasmix;
 	pressure_t start, end, sample_start, sample_end;
 	depth_t depth;
-	bool used;
+	bool manually_added;
+	volume_t gas_used;
+	volume_t deco_gas_used;
+	enum cylinderuse cylinder_use;
 } cylinder_t;
 
 typedef struct
@@ -151,7 +83,38 @@ typedef struct
 	const char *description; /* "integrated", "belt", "ankle" */
 } weightsystem_t;
 
-extern int get_pressure_units(unsigned int mb, const char **units);
+/*
+ * Events are currently based straight on what libdivecomputer gives us.
+ *  We need to wrap these into our own events at some point to remove some of the limitations.
+ */
+struct event {
+	struct event *next;
+	duration_t time;
+	int type;
+	/* This is the annoying libdivecomputer format. */
+	int flags, value;
+	/* .. and this is our "extended" data for some event types */
+	union {
+		/*
+		 * Currently only for gas switch events.
+		 *
+		 * NOTE! The index may be -1, which means "unknown". In that
+		 * case, the get_cylinder_index() function will give the best
+		 * match with the cylinders in the dive based on gasmix.
+		 */
+		struct {
+			int index;
+			struct gasmix mix;
+		} gas;
+	};
+	bool deleted;
+	char name[];
+};
+
+extern int event_is_gaschange(struct event *ev);
+extern int event_gasmix_redundant(struct event *ev);
+
+extern int get_pressure_units(int mb, const char **units);
 extern double get_depth_units(int mm, int *frac, const char **units);
 extern double get_volume_units(unsigned int ml, int *frac, const char **units);
 extern double get_temp_units(unsigned int mk, const char **units);
@@ -159,96 +122,12 @@ extern double get_weight_units(unsigned int grams, int *frac, const char **units
 extern double get_vertical_speed_units(unsigned int mms, int *frac, const char **units);
 
 extern unsigned int units_to_depth(double depth);
-
-static inline double grams_to_lbs(int grams)
-{
-	return grams / 453.6;
-}
-
-static inline int lbs_to_grams(double lbs)
-{
-	return rint(lbs * 453.6);
-}
-
-static inline double ml_to_cuft(int ml)
-{
-	return ml / 28316.8466;
-}
-
-static inline double cuft_to_l(double cuft)
-{
-	return cuft * 28.3168466;
-}
-
-static inline double mm_to_feet(int mm)
-{
-	return mm * 0.00328084;
-}
-
-static inline unsigned long feet_to_mm(double feet)
-{
-	return rint(feet * 304.8);
-}
-
-static inline int to_feet(depth_t depth)
-{
-	return rint(mm_to_feet(depth.mm));
-}
-
-static inline double mkelvin_to_C(int mkelvin)
-{
-	return (mkelvin - ZERO_C_IN_MKELVIN) / 1000.0;
-}
-
-static inline double mkelvin_to_F(int mkelvin)
-{
-	return mkelvin * 9 / 5000.0 - 459.670;
-}
-
-static inline unsigned long F_to_mkelvin(double f)
-{
-	return rint((f - 32) * 1000 / 1.8 + ZERO_C_IN_MKELVIN);
-}
-
-static inline unsigned long C_to_mkelvin(double c)
-{
-	return rint(c * 1000 + ZERO_C_IN_MKELVIN);
-}
-
-static inline double psi_to_bar(double psi)
-{
-	return psi / 14.5037738;
-}
-
-static inline long psi_to_mbar(double psi)
-{
-	return rint(psi_to_bar(psi) * 1000);
-}
-
-static inline int to_PSI(pressure_t pressure)
-{
-	return rint(pressure.mbar * 0.0145037738);
-}
-
-static inline double bar_to_atm(double bar)
-{
-	return bar / SURFACE_PRESSURE * 1000;
-}
-
-static inline double mbar_to_atm(int mbar)
-{
-	return (double)mbar / SURFACE_PRESSURE;
-}
+extern int units_to_sac(double volume);
 
 /* Volume in mliter of a cylinder at pressure 'p' */
 extern int gas_volume(cylinder_t *cyl, pressure_t p);
 extern int wet_volume(double cuft, pressure_t p);
 
-static inline int mbar_to_PSI(int mbar)
-{
-	pressure_t p = { mbar };
-	return to_PSI(p);
-}
 
 static inline int get_o2(const struct gasmix *mix)
 {
@@ -260,8 +139,20 @@ static inline int get_he(const struct gasmix *mix)
 	return mix->he.permille;
 }
 
-static inline bool is_air(int o2, int he)
+struct gas_pressures {
+	double o2, n2, he;
+};
+
+extern void fill_pressures(struct gas_pressures *pressures, const double amb_pressure, const struct gasmix *mix, double po2, enum dive_comp_type dctype, int sac);
+
+extern void sanitize_gasmix(struct gasmix *mix);
+extern int gasmix_distance(const struct gasmix *a, const struct gasmix *b);
+extern struct gasmix *get_gasmix_from_event(struct event *ev);
+
+static inline bool gasmix_is_air(const struct gasmix *gasmix)
 {
+	int o2 = gasmix->o2.permille;
+	int he = gasmix->he.permille;
 	return (he == 0) && (o2 == 0 || ((o2 >= O2_IN_AIR - 1) && (o2 <= O2_IN_AIR + 1)));
 }
 
@@ -273,21 +164,37 @@ static inline int interpolate(int a, int b, int part, int whole)
 	return rint(x / whole);
 }
 
-struct sample {
-	duration_t time;
+/* MOD rounded to multiples of roundto mm */
+static inline depth_t gas_mod(struct gasmix *mix, pressure_t po2_limit, int roundto) {
 	depth_t depth;
-	temperature_t temperature;
-	pressure_t cylinderpressure;
-	int sensor; /* Cylinder pressure sensor index */
-	duration_t ndl;
-	duration_t stoptime;
-	depth_t stopdepth;
-	bool in_deco;
-	int cns;
-	int po2;
-	int heartbeat;
-	int bearing;
-};
+	depth.mm = ((po2_limit.mbar * 1000 / get_o2(mix) * 10 - 10000) / roundto) * roundto;
+	return depth;
+}
+
+void get_gas_string(const struct gasmix *gasmix, char *text, int len);
+const char *gasname(const struct gasmix *gasmix);
+
+struct sample                         // BASE TYPE BYTES  UNITS    RANGE      DESCRIPTION
+{                                     // --------- -----  -----    -----      -----------
+	duration_t time;               // uint32_t   4  seconds  (0-68 yrs)   elapsed dive time up to this sample
+	duration_t stoptime;           // uint32_t   4  seconds  (0-18 h)     time duration of next deco stop
+	duration_t ndl;                // uint32_t   4  seconds  (0-18 h)     time duration before no-deco limit
+	duration_t tts;                // uint32_t   4  seconds  (0-18 h)     time duration to reach the surface
+	depth_t depth;                 // int32_t    4    mm     (0-2000 km)  dive depth of this sample
+	depth_t stopdepth;             // int32_t    4    mm     (0-2000 km)  depth of next deco stop
+	temperature_t temperature;     // int32_t    4  mdegrK   (0-2 MdegK)  ambient temperature
+	pressure_t cylinderpressure;   // int32_t    4    mbar   (0-2 Mbar)   main cylinder pressure
+	pressure_t o2cylinderpressure; // int32_t    4    mbar   (0-2 Mbar)   CCR o2 cylinder pressure (rebreather)
+	o2pressure_t setpoint;         // uint16_t   2    mbar   (0-65 bar)   O2 partial pressure (will be setpoint)
+	o2pressure_t o2sensor[3];      // uint16_t   6    mbar   (0-65 bar)   Up to 3 PO2 sensor values (rebreather)
+	bearing_t bearing;             // int16_t    2  degrees  (-32k to 32k deg) compass bearing
+	uint8_t sensor;                // uint8_t    1  sensorID (0-255)      ID of cylinder pressure sensor
+	uint8_t cns;                   // uint8_t    1     %     (0-255 %)    cns% accumulated
+	uint8_t heartbeat;             // uint8_t    1  beats/m  (0-255)      heart rate measurement
+	bool in_deco;                  // bool       1    y/n      y/n        this sample is part of deco
+	bool manually_entered;         // bool       1    y/n      y/n        this sample was entered by the user,
+				       //                                     not calculated when planning a dive
+};                      // Total size of structure: 53 bytes, excluding padding at end
 
 struct divetag {
 	/*
@@ -323,23 +230,22 @@ struct divetag *taglist_add_tag(struct tag_entry **tag_list, const char *tag);
  */
 int taglist_get_tagstring(struct tag_entry *tag_list, char *buffer, int len);
 
+/* cleans up a list: removes empty tags and duplicates */
+void taglist_cleanup(struct tag_entry **tag_list);
+
 void taglist_init_global();
 void taglist_free(struct tag_entry *tag_list);
 
-/*
- * Events are currently pretty meaningless. This is
- * just based on the random data that libdivecomputer
- * gives us. I'm not sure what a real "architected"
- * event model would actually look like, but right
- * now you can associate a list of events with a dive,
- * and we'll do something about it.
- */
-struct event {
-	struct event *next;
-	duration_t time;
-	int type, flags, value;
-	bool deleted;
-	char name[];
+bool taglist_contains(struct tag_entry *tag_list, const char *tag);
+int count_dives_with_tag(const char *tag);
+int count_dives_with_person(const char *person);
+int count_dives_with_location(const char *location);
+int count_dives_with_suit(const char *suit);
+
+struct extra_data {
+	const char *key;
+	const char *value;
+	struct extra_data *next;
 };
 
 /*
@@ -361,12 +267,15 @@ struct divecomputer {
 	depth_t maxdepth, meandepth;
 	temperature_t airtemp, watertemp;
 	pressure_t surface_pressure;
-	int salinity; // kg per 10000 l
-	const char *model;
+	enum dive_comp_type dctype;	// dive computer type: OC(default) or CCR
+	uint8_t no_o2sensors;		// rebreathers: number of O2 sensors used
+	int salinity; 			// kg per 10000 l
+	const char *model, *serial, *fw_version;
 	uint32_t deviceid, diveid;
 	int samples, alloc_samples;
 	struct sample *sample;
 	struct event *events;
+	struct extra_data *extra_data;
 	struct divecomputer *next;
 };
 
@@ -397,13 +306,14 @@ typedef struct dive_trip
 
 /* List of dive trips (sorted by date) */
 extern dive_trip_t *dive_trip_list;
-
+struct picture;
 struct dive {
 	int number;
 	tripflag_t tripflag;
 	dive_trip_t *divetrip;
 	struct dive *next, **pprev;
-	int selected;
+	bool selected;
+	bool hidden_by_filter;
 	bool downloaded;
 	timestamp_t when;
 	char *location;
@@ -427,7 +337,52 @@ struct dive {
 	struct tag_entry *tag_list;
 	struct divecomputer dc;
 	int id; // unique ID for this dive
+	struct picture *picture_list;
+	int oxygen_cylinder_index, diluent_cylinder_index; // CCR dive cylinder indices
 };
+
+extern int get_cylinder_idx_by_use(struct dive *dive, enum cylinderuse cylinder_use_type);
+
+/* when selectively copying dive information, which parts should be copied? */
+struct dive_components {
+	unsigned int location : 1;
+	unsigned int notes : 1;
+	unsigned int divemaster : 1;
+	unsigned int buddy : 1;
+	unsigned int suit : 1;
+	unsigned int rating : 1;
+	unsigned int visibility : 1;
+	unsigned int gps : 1;
+	unsigned int tags : 1;
+	unsigned int cylinders : 1;
+	unsigned int weights : 1;
+};
+
+/* picture list and methods related to dive picture handling */
+struct picture {
+	char *filename;
+	offset_t offset;
+	degrees_t latitude;
+	degrees_t longitude;
+	struct picture *next;
+};
+
+#define FOR_EACH_PICTURE(_dive) \
+	if (_dive)              \
+		for (struct picture *picture = (_dive)->picture_list; picture; picture = picture->next)
+
+#define FOR_EACH_PICTURE_NON_PTR(_divestruct) \
+	for (struct picture *picture = (_divestruct).picture_list; picture; picture = picture->next)
+
+extern struct picture *alloc_picture();
+extern void dive_create_picture(struct dive *d, char *filename, int shift_time);
+extern void dive_add_picture(struct dive *d, struct picture *newpic);
+extern void dive_remove_picture(char *filename);
+extern unsigned int dive_get_picture_count(struct dive *d);
+extern void picture_load_exif_data(struct picture *p, timestamp_t *timestamp);
+extern void dive_set_geodata_from_picture(struct dive *d, struct picture *pic);
+
+extern int explicit_first_cylinder(struct dive *dive, struct divecomputer *dc);
 
 static inline int dive_has_gps_location(struct dive *dive)
 {
@@ -439,6 +394,9 @@ static inline void copy_gps_location(struct dive *from, struct dive *to)
 	if (from && to) {
 		to->latitude.udeg = from->latitude.udeg;
 		to->longitude.udeg = from->longitude.udeg;
+		if (!to->location) {
+			to->location = strdup(from->location);
+		}
 	}
 }
 
@@ -515,65 +473,12 @@ extern void add_single_dive(int idx, struct dive *dive);
 
 extern void insert_trip(dive_trip_t **trip);
 
-/*
- * We keep our internal data in well-specified units, but
- * the input and output may come in some random format. This
- * keeps track of those units.
- */
-/* turns out in Win32 PASCAL is defined as a calling convention */
-#ifdef WIN32
-#undef PASCAL
-#endif
-struct units {
-	enum {
-		METERS,
-		FEET
-	} length;
-	enum {
-		LITER,
-		CUFT
-	} volume;
-	enum {
-		BAR,
-		PSI,
-		PASCAL
-	} pressure;
-	enum {
-		CELSIUS,
-		FAHRENHEIT,
-		KELVIN
-	} temperature;
-	enum {
-		KG,
-		LBS
-	} weight;
-	enum {
-		SECONDS,
-		MINUTES
-	} vertical_speed_time;
-};
 
-/*
- * We're going to default to SI units for input. Yes,
- * technically the SI unit for pressure is Pascal, but
- * we default to bar (10^5 pascal), which people
- * actually use. Similarly, C instead of Kelvin.
- * And kg instead of g.
- */
-#define SI_UNITS                                                                                                                         \
-	{                                                                                                                                \
-		.length = METERS, .volume = LITER, .pressure = BAR, .temperature = CELSIUS, .weight = KG, .vertical_speed_time = MINUTES \
-	}
-
-#define IMPERIAL_UNITS                                                                                                                    \
-	{                                                                                                                                 \
-		.length = FEET, .volume = CUFT, .pressure = PSI, .temperature = FAHRENHEIT, .weight = LBS, .vertical_speed_time = MINUTES \
-	}
 extern const struct units SI_units, IMPERIAL_units;
 extern struct units xml_parsing_units;
 
 extern struct units *get_units(void);
-extern int verbose, quit;
+extern int run_survey, verbose, quit;
 
 struct dive_table {
 	int nr, allocated, preexisting;
@@ -581,8 +486,9 @@ struct dive_table {
 };
 
 extern struct dive_table dive_table;
-
+extern struct dive displayed_dive;
 extern int selected_dive;
+extern unsigned int dc_number;
 #define current_dive (get_dive(selected_dive))
 #define current_dc (get_dive_dc(current_dive, dc_number))
 
@@ -627,6 +533,10 @@ static inline struct divecomputer *get_dive_dc(struct dive *dive, int nr)
 	return dc;
 }
 
+extern void make_first_dc(void);
+extern int count_divecomputers(void);
+extern void delete_current_divecomputer(void);
+
 /*
  * Iterate over each dive, with the first parameter being the index
  * iterator variable, and the second one being the dive one.
@@ -643,12 +553,12 @@ static inline struct divecomputer *get_dive_dc(struct dive *dive, int nr)
 #define for_each_gps_location(_i, _x) \
 	for ((_i) = 0; ((_x) = get_gps_location(_i, &gps_location_table)) != NULL; (_i)++)
 
-static inline struct dive *get_dive_by_diveid(uint32_t diveid, uint32_t deviceid)
+static inline struct dive *get_dive_by_uemis_diveid(uint32_t diveid, uint32_t deviceid)
 {
 	int i;
 	struct dive *dive;
 
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		struct divecomputer *dc = &dive->dc;
 		do {
 			if (dc->diveid == diveid && dc->deviceid == deviceid)
@@ -657,20 +567,41 @@ static inline struct dive *get_dive_by_diveid(uint32_t diveid, uint32_t deviceid
 	}
 	return NULL;
 }
-// this is very different from get_dive_by_diveid() (which is only used
-// by the UEMIS downloader) -- this uses the unique diveID to allow us
-// to hold an identifier for a dive across operations that might change
-// the dive_table
-static inline struct dive *getDiveById(int id)
+
+static inline struct dive *get_dive_by_uniq_id(int id)
 {
 	int i;
 	struct dive *dive = NULL;
 
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		if (dive->id == id)
 			break;
 	}
+#ifdef DEBUG
+	if (dive == NULL) {
+		fprintf(stderr, "Invalid id %x passed to get_dive_by_diveid, try to fix the code\n", id);
+		exit(1);
+	}
+#endif
 	return dive;
+}
+
+static inline int get_idx_by_uniq_id(int id)
+{
+	int i;
+	struct dive *dive = NULL;
+
+	for_each_dive (i, dive) {
+		if (dive->id == id)
+			break;
+	}
+#ifdef DEBUG
+	if (dive == NULL) {
+		fprintf(stderr, "Invalid id %x passed to get_dive_by_diveid, try to fix the code\n", id);
+		exit(1);
+	}
+#endif
+	return i;
 }
 
 #ifdef __cplusplus
@@ -693,10 +624,13 @@ extern void parse_xml_exit(void);
 extern void set_filename(const char *filename, bool force);
 
 extern int parse_dm4_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table);
+extern int parse_dm5_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table);
 extern int parse_shearwater_buffer(sqlite3 *handle, const char *url, const char *buf, int size, struct dive_table *table);
 
 extern int parse_file(const char *filename);
-extern int parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int stopdepthf, int sepidx, const char *csvtemplate, int units);
+extern int parse_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int ndlf, int ttsf, int stopdepthf, int pressuref, int sepidx, const char *csvtemplate, int units);
+extern int parse_seabear_csv_file(const char *filename, int time, int depth, int temp, int po2f, int cnsf, int ndlf, int ttsf, int stopdepthf, int pressuref, int sepidx, const char *csvtemplate, int units);
+extern int parse_txt_file(const char *filename, const char *csv);
 extern int parse_manual_file(const char *filename, int separator_index, int units, int number, int date, int time, int duration, int location, int gps, int maxdepth, int meandepth, int buddy, int notes, int weight, int tags);
 
 extern int save_dives(const char *filename);
@@ -706,13 +640,15 @@ extern int export_dives_xslt(const char *filename, const bool selected, const ch
 
 struct git_oid;
 struct git_repository;
-#define dummy_git_repository ((git_repository *) 3ul) /* Random bogus pointer, not NULL */
+#define dummy_git_repository ((git_repository *)3ul) /* Random bogus pointer, not NULL */
 extern struct git_repository *is_git_repository(const char *filename, const char **branchp);
 extern int git_save_dives(struct git_repository *, const char *, bool select_only);
 extern int git_load_dives(struct git_repository *, const char *);
 extern const char *saved_git_id;
 extern void clear_git_id(void);
 extern void set_git_id(const struct git_oid *);
+int cylinderuse_from_text(const char *text);
+
 
 struct user_info {
 	const char *name;
@@ -724,6 +660,7 @@ extern int subsurface_rename(const char *path, const char *newpath);
 extern int subsurface_open(const char *path, int oflags, mode_t mode);
 extern FILE *subsurface_fopen(const char *path, const char *mode);
 extern void *subsurface_opendir(const char *path);
+extern int subsurface_access(const char *path, int mode);
 extern struct zip *subsurface_zip_open_readonly(const char *path, int flags, int *errorp);
 extern int subsurface_zip_close(struct zip *zip);
 extern void subsurface_console_init(bool dedicated);
@@ -739,6 +676,10 @@ extern void utc_mkdate(timestamp_t, struct tm *tm);
 
 extern struct dive *alloc_dive(void);
 extern void record_dive(struct dive *dive);
+extern void clear_dive(struct dive *dive);
+extern void copy_dive(struct dive *s, struct dive *d);
+extern void selective_copy_dive(struct dive *s, struct dive *d, struct dive_components what, bool clear);
+extern struct dive *clone_dive(struct dive *s);
 
 extern struct sample *prepare_sample(struct divecomputer *dc);
 extern void finish_sample(struct divecomputer *dc);
@@ -747,19 +688,23 @@ extern bool has_hr_data(struct divecomputer *dc);
 
 extern void sort_table(struct dive_table *table);
 extern struct dive *fixup_dive(struct dive *dive);
-extern int getUniqID(struct dive *d);
+extern void fixup_dc_duration(struct divecomputer *dc);
+extern int dive_getUniqID(struct dive *d);
 extern unsigned int dc_airtemp(struct divecomputer *dc);
 extern unsigned int dc_watertemp(struct divecomputer *dc);
 extern struct dive *merge_dives(struct dive *a, struct dive *b, int offset, bool prefer_downloaded);
 extern struct dive *try_to_merge(struct dive *a, struct dive *b, bool prefer_downloaded);
-extern void renumber_dives(int nr);
-extern void copy_events(struct dive *s, struct dive *d);
-extern void copy_cylinders(struct dive *s, struct dive *d);
-extern void copy_samples(struct dive *s, struct dive *d);
-
+extern void renumber_dives(int start_nr, bool selected_only);
+extern void copy_events(struct divecomputer *s, struct divecomputer *d);
+extern void copy_cylinders(struct dive *s, struct dive *d, bool used_only);
+extern void copy_samples(struct divecomputer *s, struct divecomputer *d);
+extern bool is_cylinder_used(struct dive *dive, int idx);
 extern void fill_default_cylinder(cylinder_t *cyl);
 extern void add_gas_switch_event(struct dive *dive, struct divecomputer *dc, int time, int idx);
-extern void add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
+extern struct event *add_event(struct divecomputer *dc, int time, int type, int flags, int value, const char *name);
+extern void remove_event(struct event *event);
+extern void update_event_name(struct dive *d, struct event* event, char *name);
+extern void add_extra_data(struct divecomputer *dc, const char *key, const char *value);
 extern void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *mean, int *duration);
 extern int get_cylinder_index(struct dive *dive, struct event *ev);
 extern int nr_cylinders(struct dive *dive);
@@ -798,17 +743,9 @@ const char *monthname(int mon);
 #define UTF8_UPWARDS_ARROW "\xE2\x86\x91"
 #define UTF8_DOWNWARDS_ARROW "\xE2\x86\x93"
 #define UTF8_AVERAGE "\xc3\xb8"
-#define UCS4_DEGREE 0xb0
 #define UTF8_SUBSCRIPT_2 "\xe2\x82\x82"
 #define UTF8_WHITESTAR "\xe2\x98\x86"
 #define UTF8_BLACKSTAR "\xe2\x98\x85"
-#define ZERO_STARS UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR
-#define ONE_STARS UTF8_BLACKSTAR UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR
-#define TWO_STARS UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_WHITESTAR UTF8_WHITESTAR UTF8_WHITESTAR
-#define THREE_STARS UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_WHITESTAR UTF8_WHITESTAR
-#define FOUR_STARS UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_WHITESTAR
-#define FIVE_STARS UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR UTF8_BLACKSTAR
-extern const char *star_strings[];
 
 extern const char *existing_filename;
 extern void subsurface_command_line_init(int *, char ***);
@@ -816,7 +753,7 @@ extern void subsurface_command_line_exit(int *, char ***);
 
 #define FRACTION(n, x) ((unsigned)(n) / (x)), ((unsigned)(n) % (x))
 
-extern double add_segment(double pressure, const struct gasmix *gasmix, int period_in_seconds, int setpoint, const struct dive *dive);
+extern double add_segment(double pressure, const struct gasmix *gasmix, int period_in_seconds, int setpoint, const struct dive *dive, int sac);
 extern void clear_deco(double surface_pressure);
 extern void dump_tissues(void);
 extern unsigned int deco_allowed_depth(double tissues_tolerance, double surface_pressure, struct dive *dive, bool smooth);
@@ -824,34 +761,33 @@ extern void set_gf(short gflow, short gfhigh, bool gf_low_at_maxdepth);
 extern void cache_deco_state(double, char **datap);
 extern double restore_deco_state(char *data);
 
+/* this should be converted to use our types */
 struct divedatapoint {
 	int time;
 	unsigned int depth;
-	int o2;
-	int he;
-	int po2;
+	struct gasmix gasmix;
+	int setpoint;
 	bool entered;
 	struct divedatapoint *next;
 };
 
 struct diveplan {
 	timestamp_t when;
-	int lastdive_nr;
 	int surface_pressure; /* mbar */
 	int bottomsac;	/* ml/min */
 	int decosac;	  /* ml/min */
+	int salinity;
 	short gflow;
 	short gfhigh;
 	struct divedatapoint *dp;
 };
 
-struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, int depth, int o2, int he, int po2, bool entered);
-void get_gas_string(int o2, int he, char *buf, int len);
-struct divedatapoint *create_dp(int time_incr, int depth, int o2, int he, int po2);
+struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, int depth, struct gasmix gasmix, int po2, bool entered);
+struct divedatapoint *create_dp(int time_incr, int depth, struct gasmix gasmix, int po2);
 #if DEBUG_PLAN
 void dump_plan(struct diveplan *diveplan);
 #endif
-void plan(struct diveplan *diveplan, char **cached_datap, struct dive **divep, bool add_deco);
+int plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool show_disclaimer);
 void delete_single_dive(int idx);
 
 struct event *get_next_event(struct event *event, char *name);
@@ -883,6 +819,7 @@ extern bool no_weightsystems(weightsystem_t *ws);
 extern bool weightsystems_equal(weightsystem_t *ws1, weightsystem_t *ws2);
 extern void remove_cylinder(struct dive *dive, int idx);
 extern void remove_weightsystem(struct dive *dive, int idx);
+extern void reset_cylinders(struct dive *dive, bool track_gas);
 
 /*
  * String handling.
@@ -898,8 +835,9 @@ extern double strtod_flags(const char *str, const char **ptr, unsigned int flags
 #define ascii_strtod(str, ptr) strtod_flags(str, ptr, STRTOD_ASCII)
 
 extern void set_save_userid_local(short value);
-extern void set_userid(char* user_id);
+extern void set_userid(char *user_id);
 
+extern const char *get_dive_date_c_string(timestamp_t when);
 #ifdef __cplusplus
 }
 #endif
@@ -909,6 +847,7 @@ extern depth_t string_to_depth(const char *str);
 extern pressure_t string_to_pressure(const char *str);
 extern volume_t string_to_volume(const char *str, pressure_t workp);
 extern fraction_t string_to_fraction(const char *str);
+extern int average_depth(struct diveplan *dive);
 
 #include "pref.h"
 

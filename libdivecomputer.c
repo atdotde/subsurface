@@ -31,79 +31,28 @@ static dc_status_t create_parser(device_data_t *devdata, dc_parser_t **parser)
 	return dc_parser_new(parser, devdata->device);
 }
 
-/* Atomics Aquatics Cobalt specific parsing of tank information
- * realistically this REALLY needs to be done in libdivecomputer - but the
- * current API doesn't even have the notion of tank size, so for now I do
- * this here, but I need to work with Jef to make sure this gets added in
- * the new libdivecomputer API */
-#define COBALT_HEADER 228
-struct atomics_gas_info {
-	uint8_t gas_nr;
-	uint8_t po2imit;
-	uint8_t tankspecmethod; /* 1: CF@psi 2: CF@bar 3: wet vol in deciliter */
-	uint8_t gasmixtype;
-	uint8_t fo2;
-	uint8_t fhe;
-	uint16_t startpressure; /* in psi */
-	uint16_t tanksize;      /* CF or dl */
-	uint16_t workingpressure;
-	uint16_t sensorid;
-	uint16_t endpressure;      /* in psi */
-	uint16_t totalconsumption; /* in liters */
-};
-#define COBALT_CFATPSI 1
-#define COBALT_CFATBAR 2
-#define COBALT_WETINDL 3
-
-static bool get_tanksize(device_data_t *devdata, const unsigned char *data, cylinder_t *cyl, int idx)
-{
-	/* I don't like this kind of match... I'd love to have an ID and
-	 * a firmware version or... something; and even better, just get
-	 * this from libdivecomputer */
-	if (!strcmp(devdata->vendor, "Atomic Aquatics") &&
-	    !strcmp(devdata->product, "Cobalt")) {
-		struct atomics_gas_info *atomics_gas_info;
-		double airvolume;
-		int mbar;
-
-		/* at least some quick sanity check to make sure this is the
-		 * right data */
-		if (*(uint32_t *)data != 0xFFFEFFFE) {
-			printf("incorrect header for Atomics dive\n");
-			return false;
-		}
-		atomics_gas_info = (void *)(data + COBALT_HEADER);
-		switch (atomics_gas_info[idx].tankspecmethod) {
-		case COBALT_CFATPSI:
-			airvolume = cuft_to_l(atomics_gas_info[idx].tanksize) * 1000.0;
-			mbar = psi_to_mbar(atomics_gas_info[idx].workingpressure);
-			cyl[idx].type.size.mliter = rint(airvolume / bar_to_atm(mbar / 1000.0));
-			cyl[idx].type.workingpressure.mbar = mbar;
-			break;
-		case COBALT_CFATBAR:
-			airvolume = cuft_to_l(atomics_gas_info[idx].tanksize) * 1000.0;
-			mbar = atomics_gas_info[idx].workingpressure * 1000;
-			cyl[idx].type.size.mliter = rint(airvolume / bar_to_atm(mbar / 1000.0));
-			cyl[idx].type.workingpressure.mbar = mbar;
-			break;
-		case COBALT_WETINDL:
-			cyl[idx].type.size.mliter = atomics_gas_info[idx].tanksize * 100;
-			break;
-		}
-		return true;
-	}
-	return false;
-}
-
 static int parse_gasmixes(device_data_t *devdata, struct dive *dive, dc_parser_t *parser, int ngases,
 			  const unsigned char *data)
 {
-	int i;
+	static bool shown_warning = false;
+	int i, rc;
+
+#if DC_VERSION_CHECK(0, 5, 0) && defined(DC_GASMIX_UNKNOWN)
+	int ntanks = 0;
+	rc = dc_parser_get_field(parser, DC_FIELD_TANK_COUNT, 0, &ntanks);
+	if (rc == DC_STATUS_SUCCESS) {
+		if (ntanks != ngases) {
+			shown_warning = true;
+			report_error("different number of gases (%d) and tanks (%d)", ngases, ntanks);
+		}
+	}
+	dc_tank_t tank = { 0 };
+#endif
 
 	for (i = 0; i < ngases; i++) {
-		int rc;
 		dc_gasmix_t gasmix = { 0 };
 		int o2, he;
+		bool no_volume = true;
 
 		rc = dc_parser_get_field(parser, DC_FIELD_GASMIX, i, &gasmix);
 		if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED)
@@ -116,18 +65,48 @@ static int parse_gasmixes(device_data_t *devdata, struct dive *dive, dc_parser_t
 		he = rint(gasmix.helium * 1000);
 
 		/* Ignore bogus data - libdivecomputer does some crazy stuff */
-		if (o2 + he <= O2_IN_AIR || o2 >= 1000)
+		if (o2 + he <= O2_IN_AIR || o2 > 1000) {
+			if (!shown_warning) {
+				shown_warning = true;
+				report_error("unlikely dive gas data from libdivecomputer: o2 = %d he = %d", o2, he);
+			}
 			o2 = 0;
-		if (he < 0 || he >= 800 || o2 + he >= 1000)
+		}
+		if (he < 0 || o2 + he > 1000) {
+			if (!shown_warning) {
+				shown_warning = true;
+				report_error("unlikely dive gas data from libdivecomputer: o2 = %d he = %d", o2, he);
+			}
 			he = 0;
-
+		}
 		dive->cylinder[i].gasmix.o2.permille = o2;
 		dive->cylinder[i].gasmix.he.permille = he;
 
-		/* for the first tank, if there is no tanksize available from the
-		 * dive computer, fill in the default tank information (if set) */
-		if (!get_tanksize(devdata, data, dive->cylinder, i) && i == 0)
+#if DC_VERSION_CHECK(0, 5, 0) && defined(DC_GASMIX_UNKNOWN)
+		tank.volume = 0.0;
+		if (i < ntanks) {
+			rc = dc_parser_get_field(parser, DC_FIELD_TANK, i, &tank);
+			if (rc == DC_STATUS_SUCCESS) {
+				if (tank.type == DC_TANKVOLUME_IMPERIAL) {
+					dive->cylinder[i].type.size.mliter = rint(tank.volume * 1000);
+					dive->cylinder[i].type.workingpressure.mbar = rint(tank.workpressure * 1000);
+				} else if (tank.type == DC_TANKVOLUME_METRIC) {
+					dive->cylinder[i].type.size.mliter = rint(tank.volume * 1000);
+				}
+				if (tank.gasmix != i) { // we don't handle this, yet
+					shown_warning = true;
+					report_error("gasmix %d for tank %d doesn't match", tank.gasmix, i);
+				}
+			}
+		}
+		if (!IS_FP_SAME(tank.volume, 0.0))
+			no_volume = false;
+#endif
+		if (no_volume) {
+			/* for the first tank, if there is no tanksize available from the
+			 * dive computer, fill in the default tank information (if set) */
 			fill_default_cylinder(&dive->cylinder[i]);
+		}
 	}
 	return DC_STATUS_SUCCESS;
 }
@@ -175,6 +154,7 @@ void
 sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 {
 	int i;
+	unsigned int mm;
 	struct divecomputer *dc = userdata;
 	struct sample *sample;
 
@@ -193,16 +173,19 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 
 	switch (type) {
 	case DC_SAMPLE_TIME:
+		mm = 0;
 		if (sample) {
 			sample->in_deco = in_deco;
 			sample->ndl.seconds = ndl;
 			sample->stoptime.seconds = stoptime;
 			sample->stopdepth.mm = stopdepth;
-			sample->po2 = po2;
+			sample->setpoint.mbar = po2;
 			sample->cns = cns;
+			mm = sample->depth.mm;
 		}
 		sample = prepare_sample(dc);
 		sample->time.seconds = value.time;
+		sample->depth.mm = mm;
 		finish_sample(dc);
 		break;
 	case DC_SAMPLE_DEPTH:
@@ -225,8 +208,9 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 		sample->heartbeat = value.heartbeat;
 		break;
 	case DC_SAMPLE_BEARING:
-		sample->bearing = value.bearing;
+		sample->bearing.degrees = value.bearing;
 		break;
+#ifdef DEBUG_DC_VENDOR
 	case DC_SAMPLE_VENDOR:
 		printf("   <vendor time='%u:%02u' type=\"%u\" size=\"%u\">", FRACTION(sample->time.seconds, 60),
 		       value.vendor.type, value.vendor.size);
@@ -234,13 +218,14 @@ sample_cb(dc_sample_type_t type, dc_sample_value_t value, void *userdata)
 			printf("%02X", ((unsigned char *)value.vendor.data)[i]);
 		printf("</vendor>\n");
 		break;
+#endif
 #if DC_VERSION_CHECK(0, 3, 0)
 	case DC_SAMPLE_SETPOINT:
 		/* for us a setpoint means constant pO2 from here */
-		sample->po2 = po2 = rint(value.setpoint * 1000);
+		sample->setpoint.mbar = po2 = rint(value.setpoint * 1000);
 		break;
 	case DC_SAMPLE_PPO2:
-		sample->po2 = po2 = rint(value.ppo2 * 1000);
+		sample->setpoint.mbar = po2 = rint(value.ppo2 * 1000);
 		break;
 	case DC_SAMPLE_CNS:
 		sample->cns = cns = rint(value.cns * 100);
@@ -383,6 +368,38 @@ static uint32_t calculate_diveid(const unsigned char *fingerprint, unsigned int 
 	return csum[0];
 }
 
+#ifdef DC_FIELD_STRING
+static uint32_t calculate_string_hash(const char *str)
+{
+	return calculate_diveid(str, strlen(str));
+}
+
+static void parse_string_field(struct dive *dive, dc_field_string_t *str)
+{
+	// Our dive ID is the string hash of the "Dive ID" string
+	if (!strcmp(str->desc, "Dive ID")) {
+		if (!dive->dc.diveid)
+			dive->dc.diveid = calculate_string_hash(str->value);
+		return;
+	}
+	add_extra_data(&dive->dc, str->desc, str->value);
+	if (!strcmp(str->desc, "Serial")) {
+		fprintf(stderr, "string field \"Serial\": %s -- overwriting the existing serial of %s\n", str->value, dive->dc.serial);
+		dive->dc.serial = strdup(str->value);
+		/* should we just overwrite this whenever we have the "Serial" field?
+		 * It's a much better deviceid then what we have so far... for now I'm leaving it as is */
+		if (!dive->dc.deviceid)
+			dive->dc.deviceid = calculate_string_hash(str->value);
+		return;
+	}
+	if (!strcmp(str->desc, "FW Version")) {
+		fprintf(stderr, "string field \"FW Version\": %s -- overwriting the existing firware of %s\n", str->value, dive->dc.fw_version);
+		dive->dc.fw_version = strdup(str->value);
+		return;
+	}
+}
+#endif
+
 /* returns true if we want libdivecomputer's dc_device_foreach() to continue,
  *  false otherwise */
 static int dive_cb(const unsigned char *data, unsigned int size,
@@ -432,8 +449,7 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	dive->when = dive->dc.when = utc_mktime(&tm);
 
 	// Parse the divetime.
-	dev_info(devdata, translate("gettextFromC", "Dive %d: %s %d %04d"), import_dive_number,
-		 monthname(tm.tm_mon), tm.tm_mday, year(tm.tm_year));
+	dev_info(devdata, translate("gettextFromC", "Dive %d: %s"), import_dive_number, get_dive_date_c_string(dive->when));
 	unsigned int divetime = 0;
 	rc = dc_parser_get_field(parser, DC_FIELD_DIVETIME, 0, &divetime);
 	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
@@ -450,6 +466,34 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 		goto error_exit;
 	}
 	dive->dc.maxdepth.mm = rint(maxdepth * 1000);
+
+#if DC_VERSION_CHECK(0, 5, 0) && defined(DC_GASMIX_UNKNOWN)
+	// if this is defined then we have a fairly late version of libdivecomputer
+	// from the 0.5 development cylcle - most likely temperatures and tank sizes
+	// are supported
+
+	// Parse temperatures
+	double temperature;
+	dc_field_type_t temp_fields[] = {DC_FIELD_TEMPERATURE_SURFACE,
+					 DC_FIELD_TEMPERATURE_MAXIMUM,
+					 DC_FIELD_TEMPERATURE_MINIMUM};
+	for (int i = 0; i < 3; i++) {
+		rc = dc_parser_get_field(parser, temp_fields[i], 0, &temperature);
+		if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
+			dev_info(devdata, translate("gettextFromC", "Error parsing temperature"));
+			goto error_exit;
+		}
+		switch(i) {
+		case 0:
+			dive->dc.airtemp.mkelvin = C_to_mkelvin(temperature);
+			break;
+		case 1: // we don't distinguish min and max water temp here, so take min if given, max otherwise
+		case 2:
+			dive->dc.watertemp.mkelvin = C_to_mkelvin(temperature);
+			break;
+		}
+	}
+#endif
 
 	// Parse the gas mixes.
 	unsigned int ngases = 0;
@@ -481,6 +525,39 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	dive->dc.surface_pressure.mbar = rint(surface_pressure * 1000.0);
 #endif
 
+#ifdef DC_FIELD_STRING
+	// The dive parsing may give us more device information
+	int idx;
+	for (idx = 0; idx < 100; idx++) {
+		dc_field_string_t str = { NULL };
+		rc = dc_parser_get_field(parser, DC_FIELD_STRING, idx, &str);
+		if (rc != DC_STATUS_SUCCESS)
+			break;
+		if (!str.desc || !str.value)
+			break;
+		parse_string_field(dive, &str);
+	}
+#endif
+
+#if DC_VERSION_CHECK(0, 5, 0) && defined(DC_GASMIX_UNKNOWN)
+	dc_divemode_t divemode;
+	rc = dc_parser_get_field(parser, DC_FIELD_DIVEMODE, 0, &divemode);
+	if (rc != DC_STATUS_SUCCESS && rc != DC_STATUS_UNSUPPORTED) {
+		dev_info(devdata, translate("gettextFromC", "Error obtaining divemode"));
+		goto error_exit;
+	}
+	switch(divemode) {
+	case DC_DIVEMODE_FREEDIVE:
+	case DC_DIVEMODE_GAUGE:
+	case DC_DIVEMODE_OC: /* Open circuit */
+		dive->dc.dctype = OC;
+		break;
+	case DC_DIVEMODE_CC:  /* Closed circuit */
+		dive->dc.dctype = CCR;
+		break;
+	}
+#endif
+
 	rc = parse_gasmixes(devdata, dive, parser, ngases, data);
 	if (rc != DC_STATUS_SUCCESS) {
 		dev_info(devdata, translate("gettextFromC", "Error parsing the gas mix"));
@@ -504,6 +581,13 @@ static int dive_cb(const unsigned char *data, unsigned int size,
 	if (first_temp_is_air && dive->dc.samples) {
 		dive->dc.airtemp = dive->dc.sample[0].temperature;
 		dive->dc.sample[0].temperature.mkelvin = 0;
+	}
+
+	if (devdata->create_new_trip) {
+		if (!devdata->trip)
+			devdata->trip = create_and_hookup_trip_from_dive(dive);
+		else
+			add_dive_to_trip(dive, devdata->trip);
 	}
 
 	dive->downloaded = true;
@@ -617,6 +701,7 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 	const dc_event_vendor_t *vendor = data;
 	device_data_t *devdata = userdata;
 	unsigned int serial;
+	char buffer[16];
 
 	switch (event) {
 	case DC_EVENT_WAITING:
@@ -646,7 +731,19 @@ static void event_cb(dc_device_t *device, dc_event_type_t event, const void *dat
 		if (!strcmp(devdata->vendor, "Suunto"))
 			serial = fixup_suunto_versions(devdata, devinfo);
 		devdata->deviceid = calculate_sha1(devinfo->model, devinfo->firmware, serial);
-
+		/* really, serial and firmware version are NOT numbers. We'll try to save them here
+		 * in something that might work, but this really needs to be handled with the
+		 * DC_FIELD_STRING interface instead */
+		if (serial != 0) {
+			snprintf(buffer, sizeof(buffer), "%04u-%04u", serial / 10000, serial % 10000);
+			devdata->serial = strdup(buffer);
+			fprintf(stderr, "libdc devinfo serial nr converted to %s\n", devdata->serial);
+		}
+		if (devinfo->firmware != 0) {
+			snprintf(buffer, sizeof(buffer), "%02u.%02u", devinfo->firmware / 100, devinfo->firmware % 100);
+			devdata->firmware = strdup(buffer);
+			fprintf(stderr, "libdc devinfo firmware version converted to %s\n", devdata->firmware);
+		}
 		break;
 	case DC_EVENT_CLOCK:
 		dev_info(devdata, translate("gettextFromC", "Event: systime=%" PRId64 ", devtime=%u\n"),
@@ -766,7 +863,9 @@ const char *do_libdivecomputer_import(device_data_t *data)
 		err = do_device_import(data);
 		/* TODO: Show the logfile to the user on error. */
 		dc_device_close(data->device);
-	}
+	} else if (subsurface_access(data->devname, R_OK | W_OK) != 0)
+		err = translate("gettextFromC", "Insufficient privileges to open the device %s %s (%s)");
+
 	dc_context_free(data->context);
 
 	if (fp) {

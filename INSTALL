@@ -44,8 +44,8 @@ Building Subsurface 4 under Linux
 ---------------------------------
 
 On Fedora you need qt-devel, marble-devel, libzip-devel,
-libxml2-devel, libxslt-devel, libsqlite3x-devel, libudev-devel. If you are going
-to compile libdivecomputer, you need libusb-devel, too.
+libxml2-devel, libxslt-devel, libsqlite3x-devel, libudev-devel, qtwebkit-devel.
+If you are going to compile libdivecomputer, you need libusb-devel, too.
 
 On Debian style distributions you can install the required development
 packages by running (once Qt version of subsurface is available in your
@@ -72,7 +72,7 @@ $ make
 $ sudo make install
 
 To compile Subsurface:
-$ git clone git://subsurface.hohndel.org/subsurface.git
+$ git clone git://subsurface-divelog.org/subsurface.git
 $ cd subsurface
 $ qmake # qmake-qt4 on some flavors of Linux
 $ make
@@ -82,6 +82,11 @@ Note: on Fedora qmake will appear as qmake-qt4
 
 Building the Qt version under MacOSX (using Homebrew)
 -----------------------------------------------------
+
+0) You need to have XCode installed. The first time (and possibly after updating OSX)
+you need to run
+
+$ xcode-select --install
 
 1)  Install Homebrew
 
@@ -126,7 +131,7 @@ $ make install
 6) Compile Subsurface
 
 $ cd ~/src
-$ git clone git://subsurface.hohndel.org/subsurface.git
+$ git clone git://subsurface-divelog.org/subsurface.git
 $ cd subsurface
 $ qmake
 $ make
@@ -175,7 +180,7 @@ The following ports are currently installed:
 4) Compile Subsurface
 
 $ cd ~/src
-$ git clone git://subsurface.hohndel.org/subsurface.git
+$ git clone git://subsurface-divelog.org/subsurface.git
 $ cd subsurface
 $ qmake
 $ make
@@ -221,7 +226,7 @@ $ mingw32-cmake --build .
 To compile Subsurface, use:
 
 $ mkdir -p ~/src/subsurface
-$ git clone git://subsurface.hohndel.org/subsurface.git ~/src/subsurface
+$ git clone git://subsurface-divelog.org/subsurface.git ~/src/subsurface
 $ cd ~/src/subsurface
 $ packaging/windows/mingw-make.sh
 $ packaging/windows/mingw-make.sh install
@@ -296,7 +301,7 @@ variable - e.g. PKG_CONFIG_PATH=c:\msys\pkg-config
 
 To build subsurface, use:
 
-$ git clone git://subsurface.hohndel.org/subsurface.git
+$ git clone git://subsurface-divelog.org/subsurface.git
 $ cd subsurface
 $ qmake
 $ make

@@ -19,19 +19,21 @@ typedef struct device_data_t
 {
 	dc_descriptor_t *descriptor;
 	const char *vendor, *product, *devname;
-	const char *model;
+	const char *model, *serial, *firmware;
 	uint32_t deviceid, diveid;
 	dc_device_t *device;
 	dc_context_t *context;
+	struct dive_trip *trip;
 	int preexisting;
 	bool force_download;
+	bool create_new_trip;
 	bool libdc_log;
 	bool libdc_dump;
 	FILE *libdc_logfile;
 } device_data_t;
 
 const char *do_libdivecomputer_import(device_data_t *data);
-const char *do_uemis_import(const char *mountpath, short force_download);
+const char *do_uemis_import(device_data_t *data);
 
 extern int import_thread_cancelled;
 extern const char *progress_bar_text;

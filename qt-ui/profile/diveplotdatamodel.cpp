@@ -47,18 +47,26 @@ QVariant DivePlotDataModel::data(const QModelIndex &index, int role) const
 		case SAC:
 			return item.sac;
 		case PN2:
-			return item.pn2;
+			return item.pressures.n2;
 		case PHE:
-			return item.phe;
+			return item.pressures.he;
 		case PO2:
-			return item.po2;
+			return item.pressures.o2;
 		case HEARTBEAT:
 			return item.heartbeat;
+		case AMBPRESSURE:
+			return AMB_PERCENTAGE;
+		case GFLINE:
+			return item.gfline;
 		}
 	}
 
 	if (role == Qt::DisplayRole && index.column() >= TISSUE_1 && index.column() <= TISSUE_16) {
 		return item.ceilings[index.column() - TISSUE_1];
+	}
+
+	if (role == Qt::DisplayRole && index.column() >= PERCENTAGE_1 && index.column() <= PERCENTAGE_16) {
+		return item.percentages[index.column() - PERCENTAGE_1];
 	}
 
 	if (role == Qt::BackgroundRole) {
@@ -100,11 +108,11 @@ QVariant DivePlotDataModel::headerData(int section, Qt::Orientation orientation,
 	case COLOR:
 		return tr("Color");
 	case USERENTERED:
-		return tr("User Entered");
+		return tr("User entered");
 	case CYLINDERINDEX:
-		return tr("Cylinder Index");
+		return tr("Cylinder index");
 	case SENSOR_PRESSURE:
-		return tr("Pressure  S");
+		return tr("Pressure S");
 	case INTERPOLATED_PRESSURE:
 		return tr("Pressure I");
 	case CEILING:
@@ -112,14 +120,19 @@ QVariant DivePlotDataModel::headerData(int section, Qt::Orientation orientation,
 	case SAC:
 		return tr("SAC");
 	case PN2:
-		return tr("PN2");
+		return tr("pN₂");
 	case PHE:
-		return tr("PHE");
+		return tr("pHe");
 	case PO2:
-		return tr("PO2");
+		return tr("pO₂");
+	case AMBPRESSURE:
+		return tr("Ambient pressure");
 	}
 	if (role == Qt::DisplayRole && section >= TISSUE_1 && section <= TISSUE_16) {
 		return QString("Ceiling: %1").arg(section - TISSUE_1);
+	}
+	if (role == Qt::DisplayRole && section >= PERCENTAGE_1 && section <= PERCENTAGE_16) {
+		return QString("Tissue: %1").arg(section - PERCENTAGE_1);
 	}
 	return QVariant();
 }
@@ -146,11 +159,6 @@ void DivePlotDataModel::setDive(dive *d, const plot_info &info)
 	endInsertRows();
 }
 
-int DivePlotDataModel::id() const
-{
-	return diveId;
-}
-
 unsigned int DivePlotDataModel::dcShown() const
 {
 	return dcNr;
@@ -161,15 +169,15 @@ unsigned int DivePlotDataModel::dcShown() const
 	{                                                             \
 		double ret = -1;                                      \
 		for (int i = 0, count = rowCount(); i < count; i++) { \
-			if (pInfo.entry[i].GAS > ret)                 \
-				ret = pInfo.entry[i].GAS;             \
+			if (pInfo.entry[i].pressures.GAS > ret)                 \
+				ret = pInfo.entry[i].pressures.GAS;             \
 		}                                                     \
 		return ret;                                           \
 	}
 
-MAX_PPGAS_FUNC(phe, pheMax);
-MAX_PPGAS_FUNC(pn2, pn2Max);
-MAX_PPGAS_FUNC(po2, po2Max);
+MAX_PPGAS_FUNC(he, pheMax);
+MAX_PPGAS_FUNC(n2, pn2Max);
+MAX_PPGAS_FUNC(o2, po2Max);
 
 void DivePlotDataModel::emitDataChanged()
 {
@@ -178,11 +186,8 @@ void DivePlotDataModel::emitDataChanged()
 
 void DivePlotDataModel::calculateDecompression()
 {
-	struct dive *d = getDiveById(id());
-	if (!d)
-		return;
-	struct divecomputer *dc = select_dc(d);
-	init_decompression(d);
-	calculate_deco_information(d, dc, &pInfo, false);
+	struct divecomputer *dc = select_dc(&displayed_dive);
+	init_decompression(&displayed_dive);
+	calculate_deco_information(&displayed_dive, dc, &pInfo, false);
 	dataChanged(index(0, CEILING), index(pInfo.nr - 1, TISSUE_16));
 }

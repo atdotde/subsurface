@@ -3,9 +3,10 @@
 #include "kmessagewidget.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "../dive.h"
-#include "../divelist.h"
-#include "../helpers.h"
+#include "dive.h"
+#include "divelist.h"
+#include "helpers.h"
+#include "display.h"
 
 #include <QDebug>
 #include <QTimer>
@@ -25,11 +26,18 @@
 #include <QMouseEvent>
 #include <QMessageBox>
 
+// as of Marble 4.10 (which has MARBLE_VERSION 0x001000) zoomView is
+// deprecated and has been replaced by setZoom with the same function signature
+#if MARBLE_VERSION < 0x001000
+#define setZoom zoomView
+#endif
+
 GlobeGPS::GlobeGPS(QWidget *parent) : MarbleWidget(parent),
 	loadedDives(0),
 	messageWidget(new KMessageWidget(this)),
 	fixZoomTimer(new QTimer(this)),
 	currentZoomLevel(0),
+	needResetZoom(false),
 	editingDiveLocation(false)
 {
 	// check if Google Sat Maps are installed
@@ -40,11 +48,11 @@ GlobeGPS::GlobeGPS(QWidget *parent) : MarbleWidget(parent),
 	QDir marble;
 	if (!list.contains("earth/googlesat/googlesat.dgml")) {
 		subsurfaceDataPath = getSubsurfaceDataPath("marbledata");
-		if (subsurfaceDataPath != "") {
+		if (subsurfaceDataPath.size()) {
 			MarbleDirs::setMarbleDataPath(subsurfaceDataPath);
 		} else {
 			subsurfaceDataPath = getSubsurfaceDataPath("data");
-			if (subsurfaceDataPath != "")
+			if (subsurfaceDataPath.size())
 				MarbleDirs::setMarbleDataPath(subsurfaceDataPath);
 		}
 	}
@@ -56,7 +64,7 @@ GlobeGPS::GlobeGPS(QWidget *parent) : MarbleWidget(parent),
 	setProjection(Marble::Spherical);
 
 	setAnimationsEnabled(true);
-	Q_FOREACH(AbstractFloatItem * i, floatItems()) {
+	Q_FOREACH (AbstractFloatItem *i, floatItems()) {
 		i->setVisible(false);
 	}
 
@@ -80,17 +88,25 @@ GlobeGPS::GlobeGPS(QWidget *parent) : MarbleWidget(parent),
 
 bool GlobeGPS::eventFilter(QObject *obj, QEvent *ev)
 {
+	// sometimes Marble seems not to notice double clicks and consequently not call
+	// the right callback - so let's remember here if the last 'click' is a 'double' or not
+	enum QEvent::Type type = ev->type();
+	if (type == QEvent::MouseButtonDblClick)
+		doubleClick = true;
+	else if (type == QEvent::MouseButtonPress)
+		doubleClick = false;
+
 	// This disables Zooming when a double click occours on the scene.
-	if (ev->type() == QEvent::MouseButtonDblClick && !editingDiveLocation)
+	if (type == QEvent::MouseButtonDblClick && !editingDiveLocation)
 		return true;
 	// This disables the Marble's Context Menu
 	// we need to move this to our 'contextMenuEvent'
 	// if we plan to do a different one in the future.
-	if (ev->type() == QEvent::ContextMenu) {
+	if (type == QEvent::ContextMenu) {
 		contextMenuEvent(static_cast<QContextMenuEvent *>(ev));
 		return true;
 	}
-	if (ev->type() == QEvent::MouseButtonPress) {
+	if (type == QEvent::MouseButtonPress) {
 		QMouseEvent *e = static_cast<QMouseEvent *>(ev);
 		if (e->button() == Qt::RightButton)
 			return true;
@@ -101,15 +117,22 @@ bool GlobeGPS::eventFilter(QObject *obj, QEvent *ev)
 void GlobeGPS::contextMenuEvent(QContextMenuEvent *ev)
 {
 	QMenu m;
-	QAction *a = m.addAction(tr("Edit Selected Dive Locations"), this, SLOT(prepareForGetDiveCoordinates()));
+	QAction *a = m.addAction(tr("Edit selected dive locations"), this, SLOT(prepareForGetDiveCoordinates()));
 	a->setData(QVariant::fromValue<void *>(&m));
+	a->setEnabled(current_dive);
 	m.exec(ev->globalPos());
 }
 
 void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 {
+	if (doubleClick) {
+		// strangely sometimes we don't get the changeDiveGeoPosition callback
+		// and end up here instead
+		changeDiveGeoPosition(lon, lat, unit);
+		return;
+	}
 	// don't mess with the selection while the user is editing a dive
-	if (MainWindow::instance()->information()->isEditing())
+	if (MainWindow::instance()->information()->isEditing() || messageWidget->isVisible())
 		return;
 
 	GeoDataCoordinates here(lon, lat, unit);
@@ -134,7 +157,7 @@ void GlobeGPS::mouseClicked(qreal lon, qreal lat, GeoDataCoordinates::Unit unit)
 	struct dive *dive;
 	bool clear = !(QApplication::keyboardModifiers() & Qt::ControlModifier);
 	QList<int> selectedDiveIds;
-	for_each_dive(idx, dive) {
+	for_each_dive (idx, dive) {
 		long lat_diff, lon_diff;
 		if (!dive_has_gps_location(dive))
 			continue;
@@ -167,7 +190,7 @@ void GlobeGPS::repopulateLabels()
 
 	int idx = 0;
 	struct dive *dive;
-	for_each_dive(idx, dive) {
+	for_each_dive (idx, dive) {
 		if (dive_has_gps_location(dive)) {
 			GeoDataPlacemark *place = new GeoDataPlacemark(dive->location);
 			place->setCoordinate(dive->longitude.udeg / 1000000.0, dive->latitude.udeg / 1000000.0, 0, GeoDataCoordinates::Degree);
@@ -194,32 +217,44 @@ void GlobeGPS::repopulateLabels()
 void GlobeGPS::reload()
 {
 	editingDiveLocation = false;
-	if (messageWidget->isVisible())
-		messageWidget->hide();
+	messageWidget->hide();
 	repopulateLabels();
 }
 
-void GlobeGPS::centerOn(dive *dive)
+void GlobeGPS::centerOnCurrentDive()
 {
+	struct dive *dive = current_dive;
 	// dive has changed, if we had the 'editingDive', hide it.
-	if (messageWidget->isVisible() && (!dive || dive_has_gps_location(dive)))
+	if (messageWidget->isVisible() && (!dive || dive_has_gps_location(dive) || amount_selected != 1))
 		messageWidget->hide();
+
+	editingDiveLocation = false;
 	if (!dive)
 		return;
+
 	qreal longitude = dive->longitude.udeg / 1000000.0;
 	qreal latitude = dive->latitude.udeg / 1000000.0;
 
-	if (!longitude || !latitude || MainWindow::instance()->information()->isEditing()) {
+	if ((!dive_has_gps_location(dive) || MainWindow::instance()->information()->isEditing()) && amount_selected == 1) {
 		prepareForGetDiveCoordinates();
 		return;
 	}
+	if (!dive_has_gps_location(dive)) {
+		zoomOutForNoGPS();
+		return;
+	}
 
-	// set the zoom as seen from n kilometer above. 3km / 10,000ft seems pleasant
-	// do not change it it was already modified by user
-	if (!zoom())
-		zoomView(zoomFromDistance(3));
-
-	if (!fixZoomTimer->isActive())
+	// if no zoom is set up, set the zoom as seen from 3km above
+	// if we come back from a dive without GPS data, reset to the last zoom value
+	// otherwise check to make sure we aren't still running an animation and then remember
+	// the current zoom level
+	if (!zoom()) {
+		currentZoomLevel = zoomFromDistance(3);
+		fixZoom();
+	} else if (needResetZoom) {
+		needResetZoom = false;
+		fixZoom();
+	} else if (!fixZoomTimer->isActive())
 		currentZoomLevel = zoom();
 	// From the marble source code, the maximum time of
 	// 'spin and fit' is 2 seconds, so wait a bit them zoom again.
@@ -230,7 +265,21 @@ void GlobeGPS::centerOn(dive *dive)
 
 void GlobeGPS::fixZoom()
 {
-	zoomView(currentZoomLevel, Marble::Linear);
+	setZoom(currentZoomLevel, Marble::Linear);
+}
+
+void GlobeGPS::zoomOutForNoGPS()
+{
+	// this is called if the dive has no GPS location.
+	// zoom out quite a bit to show the globe and remember that the next time
+	// we show a dive with GPS location we need to zoom in again
+	if (fixZoomTimer->isActive())
+		fixZoomTimer->stop();
+	setZoom(1200, Marble::Automatic);
+	if (!needResetZoom) {
+		needResetZoom = true;
+		currentZoomLevel = zoom();
+	}
 }
 
 void GlobeGPS::prepareForGetDiveCoordinates()
@@ -239,8 +288,11 @@ void GlobeGPS::prepareForGetDiveCoordinates()
 		messageWidget->setMessageType(KMessageWidget::Warning);
 		messageWidget->setText(QObject::tr("Move the map and double-click to set the dive location"));
 		messageWidget->setWordWrap(true);
+		messageWidget->setCloseButtonVisible(false);
 		messageWidget->animatedShow();
 		editingDiveLocation = true;
+		if (!dive_has_gps_location(current_dive))
+			zoomOutForNoGPS();
 	}
 }
 
@@ -257,10 +309,11 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 		lat = lat * 180 / M_PI;
 	}
 
-	/* change everything on the selection. */
+	// right now we try to only ever do this with one dive selected,
+	// but we keep the code here that changes the coordinates for each selected dive
 	int i;
 	struct dive *dive;
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		if (!dive->selected)
 			continue;
 		dive->latitude.udeg = lrint(lat * 1000000.0);
@@ -274,6 +327,9 @@ void GlobeGPS::changeDiveGeoPosition(qreal lon, qreal lat, GeoDataCoordinates::U
 
 void GlobeGPS::mousePressEvent(QMouseEvent *event)
 {
+	if (event->type() != QEvent::MouseButtonDblClick)
+		return;
+
 	qreal lat, lon;
 	bool clickOnGlobe = geoCoordinates(event->pos().x(), event->pos().y(), lon, lat, GeoDataCoordinates::Degree);
 
@@ -298,10 +354,24 @@ void GlobeGPS::resizeEvent(QResizeEvent *event)
 }
 #else
 
-GlobeGPS::GlobeGPS(QWidget* parent) { setText("MARBLE DISABLED AT BUILD TIME"); }
-void GlobeGPS::repopulateLabels() {}
-void GlobeGPS::centerOn(dive* dive) {}
-bool GlobeGPS::eventFilter(QObject *obj, QEvent *ev) {}
-void GlobeGPS::prepareForGetDiveCoordinates() {}
-void GlobeGPS::reload() {}
+GlobeGPS::GlobeGPS(QWidget *parent)
+{
+	setText("MARBLE DISABLED AT BUILD TIME");
+}
+void GlobeGPS::repopulateLabels()
+{
+}
+void GlobeGPS::centerOnCurrentDive()
+{
+}
+bool GlobeGPS::eventFilter(QObject *obj, QEvent *ev)
+{
+	return QObject::eventFilter(obj, ev);
+}
+void GlobeGPS::prepareForGetDiveCoordinates()
+{
+}
+void GlobeGPS::reload()
+{
+}
 #endif

@@ -23,65 +23,35 @@
  */
 static void quote(struct membuffer *b, const char *text, int is_attribute)
 {
-	const char *p = text;
-
-	for (;;) {
-		const char *escape;
-
-		switch (*p++) {
-		default:
-			continue;
-		case 0:
-			escape = NULL;
-			break;
-		case 1 ... 8:
-		case 11:
-		case 12:
-		case 14 ... 31:
-			escape = "?";
-			break;
-		case '<':
-			escape = "&lt;";
-			break;
-		case '>':
-			escape = "&gt;";
-			break;
-		case '&':
-			escape = "&amp;";
-			break;
-		case '\'':
-			if (!is_attribute)
-				continue;
-			escape = "&apos;";
-			break;
-		case '\"':
-			if (!is_attribute)
-				continue;
-			escape = "&quot;";
-			break;
-		}
-		put_bytes(b, text, (p - text - 1));
-		if (!escape)
-			break;
-		put_string(b, escape);
-		text = p;
-	}
+	int is_html = 0;
+	put_quoted(b, text, is_attribute, is_html);
 }
 
 static void show_utf8(struct membuffer *b, const char *text, const char *pre, const char *post, int is_attribute)
 {
 	int len;
+	char *cleaned;
+
+	if (!text)
+		return;
+	/* remove leading and trailing space */
+	/* We need to combine isascii() with isspace(),
+	 * because we can only trust isspace() with 7-bit ascii,
+	 * on windows for example */
+	while (isascii(*text) && isspace(*text))
+		text++;
+	len = strlen(text);
+	if (!len)
+		return;
+	while (len && isascii(text[len - 1]) && isspace(text[len - 1]))
+		len--;
+	/* strndup would be easier, but that doesn't appear to exist on Windows / Mac */
+	cleaned = strdup(text);
+	cleaned[len] = '\0';
 	put_string(b, pre);
-	if (text){
-		while (isspace(*text))
-			text++;
-		len = strlen(text);
-		while (len && isspace(text[len - 1]))
-			len--;
-		/* FIXME! Quoting! */
-		quote(b, text, is_attribute);
-	}
+	quote(b, cleaned, is_attribute);
 	put_string(b, post);
+	free(cleaned);
 }
 
 static void save_depths(struct membuffer *b, struct divecomputer *dc)
@@ -140,42 +110,16 @@ static void save_salinity(struct membuffer *b, struct divecomputer *dc)
 	put_string(b, " />\n");
 }
 
-/*
- * Format degrees to within 6 decimal places. That's about 0.1m
- * on a great circle (ie longitude at equator). And micro-degrees
- * is also enough to fit in a fixed-point 32-bit integer.
- */
-static int format_degrees(char *buffer, degrees_t value)
-{
-	int udeg = value.udeg;
-	const char *sign = "";
-
-	if (udeg < 0) {
-		sign = "-";
-		udeg = -udeg;
-	}
-	return sprintf(buffer, "%s%u.%06u",
-		       sign, udeg / 1000000, udeg % 1000000);
-}
-
-static int format_location(char *buffer, degrees_t latitude, degrees_t longitude)
-{
-	int len = sprintf(buffer, "gps='");
-
-	len += format_degrees(buffer + len, latitude);
-	buffer[len++] = ' ';
-	len += format_degrees(buffer + len, longitude);
-	buffer[len++] = '\'';
-
-	return len;
-}
-
 static void show_location(struct membuffer *b, struct dive *dive)
 {
-	char buffer[80];
-	const char *prefix = "  <location>";
 	degrees_t latitude = dive->latitude;
 	degrees_t longitude = dive->longitude;
+
+	/* Should we write a location tag at all? */
+	if (!(latitude.udeg || longitude.udeg) && !dive->location)
+		return;
+
+	put_string(b, "  <location");
 
 	/*
 	 * Ok, theoretically I guess you could dive at
@@ -184,13 +128,15 @@ static void show_location(struct membuffer *b, struct dive *dive)
 	 * you dove a few meters away.
 	 */
 	if (latitude.udeg || longitude.udeg) {
-		int len = sprintf(buffer, "  <location ");
-		len += format_location(buffer + len, latitude, longitude);
-		buffer[len++] = '>';
-		buffer[len] = 0;
-		prefix = buffer;
+		put_degrees(b, latitude, " gps='", " ");
+		put_degrees(b, longitude, "", "'");
 	}
-	show_utf8(b, dive->location, prefix, "</location>\n", 0);
+
+	/* Do we have a location name or should we write a empty tag? */
+	if (dive->location && dive->location[0] != '\0')
+		show_utf8(b, dive->location, ">", "</location>\n", 0);
+	else
+		put_string(b, "/>\n");
 }
 
 static void save_overview(struct membuffer *b, struct dive *dive)
@@ -200,6 +146,18 @@ static void save_overview(struct membuffer *b, struct dive *dive)
 	show_utf8(b, dive->buddy, "  <buddy>", "</buddy>\n", 0);
 	show_utf8(b, dive->notes, "  <notes>", "</notes>\n", 0);
 	show_utf8(b, dive->suit, "  <suit>", "</suit>\n", 0);
+}
+
+static void put_gasmix(struct membuffer *b, struct gasmix *mix)
+{
+	int o2 = mix->o2.permille;
+	int he = mix->he.permille;
+
+	if (o2) {
+		put_format(b, " o2='%u.%u%%'", FRACTION(o2, 10));
+		if (he)
+			put_format(b, " he='%u.%u%%'", FRACTION(he, 10));
+	}
 }
 
 static void save_cylinder_info(struct membuffer *b, struct dive *dive)
@@ -212,21 +170,17 @@ static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 		cylinder_t *cylinder = dive->cylinder + i;
 		int volume = cylinder->type.size.mliter;
 		const char *description = cylinder->type.description;
-		int o2 = cylinder->gasmix.o2.permille;
-		int he = cylinder->gasmix.he.permille;
 
 		put_format(b, "  <cylinder");
 		if (volume)
 			put_milli(b, " size='", volume, " l'");
 		put_pressure(b, cylinder->type.workingpressure, " workpressure='", " bar'");
 		show_utf8(b, description, " description='", "'", 1);
-		if (o2) {
-			put_format(b, " o2='%u.%u%%'", FRACTION(o2, 10));
-			if (he)
-				put_format(b, " he='%u.%u%%'", FRACTION(he, 10));
-		}
+		put_gasmix(b, &cylinder->gasmix);
 		put_pressure(b, cylinder->start, " start='", " bar'");
 		put_pressure(b, cylinder->end, " end='", " bar'");
+		if (cylinder->cylinder_use != OC_GAS)
+			show_utf8(b, cylinderuse_text[cylinder->cylinder_use], " use='", "'", 1);
 		put_format(b, " />\n");
 	}
 }
@@ -261,6 +215,7 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 	put_milli(b, " depth='", sample->depth.mm, " m'");
 	put_temperature(b, sample->temperature, " temp='", " C'");
 	put_pressure(b, sample->cylinderpressure, " pressure='", " bar'");
+	put_pressure(b, sample->o2cylinderpressure, " o2pressure='", " bar'");
 
 	/*
 	 * We only show sensor information for samples with pressure, and only if it
@@ -275,6 +230,10 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 	if (sample->ndl.seconds != old->ndl.seconds) {
 		put_format(b, " ndl='%u:%02u min'", FRACTION(sample->ndl.seconds, 60));
 		old->ndl = sample->ndl;
+	}
+	if (sample->tts.seconds != old->tts.seconds) {
+		put_format(b, " tts='%u:%02u min'", FRACTION(sample->tts.seconds, 60));
+		old->tts = sample->tts;
 	}
 	if (sample->in_deco != old->in_deco) {
 		put_format(b, " in_deco='%d'", sample->in_deco ? 1 : 0);
@@ -295,12 +254,27 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 		old->cns = sample->cns;
 	}
 
-	if (sample->po2 != old->po2) {
-		put_milli(b, " po2='", sample->po2, " bar'");
-		old->po2 = sample->po2;
+	if ((sample->o2sensor[0].mbar) && (sample->o2sensor[0].mbar != old->o2sensor[0].mbar)) {
+		put_milli(b, " sensor1='", sample->o2sensor[0].mbar, " bar'");
+		old->o2sensor[0] = sample->o2sensor[0];
+	}
+
+	if ((sample->o2sensor[1].mbar) && (sample->o2sensor[1].mbar != old->o2sensor[1].mbar)) {
+		put_milli(b, " sensor2='", sample->o2sensor[1].mbar, " bar'");
+		old->o2sensor[1] = sample->o2sensor[1];
+	}
+
+	if ((sample->o2sensor[2].mbar) && (sample->o2sensor[2].mbar != old->o2sensor[2].mbar)) {
+		put_milli(b, " sensor3='", sample->o2sensor[2].mbar, " bar'");
+		old->o2sensor[2] = sample->o2sensor[2];
+	}
+
+	if (sample->setpoint.mbar != old->setpoint.mbar) {
+		put_milli(b, " po2='", sample->setpoint.mbar, " bar'");
+		old->setpoint = sample->setpoint;
 	}
 	show_index(b, sample->heartbeat, "heartbeat='", "'");
-	show_index(b, sample->bearing, "bearing='", "'");
+	show_index(b, sample->bearing.degrees, "bearing='", "'");
 	put_format(b, " />\n");
 }
 
@@ -311,6 +285,13 @@ static void save_one_event(struct membuffer *b, struct event *ev)
 	show_index(b, ev->flags, "flags='", "'");
 	show_index(b, ev->value, "value='", "'");
 	show_utf8(b, ev->name, " name='", "'", 1);
+	if (event_is_gaschange(ev)) {
+		if (ev->gas.index >= 0) {
+			show_index(b, ev->gas.index, "cylinder='", "'");
+			put_gasmix(b, &ev->gas.mix);
+		} else if (!event_gasmix_redundant(ev))
+			put_gasmix(b, &ev->gas.mix);
+	}
 	put_format(b, " />\n");
 }
 
@@ -335,6 +316,19 @@ static void save_tags(struct membuffer *b, struct tag_entry *entry)
 			sep = ", ";
 		} while ((entry = entry->next) != NULL);
 		put_string(b, "'");
+	}
+}
+
+static void save_extra_data(struct membuffer *b, struct extra_data *ed)
+{
+	while (ed) {
+		if (ed->key && ed->value) {
+			put_string(b, "  <extradata");
+			show_utf8(b, ed->key, " key='", "'", 1);
+			show_utf8(b, ed->value, " value='", "'", 1);
+			put_string(b, " />\n");
+		}
+		ed = ed->next;
 	}
 }
 
@@ -372,17 +366,45 @@ static void save_dc(struct membuffer *b, struct dive *dive, struct divecomputer 
 		show_date(b, dc->when);
 	if (dc->duration.seconds && dc->duration.seconds != dive->dc.duration.seconds)
 		put_duration(b, dc->duration, " duration='", " min'");
+	if (dc->dctype != OC) {
+		for (enum dive_comp_type i = 0; i < NUM_DC_TYPE; i++)
+			if (dc->dctype == i)
+				show_utf8(b, dctype_text[i], " dctype='", "'", 1);
+		if (dc->no_o2sensors)
+			put_format(b," no_o2sensors='%d'", dc->no_o2sensors);
+	}
 	put_format(b, ">\n");
 	save_depths(b, dc);
 	save_temperatures(b, dc);
 	save_airpressure(b, dc);
 	save_salinity(b, dc);
 	put_duration(b, dc->surfacetime, "  <surfacetime>", " min</surfacetime>\n");
-
+	save_extra_data(b, dc->extra_data);
 	save_events(b, dc->events);
 	save_samples(b, dc->samples, dc->sample);
 
 	put_format(b, "  </divecomputer>\n");
+}
+
+static void save_picture(struct membuffer *b, struct picture *pic)
+{
+	put_string(b, "  <picture filename='");
+	put_string(b, pic->filename);
+	put_string(b, "'");
+	if (pic->offset.seconds) {
+		int offset = pic->offset.seconds;
+		char sign = '+';
+		if (offset < 0) {
+			sign = '-';
+			offset = -offset;
+		}
+		put_format(b, " offset='%c%u:%02u min'", sign, FRACTION(offset, 60));
+	}
+	if (pic->latitude.udeg || pic->longitude.udeg) {
+		put_degrees(b, pic->latitude, " gps='", " ");
+		put_degrees(b, pic->longitude, "", "'");
+	}
+	put_string(b, "/>\n");
 }
 
 void save_one_dive(struct membuffer *b, struct dive *dive)
@@ -408,12 +430,10 @@ void save_one_dive(struct membuffer *b, struct dive *dive)
 	save_weightsystem_info(b, dive);
 	save_dive_temperature(b, dive);
 	/* Save the dive computer data */
-	dc = &dive->dc;
-	do {
+	for_each_dc(dive, dc)
 		save_dc(b, dive, dc);
-		dc = dc->next;
-	} while (dc);
-
+	FOR_EACH_PICTURE(dive)
+		save_picture(b, picture);
 	put_format(b, "</dive>\n");
 }
 
@@ -500,7 +520,7 @@ void save_dives_buffer(struct membuffer *b, const bool select_only)
 	put_format(b, "<divelog program='subsurface' version='%d'>\n<settings>\n", VERSION);
 
 	if (prefs.save_userid_local)
-		put_format(b, "  <userid>%s</userid>\n", prefs.userid);
+		put_format(b, "  <userid>%30s</userid>\n", prefs.userid);
 
 	/* save the dive computer nicknames, if any */
 	call_for_each_dc(b, save_one_device);
@@ -625,7 +645,7 @@ int export_dives_xslt(const char *filename, const bool selected, const char *exp
 	xmlDoc *doc;
 	xsltStylesheetPtr xslt = NULL;
 	xmlDoc *transformed;
-
+	int res = 0;
 
 	if (!filename)
 		return report_error("No filename for export");
@@ -649,18 +669,19 @@ int export_dives_xslt(const char *filename, const bool selected, const char *exp
 		return report_error("Failed to open export conversion stylesheet");
 
 	transformed = xsltApplyStylesheet(xslt, doc, NULL);
-	xsltFreeStylesheet(xslt);
 	xmlFreeDoc(doc);
 
 	/* Write the transformed export to file */
 	f = subsurface_fopen(filename, "w");
-	if (!f)
-		return report_error("Failed to open %s for writing (%s)", filename, strerror(errno));
-
-	xmlDocFormatDump(f, transformed, 1);
+	if (f) {
+		xsltSaveResultToFile(f, transformed, xslt);
+		fclose(f);
+		/* Check write errors? */
+	} else {
+		res = report_error("Failed to open %s for writing (%s)", filename, strerror(errno));
+	}
+	xsltFreeStylesheet(xslt);
 	xmlFreeDoc(transformed);
 
-	fclose(f);
-	/* Check write errors? */
-	return 0;
+	return res;
 }

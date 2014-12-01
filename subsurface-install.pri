@@ -1,12 +1,13 @@
 marbledir.files = $$MARBLEDIR
 doc.files = $$DOC_FILES
+theme.files = $$THEME_FILES
 translation.files = $$replace(TRANSLATIONS, .ts, .qm)
 exists($$[QT_INSTALL_TRANSLATIONS]) {
         qt_translation_dir = $$[QT_INSTALL_TRANSLATIONS]
-} else: exists(/usr/share/qt4/translations) {
+} else: exists(/usr/share/qt5/translations) {
 	# On some cross-compilation environments, the translations are either missing or not
 	# where they're expected to be. In such cases, try copying from the system.
-	qt_translation_dir = /usr/share/qt4/translations
+	qt_translation_dir = /usr/share/qt5/translations
 }
 
 # Prepend the Qt translation dir so we can actually find the files
@@ -30,10 +31,11 @@ mac {
 
 	datadir = Contents/Resources/share
 	marbledir.path = Contents/Resources/data
+	theme.path = Contents/Resources
 	doc.path = $$datadir/Documentation
 	translation.path = Contents/Resources/translations
 	qttranslation.path = Contents/Resources/translations
-	QMAKE_BUNDLE_DATA += marbledir doc translation qttranslation
+	QMAKE_BUNDLE_DATA += marbledir doc translation qttranslation theme
 
 	mac_deploy.target = mac-deploy
 	mac_deploy.commands += $$[QT_INSTALL_BINS]/macdeployqt $${TARGET}.app
@@ -60,7 +62,8 @@ mac {
 	deploy.CONFIG += no_check_exist
 	target.path = $$WINDOWSSTAGING
 	marbledir.path = $$WINDOWSSTAGING/data
-	INSTALLS += deploy marbledir target doc
+	theme.path = $$WINDOWSSTAGING
+	INSTALLS += deploy marbledir target doc theme
 
 	translation.path = $$WINDOWSSTAGING/translations
 	qttranslation.path = $$WINDOWSSTAGING/translations
@@ -115,9 +118,19 @@ mac {
 		dlls.depends += $(DESTDIR_TARGET)
 
 		nsis.commands += $(CHK_DIR_EXISTS) $$WINDOWSSTAGING;
-		nsis.commands += cat $$NSIINPUTFILE | sed -e \'s/VERSIONTOKEN/$$VERSION_STRING/;s/PRODVTOKEN/$${PRODVERSION_STRING}/\' > $$NSIFILE
+		win64target {
+			nsis.commands += cat $$NSIINPUTFILE | sed -e \'s/VERSIONTOKEN/$$VERSION_STRING/;s/PRODVTOKEN/$${PRODVERSION_STRING}/;s/64BITBUILDTOKEN/1 == 1/\' > $$NSIFILE
+		} else {
+			nsis.commands += cat $$NSIINPUTFILE | sed -e \'s/VERSIONTOKEN/$$VERSION_STRING/;s/PRODVTOKEN/$${PRODVERSION_STRING}/;s/64BITBUILDTOKEN/1 == 0/\' > $$NSIFILE
+		}
 		nsis.depends += $$NSIINPUTFILE
 		nsis.target = $$NSISFILE
+		#
+		# FIXME HACK HACK FIXME  -- this is needed to create working daily builds...
+		#
+		brokenQt532win {
+			installer.commands += cp Qt531/*.dll staging;
+		}
 		installer.commands += $$MAKENSIS $$NSIFILE
 		installer.target = installer
 		installer.depends = nsis install
@@ -127,6 +140,8 @@ mac {
 } else: android {
 	# Android install rules
 	QMAKE_BUNDLE_DATA += translation qttranslation
+	# Android template directory
+	ANDROID_PACKAGE_SOURCE_DIR = $$OUT_PWD/android
 } else {
 	# Linux install rules
 	# On Linux, we can count on packagers doing the right thing
@@ -160,13 +175,14 @@ mac {
 
 	marbledir.path = /$(EXPORT_DATADIR)/subsurface/data
 	doc.path = /$(EXPORT_DOCDIR)
+	theme.path = /$(EXPORT_DATADIR)/subsurface
 
 	doc.CONFIG += no_check_exist
 
 	translation.path = /$(EXPORT_DATADIR)/subsurface/translations
 	translation.CONFIG += no_check_exist
 
-	INSTALLS += target desktop manpage doc marbledir translation icon
+	INSTALLS += target desktop manpage doc marbledir translation icon theme
 	install.target = install
 }
 !isEmpty(TRANSLATIONS) {

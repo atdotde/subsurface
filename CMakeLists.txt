@@ -77,6 +77,7 @@ ADD_CUSTOM_TARGET(version ALL COMMAND
 
 # compile the core library, in C.
 SET(SUBSURFACE_CORE_LIB_SRCS
+	cochran.c
 	deco.c
 	device.c
 	dive.c
@@ -84,14 +85,17 @@ SET(SUBSURFACE_CORE_LIB_SRCS
 	equipment.c
 	file.c
 	libdivecomputer.c
+	liquivision.c
 	load-git.c
 	membuffer.c
 	parse-xml.c
 	planner.c
 	profile.c
+	gaspressures.c
 	worldmap-save.c
 	save-git.c
 	save-xml.c
+	save-html.c
 	sha1.c
 	statistics.c
 	strtod.c
@@ -104,6 +108,12 @@ SET(SUBSURFACE_CORE_LIB_SRCS
 	gettextfromc.cpp
 	#dirk ported some core functionality to c++.
 	qthelper.cpp
+	divecomputer.cpp
+	exif.cpp
+	subsurfacesysinfo.cpp
+	devicedetails.cpp
+	configuredivecomputer.cpp
+	configuredivecomputerthreads.cpp
 )
 
 #the interface, in C++
@@ -114,6 +124,7 @@ SET(SUBSURFACE_INTERFACE
 	qt-ui/divecomputermanagementdialog.cpp
 	qt-ui/divelistview.cpp
 	qt-ui/diveplanner.cpp
+	qt-ui/diveshareexportdialog.cpp
 	qt-ui/downloadfromdivecomputer.cpp
 	qt-ui/globe.cpp
 	qt-ui/graphicsview-common.cpp
@@ -122,6 +133,7 @@ SET(SUBSURFACE_INTERFACE
 	qt-ui/mainwindow.cpp
 	qt-ui/modeldelegates.cpp
 	qt-ui/models.cpp
+	qt-ui/metrics.cpp
 	qt-ui/preferences.cpp
 	qt-ui/printdialog.cpp
 	qt-ui/printlayout.cpp
@@ -130,11 +142,15 @@ SET(SUBSURFACE_INTERFACE
 	qt-ui/starwidget.cpp
 	qt-ui/subsurfacewebservices.cpp
 	qt-ui/tableview.cpp
-	qt-ui/exif.cpp
 	qt-ui/divelogimportdialog.cpp
 	qt-ui/tagwidget.cpp
 	qt-ui/groupedlineedit.cpp
 	qt-ui/usermanual.cpp
+	qt-ui/divelogexportdialog.cpp
+	qt-ui/divepicturewidget.cpp
+	qt-ui/usersurvey.cpp
+	qt-ui/configuredivecomputerdialog.cpp
+	qt-ui/filtermodels.cpp
 )
 
 #the profile widget
@@ -151,6 +167,15 @@ SET(SUBSURFACE_PROFILE_LIB_SRCS
 	qt-ui/profile/diveeventitem.cpp
 	qt-ui/profile/divetooltipitem.cpp
 	qt-ui/profile/ruleritem.cpp
+	qt-ui/profile/tankitem.cpp
+)
+
+#the yearly statistics widget.
+SET(SUBSURFACE_STATISTICS_LIB_SRCS
+	qt-ui/statistics/statisticswidget.cpp
+	qt-ui/statistics/yearstatistics.cpp
+	qt-ui/statistics/statisticsbar.cpp
+	qt-ui/statistics/monthstatistics.cpp
 )
 
 #the main app.
@@ -171,6 +196,7 @@ ENDIF()
 
 ADD_LIBRARY(subsurface_corelib STATIC ${SUBSURFACE_CORE_LIB_SRCS} )
 ADD_LIBRARY(subsurface_profile STATIC ${SUBSURFACE_PROFILE_LIB_SRCS})
+ADD_LIBRARY(subsurface_statistics STATIC ${SUBSURFACE_STATISTICS_LIB_SRCS})
 ADD_LIBRARY(subsurface_generated_ui STATIC ${SUBSURFACE_UI_HDRS})
 ADD_LIBRARY(subsurface_interface STATIC ${SUBSURFACE_INTERFACE})
 ADD_EXECUTABLE(subsurface ${SUBSURFACE_APP} ${SUBSURFACE_QRC_HRDS} )
@@ -179,6 +205,7 @@ target_link_libraries( subsurface
   subsurface_generated_ui
   subsurface_interface
   subsurface_profile
+  subsurface_statistics
   subsurface_corelib
   ${QT_LIBRARIES}
   ${MARBLE_LIBRARIES}
@@ -187,6 +214,7 @@ target_link_libraries( subsurface
   -lzip
 )
 
+ADD_DEPENDENCIES(subsurface_statistics subsurface_generated_ui)
 ADD_DEPENDENCIES(subsurface_profile subsurface_generated_ui)
 ADD_DEPENDENCIES(subsurface_interface subsurface_generated_ui)
 ADD_DEPENDENCIES(subsurface_generated_ui version)

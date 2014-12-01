@@ -7,40 +7,39 @@
 # submitting patches to the user manual, only submit the changes to the .txt
 # file - the maintainer will recreate the .html.git file
 
-DOCNAME = user-manual
-DOCSOURCE = $(DOCNAME).txt
-HTMLDOC = $(DOCNAME).html
+DOCNAMES = user-manual user-manual_es user-manual_ru
+
+HTMLDOCS = $(patsubst %,$(OUT)%.html,$(DOCNAMES))
+TEXTDOCS = $(patsubst %,$(OUT)%.text,$(DOCNAMES))
+PDFDOCS = $(patsubst %,$(OUT)%.pdf,$(DOCNAMES))
+
 ASCIIDOC = asciidoc
 A2X = a2x
 BROWSER = firefox
 THEME = compact_subsurface
 PWD = $(realpath .)
-ENABLE_PLANNER := 0
-ifeq ($(ENABLE_PLANNER), 1)
-ENABLE_PLANNER_ATTR=-a ENABLE_PLANNER=$(ENABLE_PLANNER)
-endif
 
-all: doc $(addprefix $(DOCNAME).,pdf text)
+all: $(HTMLEDOCS) $(TEXTDOCS) $(PDFDOCS)
 
-doc: $(OUT)$(HTMLDOC)
+doc: $(HTMLDOCS)
 
-$(OUT)$(DOCNAME).text: $(DOCSOURCE)
+$(OUT)%.text: %.txt
 	$(A2X) -f text $<
 
-$(OUT)$(DOCNAME).pdf: $(DOCSOURCE)
-	$(A2X) -f pdf $<
+$(OUT)%.pdf: %.txt
+	-$(A2X) --dblatex-opts "-P latex.output.revhistory=0" -f pdf $<
 
-$(OUT)$(HTMLDOC): $(DOCSOURCE)
+$(OUT)%.html: %.txt
 	@echo "if asciidoc isn't found the html file included in the sources is copied"
 	$(ASCIIDOC) -a toc -a toclevels=3 -a themedir=$(PWD) -a theme=$(THEME) -a stylesdir=$(PWD) \
-		$(ENABLE_PLANNER_ATTR) -o $(OUT)$(HTMLDOC) $< || cp $(HTMLDOC).git $(OUT)$(HTMLDOC)
+		-o $@ $< || cp $(<:%.txt=%.html.git) $@
 
 # Alternatively::
 $(OUT)$(DOCNAME).xhtml: $(DOCSOURCE)
-	$(A2X) $(ENABLE_PLANNER_ATTR) --icons -f xhtml $<
+	$(A2X) --icons -f xhtml $<
 
 show: $(HTMLDOC)
 	$(BROWSER) $<
 
 clean:
-	rm -f *~ docbook-xsl.css $(HTMLDOC) $(addprefix $(DOCNAME).,pdf text)
+	rm -f *~ docbook-xsl.css $(HTMLDOCS) $(TEXTDOCS) $(PDFDOCS)

@@ -18,9 +18,10 @@ struct preferences default_prefs = {
 		.phe_threshold = 13.0,
 	},
 	.mod = false,
-	.modppO2 = 1.6,
+	.modpO2 = 1.6,
 	.ead = false,
 	.hrgraph = true,
+	.percentagegraph = true,
 	.dcceiling = true,
 	.redceiling = false,
 	.calcceiling = false,
@@ -28,14 +29,31 @@ struct preferences default_prefs = {
 	.calcndltts = false,
 	.gflow = 30,
 	.gfhigh = 75,
-	.animation = 500,
+	.animation_speed = 500,
 	.gf_low_at_maxdepth = false,
 	.font_size = -1,
 	.display_invalid_dives = false,
 	.show_sac = false,
 	.display_unused_tanks = false,
-	.show_average_depth = true
+	.show_average_depth = true,
+	.ascrate75 = 9000 / 60,
+	.ascrate50 = 6000 / 60,
+	.ascratestops = 6000 / 60,
+	.ascratelast6m = 1000 / 60,
+	.descrate = 18000 / 60,
+	.bottompo2 = 1400,
+	.decopo2 = 1600,
+	.doo2breaks = false,
+	.drop_stone_mode = false,
+	.bottomsac = 20000,
+	.decosac = 17000,
+	.o2consumption = 1000,
+	.pscr_ratio = 100,
+	.show_pictures_in_profile = true,
+	.tankbar = false
 };
+
+int run_survey;
 
 struct units *get_units()
 {
@@ -100,6 +118,7 @@ static void print_help()
 	printf("\n --import logfile ...  Logs before this option is treated as base, everything after is imported");
 	printf("\n --verbose|-v          Verbose debug (repeat to increase verbosity)");
 	printf("\n --version             Prints current version");
+	printf("\n --survey              Offer to submit a user survey");
 	printf("\n --win32console        Create a dedicated console if needed (Windows only). Add option before everything else\n\n");
 }
 
@@ -136,6 +155,10 @@ void parse_argument(const char *arg)
 				print_version();
 				exit(0);
 			}
+			if (strcmp(arg, "--survey") == 0) {
+				run_survey = true;
+				return;
+			}
 			if (strcmp(arg, "--win32console") == 0)
 				return;
 		/* fallthrough */
@@ -152,13 +175,14 @@ void parse_argument(const char *arg)
 	} while (*++p);
 }
 
-void renumber_dives(int nr)
+void renumber_dives(int start_nr, bool selected_only)
 {
-	int i;
+	int i, nr = start_nr;
+	struct dive *dive;
 
-	for (i = 0; i < dive_table.nr; i++) {
-		struct dive *dive = dive_table.dives[i];
-		dive->number = nr + i;
+	for_each_dive (i, dive) {
+		if (dive->selected)
+			dive->number = nr++;
 	}
 	mark_divelist_changed(true);
 }
@@ -185,6 +209,7 @@ void setup_system_prefs(void)
 	if(!feof(tex))
 	  has_pdftex = true;
 
+	subsurface_OS_pref_setup();
 	default_prefs.divelist_font = strdup(system_divelist_default_font);
 	default_prefs.font_size = system_divelist_default_font_size;
 	default_prefs.default_filename = system_default_filename();

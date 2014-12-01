@@ -38,11 +38,53 @@
     <PARTNER>
       <xsl:value-of select="buddy"/>
     </PARTNER>
+
+    <!-- If there is a gas change event within the first few seconds
+         then we try to detect matching cylinder, otherwise the first
+         cylinder is used.
+         -->
+    <xsl:variable name="time">
+      <xsl:call-template name="time2sec">
+        <xsl:with-param name="time">
+          <xsl:value-of select="event[@name = 'gaschange']/@time"/>
+        </xsl:with-param>
+      </xsl:call-template>
+    </xsl:variable>
+
+    <xsl:variable name="mix">
+      <xsl:value-of select="concat(event[@name = 'gaschange']/@value, '.0%')"/>
+    </xsl:variable>
+
+    <xsl:variable name="cylinder">
+      <xsl:choose>
+        <xsl:when test="$time &lt; 60">
+          <xsl:value-of select="count(cylinder[@o2 = $mix]/preceding-sibling::cylinder) + 1"/>
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:value-of select="1"/>
+        </xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+
     <CYLINDERDESCRIPTION>
-      <xsl:value-of select="cylinder/@description"/>
+      <xsl:value-of select="cylinder[position() = $cylinder]/@description"/>
     </CYLINDERDESCRIPTION>
+
+    <xsl:variable name="double">
+      <xsl:choose>
+        <xsl:when test="substring(cylinder[position() = $cylinder]/@description, 1, 1) = 'D' and substring-before(substring(cylinder[position() = $cylinder]/@description, 2), ' ') * 2 = substring-before(cylinder[position() = $cylinder]/@size, ' ')">
+          <xsl:value-of select="'2'"/>
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:value-of select="'1'"/>
+        </xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+    <DBLTANK>
+      <xsl:value-of select="$double - 1"/>
+    </DBLTANK>
     <CYLINDERSIZE>
-      <xsl:value-of select="substring-before(cylinder/@size, ' ')"/>
+      <xsl:value-of select="substring-before(cylinder[position() = $cylinder]/@size, ' ') div $double"/>
     </CYLINDERSIZE>
     <CYLINDERSTARTPRESSURE>
       <xsl:choose>
@@ -50,7 +92,7 @@
           <xsl:value-of select="substring-before(node()/sample/@pressure, ' ')"/>
         </xsl:when>
         <xsl:otherwise>
-          <xsl:value-of select="cylinder[1]/@start"/>
+          <xsl:value-of select="cylinder[position() = $cylinder]/@start"/>
         </xsl:otherwise>
       </xsl:choose>
     </CYLINDERSTARTPRESSURE>
@@ -60,18 +102,65 @@
           <xsl:value-of select="node()/sample[@pressure][last()]/@pressure"/>
         </xsl:when>
         <xsl:otherwise>
-          <xsl:value-of select="cylinder[1]/@end"/>
+          <xsl:value-of select="cylinder[position() = $cylinder]/@end"/>
         </xsl:otherwise>
       </xsl:choose>
     </CYLINDERENDPRESSURE>
+
+    <ADDITIONALTANKS>
+      <xsl:for-each select="cylinder[position() != $cylinder]">
+          <xsl:variable name="cur_cyl">
+            <xsl:value-of select="position()"/>
+          </xsl:variable>
+
+          <TANK>
+            <CYLINDERDESCRIPTION>
+              <xsl:value-of select="@description"/>
+            </CYLINDERDESCRIPTION>
+
+            <xsl:variable name="dbl">
+              <xsl:choose>
+                <xsl:when test="substring(@description, 1, 1) = 'D' and substring-before(substring(@description, 2), ' ') * 2 = substring-before(@size, ' ')">
+                  <xsl:value-of select="'2'"/>
+                </xsl:when>
+                <xsl:otherwise>
+                  <xsl:value-of select="'1'"/>
+                </xsl:otherwise>
+              </xsl:choose>
+            </xsl:variable>
+            <DBLTANK>
+              <xsl:value-of select="$dbl - 1"/>
+            </DBLTANK>
+            <CYLINDERSIZE>
+              <xsl:value-of select="substring-before(@size, ' ') div $dbl"/>
+            </CYLINDERSIZE>
+            <CYLINDERSTARTPRESSURE>
+              <xsl:value-of select="@start"/>
+            </CYLINDERSTARTPRESSURE>
+            <CYLINDERENDPRESSURE>
+              <xsl:value-of select="@end"/>
+            </CYLINDERENDPRESSURE>
+            <O2PCT>
+              <xsl:value-of select="substring-before(@o2, '%')"/>
+            </O2PCT>
+            <HEPCT>
+              <xsl:value-of select="substring-before(@he, '%')"/>
+            </HEPCT>
+          </TANK>
+      </xsl:for-each>
+    </ADDITIONALTANKS>
+
     <WEIGHT>
       <xsl:call-template name="sum">
         <xsl:with-param name="values" select="weightsystem/@weight"/>
       </xsl:call-template>
     </WEIGHT>
     <O2PCT>
-      <xsl:value-of select="substring-before(cylinder/@o2, '%')"/>
+      <xsl:value-of select="substring-before(cylinder[position() = $cylinder]/@o2, '%')"/>
     </O2PCT>
+    <HEPCT>
+      <xsl:value-of select="substring-before(cylinder[position() = $cylinder]/@he, '%')"/>
+    </HEPCT>
     <LOGNOTES>
       <xsl:value-of select="notes"/>
     </LOGNOTES>
@@ -120,7 +209,7 @@
         </xsl:call-template>
       </xsl:variable>
       <xsl:choose>
-        <xsl:when test="$manual = 1">
+        <xsl:when test="$manual = 0">
           <xsl:value-of select="$second - $first"/>
         </xsl:when>
         <xsl:otherwise>

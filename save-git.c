@@ -119,6 +119,27 @@ static void save_tags(struct membuffer *b, struct tag_entry *tags)
 	put_string(b, "\n");
 }
 
+static void save_extra_data(struct membuffer *b, struct extra_data *ed)
+{
+	while (ed) {
+		if (ed->key && ed->value)
+			put_format(b, "keyvalue \"%s\" \"%s\"\n", ed->key ? : "", ed->value ? : "");
+		ed = ed->next;
+	}
+}
+
+static void put_gasmix(struct membuffer *b, struct gasmix *mix)
+{
+	int o2 = mix->o2.permille;
+	int he = mix->he.permille;
+
+	if (o2) {
+		put_format(b, " o2=%u.%u%%", FRACTION(o2, 10));
+		if (he)
+			put_format(b, " he=%u.%u%%", FRACTION(he, 10));
+	}
+}
+
 static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 {
 	int i, nr;
@@ -128,8 +149,6 @@ static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 		cylinder_t *cylinder = dive->cylinder + i;
 		int volume = cylinder->type.size.mliter;
 		const char *description = cylinder->type.description;
-		int o2 = cylinder->gasmix.o2.permille;
-		int he = cylinder->gasmix.he.permille;
 
 		put_string(b, "cylinder");
 		if (volume)
@@ -137,13 +156,12 @@ static void save_cylinder_info(struct membuffer *b, struct dive *dive)
 		put_pressure(b, cylinder->type.workingpressure, " workpressure=", "bar");
 		show_utf8(b, " description=", description, "");
 		strip_mb(b);
-		if (o2) {
-			put_format(b, " o2=%u.%u%%", FRACTION(o2, 10));
-			if (he)
-				put_format(b, " he=%u.%u%%", FRACTION(he, 10));
-		}
+		put_gasmix(b, &cylinder->gasmix);
 		put_pressure(b, cylinder->start, " start=", "bar");
 		put_pressure(b, cylinder->end, " end=", "bar");
+		if (cylinder->cylinder_use != OC_GAS)
+			put_format(b, " use=%s", cylinderuse_text[cylinder->cylinder_use]);
+
 		put_string(b, "\n");
 	}
 }
@@ -228,6 +246,7 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 	put_milli(b, " ", sample->depth.mm, "m");
 	put_temperature(b, sample->temperature, " ", "°C");
 	put_pressure(b, sample->cylinderpressure, " ", "bar");
+	put_pressure(b, sample->o2cylinderpressure," o2pressure=","bar");
 
 	/*
 	 * We only show sensor information for samples with pressure, and only if it
@@ -242,6 +261,10 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 	if (sample->ndl.seconds != old->ndl.seconds) {
 		put_format(b, " ndl=%u:%02u", FRACTION(sample->ndl.seconds, 60));
 		old->ndl = sample->ndl;
+	}
+	if (sample->tts.seconds != old->tts.seconds) {
+		put_format(b, " tts=%u:%02u", FRACTION(sample->tts.seconds, 60));
+		old->tts = sample->tts;
 	}
 	if (sample->in_deco != old->in_deco) {
 		put_format(b, " in_deco=%d", sample->in_deco ? 1 : 0);
@@ -262,12 +285,27 @@ static void save_sample(struct membuffer *b, struct sample *sample, struct sampl
 		old->cns = sample->cns;
 	}
 
-	if (sample->po2 != old->po2) {
-		put_milli(b, " po2=", sample->po2, "bar");
-		old->po2 = sample->po2;
+	if (sample->o2sensor[0].mbar != old->o2sensor[0].mbar) {
+		put_milli(b, " sensor1=", sample->o2sensor[0].mbar, "bar");
+		old->o2sensor[0] = sample->o2sensor[0];
+	}
+
+	if ((sample->o2sensor[1].mbar) && (sample->o2sensor[1].mbar != old->o2sensor[1].mbar)) {
+		put_milli(b, " sensor2=", sample->o2sensor[1].mbar, "bar");
+		old->o2sensor[1] = sample->o2sensor[1];
+	}
+
+	if ((sample->o2sensor[2].mbar) && (sample->o2sensor[2].mbar != old->o2sensor[2].mbar)) {
+		put_milli(b, " sensor3=", sample->o2sensor[2].mbar, "bar");
+		old->o2sensor[2] = sample->o2sensor[2];
+	}
+
+	if (sample->setpoint.mbar != old->setpoint.mbar) {
+		put_milli(b, " po2=", sample->setpoint.mbar, "bar");
+		old->setpoint = sample->setpoint;
 	}
 	show_index(b, sample->heartbeat, "heartbeat=", "");
-	show_index(b, sample->bearing, "bearing=", "°");
+	show_index(b, sample->bearing.degrees, "bearing=", "°");
 	put_format(b, "\n");
 }
 
@@ -288,6 +326,13 @@ static void save_one_event(struct membuffer *b, struct event *ev)
 	show_index(b, ev->flags, "flags=", "");
 	show_index(b, ev->value, "value=", "");
 	show_utf8(b, " name=", ev->name, "");
+	if (event_is_gaschange(ev)) {
+		if (ev->gas.index >= 0) {
+			show_index(b, ev->gas.index, "cylinder=", "");
+			put_gasmix(b, &ev->gas.mix);
+		} else if (!event_gasmix_redundant(ev))
+			put_gasmix(b, &ev->gas.mix);
+	}
 	put_string(b, "\n");
 }
 
@@ -310,6 +355,10 @@ static void save_dc(struct membuffer *b, struct dive *dive, struct divecomputer 
 		show_date(b, dc->when);
 	if (dc->duration.seconds && dc->duration.seconds != dive->dc.duration.seconds)
 		put_duration(b, dc->duration, "duration ", "min\n");
+	if (dc->dctype != OC) {
+		put_format(b, "dctype %s\n", dctype_text[dc->dctype]);
+	put_format(b, "numberofoxygensensors %d\n",dc->no_o2sensors);
+	}
 
 	save_depths(b, dc);
 	save_temperatures(b, dc);
@@ -317,6 +366,7 @@ static void save_dc(struct membuffer *b, struct dive *dive, struct divecomputer 
 	save_salinity(b, dc);
 	put_duration(b, dc->surfacetime, "surfacetime ", "min\n");
 
+	save_extra_data(b, dc->extra_data);
 	save_events(b, dc->events);
 	save_samples(b, dc->samples, dc->sample);
 }
@@ -439,6 +489,26 @@ static struct dir *new_directory(struct dir *parent, struct membuffer *namebuf)
 	return subdir;
 }
 
+static struct dir *mktree(struct dir *dir, const char *fmt, ...)
+{
+	struct membuffer buf = { 0 };
+	struct dir *subdir;
+
+	VA_BUF(&buf, fmt);
+	for (subdir = dir->subdirs; subdir; subdir = subdir->sibling) {
+		if (subdir->unique)
+			continue;
+		if (strncmp(subdir->name, buf.buffer, buf.len))
+			continue;
+		if (!subdir->name[buf.len])
+			break;
+	}
+	if (!subdir)
+		subdir = new_directory(dir, &buf);
+	free_buffer(&buf);
+	return subdir;
+}
+
 /*
  * The name of a dive is the date and the dive number (and possibly
  * the uniqueness suffix).
@@ -447,10 +517,14 @@ static struct dir *new_directory(struct dir *parent, struct membuffer *namebuf)
  * time of the directory structure it is created in: the dive
  * might be part of a trip that straddles a month (or even a
  * year).
+ *
+ * We do *not* want to use localized weekdays and cause peoples save
+ * formats to depend on their locale.
  */
 static void create_dive_name(struct dive *dive, struct membuffer *name, struct tm *dirtm)
 {
 	struct tm tm;
+	static const char weekday[7][4] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 	utc_mkdate(dive->when, &tm);
 	if (tm.tm_year != dirtm->tm_year)
@@ -459,7 +533,7 @@ static void create_dive_name(struct dive *dive, struct membuffer *name, struct t
 		put_format(name, "%02u-", tm.tm_mon+1);
 
 	put_format(name, "%02u-%s-%02u:%02u:%02u",
-		tm.tm_mday, weekday(tm.tm_wday),
+		tm.tm_mday, weekday[tm.tm_wday],
 		tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
@@ -495,6 +569,40 @@ static int save_one_divecomputer(git_repository *repo, struct dir *tree, struct 
 	return ret;
 }
 
+static int save_one_picture(git_repository *repo, struct dir *dir, struct picture *pic)
+{
+	int offset = pic->offset.seconds;
+	struct membuffer buf = { 0 };
+	char sign = '+';
+	unsigned h;
+
+	show_utf8(&buf, "filename ", pic->filename, "\n");
+	show_gps(&buf, pic->latitude, pic->longitude);
+
+	/* Picture loading will load even negative offsets.. */
+	if (offset < 0) {
+		offset = -offset;
+		sign = '-';
+	}
+
+	/* Use full hh:mm:ss format to make it all sort nicely */
+	h = offset / 3600;
+	offset -= h *3600;
+	return blob_insert(repo, dir, &buf, "%c%02u:%02u:%02u",
+		sign, h, FRACTION(offset, 60));
+}
+
+static int save_pictures(git_repository *repo, struct dir *dir, struct dive *dive)
+{
+	if (dive->picture_list) {
+		dir = mktree(dir, "Pictures");
+		FOR_EACH_PICTURE(dive) {
+			save_one_picture(repo, dir, picture);
+		}
+	}
+	return 0;
+}
+
 static int save_one_dive(git_repository *repo, struct dir *tree, struct dive *dive, struct tm *tm)
 {
 	struct divecomputer *dc;
@@ -527,6 +635,8 @@ static int save_one_dive(git_repository *repo, struct dir *tree, struct dive *di
 		dc = dc->next;
 	} while (dc);
 
+	/* Save the picture data, if any */
+	save_pictures(repo, subdir, dive);
 	return 0;
 }
 
@@ -658,31 +768,11 @@ static int save_one_trip(git_repository *repo, struct dir *tree, dive_trip_t *tr
 	return 0;
 }
 
-static struct dir *mktree(struct dir *dir, const char *fmt, ...)
-{
-	struct membuffer buf = { 0 };
-	struct dir *subdir;
-
-	VA_BUF(&buf, fmt);
-	for (subdir = dir->subdirs; subdir; subdir = subdir->sibling) {
-		if (subdir->unique)
-			continue;
-		if (strncmp(subdir->name, buf.buffer, buf.len))
-			continue;
-		if (!subdir->name[buf.len])
-			break;
-	}
-	if (!subdir)
-		subdir = new_directory(dir, &buf);
-	free_buffer(&buf);
-	return subdir;
-}
-
 static void save_userid(void *_b)
 {
 	struct membuffer *b = _b;
 	if (prefs.save_userid_local)
-		put_format(b, "userid %30s", prefs.userid);
+		put_format(b, "userid %30s\n", prefs.userid);
 }
 
 static void save_one_device(void *_b, const char *model, uint32_t deviceid,
@@ -841,14 +931,23 @@ static void create_commit_message(struct membuffer *msg)
 	if (dive) {
 		dive_trip_t *trip = dive->divetrip;
 		const char *location = dive->location ? : "no location";
+		struct divecomputer *dc = &dive->dc;
+		const char *sep = "\n";
 
 		if (dive->number)
 			nr = dive->number;
 
 		put_format(msg, "dive %d: %s", nr, location);
-		if (trip->location && *trip->location && strcmp(trip->location, location))
+		if (trip && trip->location && *trip->location && strcmp(trip->location, location))
 			put_format(msg, " (%s)", trip->location);
-		put_format(msg, "\n\n");
+		put_format(msg, "\n");
+		do {
+			if (dc->model && *dc->model) {
+				put_format(msg, "%s%s", sep, dc->model);
+				sep = ", ";
+			}
+		} while ((dc = dc->next) != NULL);
+		put_format(msg, "\n");
 	}
 	put_format(msg, "Created by subsurface %s\n", VERSION_STRING);
 }
@@ -1040,6 +1139,7 @@ struct git_repository *is_git_repository(const char *filename, const char **bran
 
 	if (stat(loc, &st) < 0 || !S_ISDIR(st.st_mode)) {
 		free(loc);
+		free(branch);
 		return dummy_git_repository;
 	}
 

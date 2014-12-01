@@ -1,10 +1,13 @@
+CODECFORTR = UTF-8
+CODECFORSRC = UTF-8
 include(subsurface-configure.pri)
 
 QT = core gui network svg
 lessThan(QT_MAJOR_VERSION, 5) {
 	QT += webkit
 } else {
-	!android: QT += webkitwidgets
+	QT += printsupport concurrent
+	!android: QT += webkitwidgets webkit
 	android: QT += androidextras
 }
 INCLUDEPATH += qt-ui $$PWD
@@ -13,14 +16,12 @@ DEPENDPATH += qt-ui
 mac: TARGET = Subsurface
 else: TARGET = subsurface
 
-VERSION = 4.0.95
+QMAKE_CLEAN += $$TARGET
 
-# enable or disable the dive planner
-planner {
-	DEFINES += ENABLE_PLANNER
-}
+VERSION = 4.2.90
 
 HEADERS = \
+	cochran.h \
 	color.h \
 	deco.h \
 	device.h \
@@ -33,16 +34,21 @@ HEADERS = \
 	helpers.h \
 	libdivecomputer.h \
 	planner.h \
+	save-html.h \
 	worldmap-save.h \
 	worldmap-options.h \
 	pref.h \
 	profile.h \
+	gaspressures.h \
 	qt-gui.h \
 	qthelper.h \
+	units.h \
+	divecomputer.h \
 	qt-ui/about.h \
 	qt-ui/completionmodels.h \
 	qt-ui/divecomputermanagementdialog.h \
 	qt-ui/divelistview.h \
+	qt-ui/divepicturewidget.h \
 	qt-ui/diveplanner.h \
 	qt-ui/downloadfromdivecomputer.h \
 	qt-ui/globe.h \
@@ -52,6 +58,7 @@ HEADERS = \
 	qt-ui/mainwindow.h \
 	qt-ui/modeldelegates.h \
 	qt-ui/models.h \
+	qt-ui/metrics.h \
 	qt-ui/preferences.h \
 	qt-ui/printdialog.h \
 	qt-ui/printlayout.h \
@@ -60,7 +67,7 @@ HEADERS = \
 	qt-ui/starwidget.h \
 	qt-ui/subsurfacewebservices.h \
 	qt-ui/tableview.h \
-	qt-ui/exif.h \
+	exif.h \
 	sha1.h \
 	statistics.h \
 	subsurfacestartup.h \
@@ -82,7 +89,21 @@ HEADERS = \
 	qt-ui/profile/diveeventitem.h \
 	qt-ui/profile/divetooltipitem.h \
 	qt-ui/profile/ruleritem.h \
-	qt-ui/updatemanager.h
+	qt-ui/profile/tankitem.h \
+	qt-ui/updatemanager.h \
+	qt-ui/divelogexportdialog.h \
+	qt-ui/usersurvey.h \
+	subsurfacesysinfo.h \
+	qt-ui/configuredivecomputerdialog.h \
+	configuredivecomputer.h \
+	configuredivecomputerthreads.h \
+	devicedetails.h \
+	qt-ui/statistics/monthstatistics.h \
+	qt-ui/statistics/statisticswidget.h \
+	qt-ui/statistics/statisticsbar.h \
+	qt-ui/statistics/yearstatistics.h \
+	qt-ui/diveshareexportdialog.h \
+	qt-ui/filtermodels.h
 
 android: HEADERS -= \
 	qt-ui/usermanual.h \
@@ -91,6 +112,7 @@ android: HEADERS -= \
 	qt-ui/printoptions.h
 
 SOURCES =  \
+	cochran.c \
 	deco.c \
 	device.c \
 	dive.c \
@@ -99,19 +121,24 @@ SOURCES =  \
 	file.c \
 	gettextfromc.cpp \
 	libdivecomputer.c \
+	liquivision.c \
 	load-git.c \
 	main.cpp \
 	membuffer.c \
 	parse-xml.c \
 	planner.c \
 	profile.c \
+	gaspressures.c \
+	divecomputer.cpp \
 	worldmap-save.c \
+	save-html.c \
 	qt-gui.cpp \
 	qthelper.cpp \
 	qt-ui/about.cpp \
 	qt-ui/completionmodels.cpp \
 	qt-ui/divecomputermanagementdialog.cpp \
 	qt-ui/divelistview.cpp \
+	qt-ui/divepicturewidget.cpp \
 	qt-ui/diveplanner.cpp \
 	qt-ui/downloadfromdivecomputer.cpp \
 	qt-ui/globe.cpp \
@@ -121,6 +148,7 @@ SOURCES =  \
 	qt-ui/mainwindow.cpp \
 	qt-ui/modeldelegates.cpp \
 	qt-ui/models.cpp \
+	qt-ui/metrics.cpp \
 	qt-ui/preferences.cpp \
 	qt-ui/printdialog.cpp \
 	qt-ui/printlayout.cpp \
@@ -129,7 +157,7 @@ SOURCES =  \
 	qt-ui/starwidget.cpp \
 	qt-ui/subsurfacewebservices.cpp \
 	qt-ui/tableview.cpp \
-	qt-ui/exif.cpp \
+	exif.cpp \
 	save-git.c \
 	save-xml.c \
 	sha1.c \
@@ -155,12 +183,26 @@ SOURCES =  \
 	qt-ui/profile/diveeventitem.cpp \
 	qt-ui/profile/divetooltipitem.cpp \
 	qt-ui/profile/ruleritem.cpp \
-	qt-ui/updatemanager.cpp
+	qt-ui/profile/tankitem.cpp \
+	qt-ui/updatemanager.cpp \
+	qt-ui/divelogexportdialog.cpp \
+	qt-ui/usersurvey.cpp \
+	subsurfacesysinfo.cpp \
+	qt-ui/configuredivecomputerdialog.cpp \
+	configuredivecomputer.cpp \
+	configuredivecomputerthreads.cpp \
+	devicedetails.cpp \
+	qt-ui/statistics/statisticswidget.cpp \
+	qt-ui/statistics/yearstatistics.cpp \
+	qt-ui/statistics/statisticsbar.cpp \
+	qt-ui/statistics/monthstatistics.cpp \
+	qt-ui/diveshareexportdialog.cpp \
+	qt-ui/filtermodels.cpp
 
 android: SOURCES += android.cpp
-else: linux*: SOURCES += linux.c
-mac: SOURCES += macos.c
-win32: SOURCES += windows.c
+else: win32: SOURCES += windows.c
+else: mac: SOURCES += macos.c
+else: SOURCES += linux.c        # All other Unix, really
 
 android: SOURCES -= \
 	qt-ui/usermanual.cpp \
@@ -178,15 +220,24 @@ FORMS = \
 	qt-ui/preferences.ui \
 	qt-ui/printoptions.ui \
 	qt-ui/renumber.ui \
+	qt-ui/setpoint.ui \
 	qt-ui/shifttimes.ui \
 	qt-ui/shiftimagetimes.ui \
 	qt-ui/webservices.ui \
 	qt-ui/tableview.ui \
 	qt-ui/divelogimportdialog.ui \
-	qt-ui/usermanual.ui
+	qt-ui/searchbar.ui \
+	qt-ui/divelogexportdialog.ui \
+	qt-ui/plannerSettings.ui \
+	qt-ui/usersurvey.ui \
+	qt-ui/divecomponentselection.ui \
+	qt-ui/configuredivecomputerdialog.ui \
+	qt-ui/listfilter.ui \
+	qt-ui/diveshareexportdialog.ui \
+	qt-ui/filterwidget.ui
 
 # Nether usermanual or printing is supported on android right now
-android: FORMS -= qt-ui/usermanual.ui qt-ui/printoptions.ui
+android: FORMS -= qt-ui/printoptions.ui
 
 RESOURCES = subsurface.qrc
 
@@ -232,16 +283,43 @@ QTTRANSLATIONS = \
 	qt_sv.qm \
 	qt_zh_TW.qm
 
-# Should we enable the planner sections in the manual?
-planner: ENABLE_PLANNER=1
-else: ENABLE_PLANNER=0
-doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation || $(MKDIR) $$OUT_PWD/Documentation $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ ENABLE_PLANNER=$$ENABLE_PLANNER doc
-all.depends += doc
-QMAKE_EXTRA_TARGETS += doc all
+greaterThan(QT_MAJOR_VERSION, 4) {
+QTRANSLATIONS += \
+	qtbase_de.qm \
+	qt_fi.qm \
+	qtbase_fi.qm \
+	qtbase_hu.qm \
+	qtbase_ru.qm \
+	qtbase_sk.qm
+}
+
+USERMANUALS = \
+	user-manual.html \
+	user-manual_es.html \
+	user-manual_ru.html
+
+doc.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/Documentation || $(MKDIR) $$OUT_PWD/Documentation $$escape_expand(\\n\\t)$(MAKE) -C $$PWD/Documentation OUT=$$OUT_PWD/Documentation/ doc
+all.depends += usermanual
+usermanual.depends += doc
+usermanual.target = $$OUT_PWD/Documentation/user-manual.html
+QMAKE_EXTRA_TARGETS += doc usermanual all
+# add the generated user manual HTML files to the list of files to remove
+# when running make clean
+for(MANUAL,USERMANUALS) QMAKE_CLEAN += $$OUT_PWD/Documentation/$$MANUAL
 
 marbledata.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/marbledata || $(COPY_DIR) $$PWD/marbledata $$OUT_PWD
 all.depends += marbledata
 QMAKE_EXTRA_TARGETS += marbledata
+
+theme.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/theme || $(COPY_DIR) $$PWD/theme $$OUT_PWD
+all.depends += theme
+QMAKE_EXTRA_TARGETS += theme
+
+android {
+	android.commands += $(CHK_DIR_EXISTS) $$OUT_PWD/android || $(COPY_DIR) $$PWD/android $$OUT_PWD
+	all.depends += android
+	QMAKE_EXTRA_TARGETS += android
+}
 
 DESKTOP_FILE = subsurface.desktop
 mac: ICON = packaging/macosx/Subsurface.icns
@@ -249,7 +327,9 @@ else: ICON = subsurface-icon.svg
 MANPAGE = subsurface.1
 XSLT_FILES = xslt
 ICONS_FILES = icons
-DOC_FILES = $$OUT_PWD/Documentation/user-manual.html Documentation/images
+DOC_FILES = Documentation/images README Releasenotes.txt SupportedDivecomputers.txt
+for(MANUAL,USERMANUALS) DOC_FILES += $$OUT_PWD/Documentation/$$MANUAL
+THEME_FILES = theme
 MARBLEDIR = marbledata/maps marbledata/bitmaps
 
 #DEPLOYMENT_PLUGIN += bearer/qnativewifibearer
@@ -259,9 +339,9 @@ DEPLOYMENT_PLUGIN += iconengines/qsvgicon
 #DEPLOYMENT_PLUGIN += sqldrivers/qsqlite
 
 # This information will go into the Windows .rc file and linked into the .exe
-QMAKE_TARGET_COMPANY = subsurface team
-QMAKE_TARGET_DESCRIPTION = subsurface dive log
-QMAKE_TARGET_COPYRIGHT = Linus Torvalds, Dirk Hohndel and others
+QMAKE_TARGET_COMPANY = Subsurface Team
+QMAKE_TARGET_DESCRIPTION = Subsurface Dive Log
+QMAKE_TARGET_COPYRIGHT = Linus Torvalds, Dirk Hohndel, Tomaz Canabrava and others
 
 # And this is the Mac Info.plist file
 # qmake automatically generates sed rules to replace:
@@ -274,7 +354,19 @@ QMAKE_TARGET_COPYRIGHT = Linus Torvalds, Dirk Hohndel and others
 QMAKE_INFO_PLIST = packaging/macosx/Info.plist.in
 
 OTHER_FILES += $$DESKTOPFILE $$ICON $$MANPAGE $$XSLT_FILES $$DOC_FILES $$MARBLEDIR \
-        $$QMAKE_INFO_PLIST
+	$$QMAKE_INFO_PLIST
 
 include(subsurface-gen-version.pri)
 include(subsurface-install.pri)
+
+# to debug planner issues
+#QMAKE_CFLAGS += -DDEBUG_PLAN=31
+#QMAKE_CXXFLAGS += -DDEBUG_PLAN=31
+# to build debuggable binaries on Windows, you need something like this
+#QMAKE_CFLAGS_RELEASE=$$QMAKE_CFLAGS_DEBUG -O0 -g
+#QMAKE_CXXFLAGS_RELEASE=$$QMAKE_CXXFLAGS_DEBUG -O0 -g
+
+QMAKE_CXXFLAGS += $$(CXXFLAGS)
+QMAKE_CFLAGS += $$(CFLAGS)
+QMAKE_LFLAGS += $$(LDFLAGS)
+QMAKE_CPPFLAGS += $$(CPPFLAGS)

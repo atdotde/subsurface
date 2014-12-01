@@ -40,7 +40,7 @@
         </xsl:otherwise>
       </xsl:choose>
 
-      <temperature air="{concat(AIRTEMP, ' C')}" water="{concat(WATERTEMPATEND, ' C')}"/>
+      <temperature air="{concat(AIRTEMP, ' C')}" water="{concat(WATERTEMPMAXDEPTH, ' C')}"/>
       <xsl:if test="SURFACETIME != '0'">
         <surfacetime>
           <xsl:call-template name="timeConvert">
@@ -189,9 +189,11 @@
               <xsl:attribute name="depth">
                 <xsl:value-of select="concat(translate(DEPTH, ',', '.'), ' m')"/>
               </xsl:attribute>
-              <xsl:attribute name="temp">
-                <xsl:value-of select="TEMPERATURE"/>
-              </xsl:attribute>
+              <xsl:if test="TEMPERATURE &gt; 0">
+                <xsl:attribute name="temp">
+                  <xsl:value-of select="TEMPERATURE"/>
+                </xsl:attribute>
+              </xsl:if>
               <xsl:attribute name="pressure">
                 <xsl:call-template name="pressure">
                   <xsl:with-param name="number" select="PRESSURE"/>

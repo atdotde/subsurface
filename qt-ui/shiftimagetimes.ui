@@ -20,7 +20,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Shift selected times</string>
+   <string>Shift selected image times</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -91,6 +91,9 @@
           <second>0</second>
          </time>
         </property>
+        <property name="displayFormat">
+         <string>h:mm</string>
+        </property>
         <property name="timeSpec">
          <enum>Qt::LocalTime</enum>
         </property>
@@ -99,14 +102,14 @@
       <item>
        <widget class="QRadioButton" name="backwards">
         <property name="text">
-         <string>earlier</string>
+         <string>Earlier</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QRadioButton" name="forward">
         <property name="text">
-         <string>later</string>
+         <string>Later</string>
         </property>
         <property name="checked">
          <bool>true</bool>
@@ -167,54 +170,50 @@
         <property name="title">
          <string/>
         </property>
-        <widget class="QDateTimeEdit" name="dcTime">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>70</y>
-           <width>161</width>
-           <height>24</height>
-          </rect>
-         </property>
-        </widget>
-        <widget class="QLabel" name="label_2">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>10</y>
-           <width>234</width>
-           <height>60</height>
-          </rect>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>16777215</width>
-           <height>60</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Which date and time are displayed on the image?</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-        <widget class="QGraphicsView" name="DCImage">
-         <property name="geometry">
-          <rect>
-           <x>260</x>
-           <y>10</y>
-           <width>361</width>
-           <height>281</height>
-          </rect>
-         </property>
-         <property name="verticalScrollBarPolicy">
-          <enum>Qt::ScrollBarAlwaysOff</enum>
-         </property>
-         <property name="horizontalScrollBarPolicy">
-          <enum>Qt::ScrollBarAlwaysOff</enum>
-         </property>
-        </widget>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_2">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>60</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>Which date and time are displayed on the image?</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1" rowspan="3">
+          <widget class="QGraphicsView" name="DCImage">
+           <property name="verticalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+           <property name="horizontalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QDateTimeEdit" name="dcTime"/>
+         </item>
+         <item row="2" column="0">
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>193</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>

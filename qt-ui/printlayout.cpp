@@ -6,6 +6,9 @@
 #include <QTableView>
 #include <QHeaderView>
 #include <QPointer>
+#include <QPicture>
+#include <QMessageBox>
+
 #include "mainwindow.h"
 #include "../dive.h"
 #include "../display.h"
@@ -14,7 +17,7 @@
 #include "models.h"
 #include "modeldelegates.h"
 
-PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct options *optionsPtr)
+PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct print_options *optionsPtr)
 {
 	dialog = dialogPtr;
 	printer = printerPtr;
@@ -30,9 +33,9 @@ PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct op
 	tablePrintColumnNames.append(tr("Buddy"));
 	tablePrintColumnNames.append(tr("Location"));
 	tablePrintColumnWidths.append(7);
-	tablePrintColumnWidths.append(10);
-	tablePrintColumnWidths.append(10);
-	tablePrintColumnWidths.append(10);
+	tablePrintColumnWidths.append(14);
+	tablePrintColumnWidths.append(8);
+	tablePrintColumnWidths.append(8);
 	tablePrintColumnWidths.append(15);
 	tablePrintColumnWidths.append(15);
 	tablePrintColumnWidths.append(33);
@@ -40,10 +43,10 @@ PrintLayout::PrintLayout(PrintDialog *dialogPtr, QPrinter *printerPtr, struct op
 	const int dw = 20; // base percentage
 	profilePrintColumnWidths.append(dw);
 	profilePrintColumnWidths.append(dw);
-	profilePrintColumnWidths.append(dw - 3);
-	profilePrintColumnWidths.append(dw - 3);
-	profilePrintColumnWidths.append(dw + 6); // fit to 100%
-	const int sr = 12;			 // smallest row height in pixels
+	profilePrintColumnWidths.append(dw + 8);
+	profilePrintColumnWidths.append(dw - 4);
+	profilePrintColumnWidths.append(dw - 4); // fit to 100%
+	const int sr = 12; // smallest row height in pixels
 	profilePrintRowHeights.append(sr);
 	profilePrintRowHeights.append(sr + 4);
 	profilePrintRowHeights.append(sr);
@@ -62,14 +65,25 @@ void PrintLayout::print()
 {
 	// we call setup each time to check if the printer properties have changed
 	setup();
+	if (pageW == 0 || pageH == 0) {
+		QMessageBox msgBox;
+		msgBox.setIcon(QMessageBox::Critical);
+		msgBox.setText(tr("Subsurface cannot find a usable printer on this system!"));
+		msgBox.setWindowIcon(QIcon(":subsurface-icon"));
+		msgBox.exec();
+		return;
+	}
 	switch (printOptions->type) {
-	case options::PRETTY:
+	case print_options::PRETTY:
 		printProfileDives(3, 2);
 		break;
-	case options::TWOPERPAGE:
+	case print_options::ONEPERPAGE:
+		printProfileDives(1, 1);
+		break;
+	case print_options::TWOPERPAGE:
 		printProfileDives(2, 1);
 		break;
-	case options::TABLE:
+	case print_options::TABLE:
 		printTable();
 		break;
 	}
@@ -84,12 +98,9 @@ void PrintLayout::setup()
 	printerDpi = printer->resolution();
 	pageRect = printer->pageRect();
 
-	scaleX = (qreal)printerDpi / (qreal)screenDpiX;
-	scaleY = (qreal)printerDpi / (qreal)screenDpiY;
-
-	// a printer page scalled to screen DPI
-	scaledPageW = pageRect.width() / scaleX;
-	scaledPageH = pageRect.height() / scaleY;
+	// a printer page in pixels
+	pageW = pageRect.width();
+	pageH = pageRect.height();
 }
 
 // go trought the dive table and find how many dives we are a going to print
@@ -98,7 +109,7 @@ int PrintLayout::estimateTotalDives() const
 {
 	int total = 0, i = 0;
 	struct dive *dive;
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		if (!dive->selected && printOptions->print_selected)
 			continue;
 		total++;
@@ -120,22 +131,27 @@ int PrintLayout::estimateTotalDives() const
 void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 {
 	int i, row = 0, col = 0, printed = 0, total = estimateTotalDives();
+	int animationOriginal = prefs.animation_speed;
+
 	struct dive *dive;
 	if (!total)
 		return;
+
+	// disable animations on the profile:
+	prefs.animation_speed = 0;
 
 	// setup a painter
 	QPainter painter;
 	painter.begin(printer);
 	painter.setRenderHint(QPainter::Antialiasing);
 	painter.setRenderHint(QPainter::SmoothPixmapTransform);
-	painter.scale(scaleX, scaleY);
 
 	// setup the profile widget
 	QPointer<ProfileWidget2> profile = MainWindow::instance()->graphics();
 	const int profileFrameStyle = profile->frameStyle();
 	profile->setFrameStyle(QFrame::NoFrame);
 	profile->setPrintMode(true, !printOptions->color_selected);
+	profile->setFontPrintScale(divesPerRow * divesPerColumn > 3 ? 0.6 : 1.0);
 	QSize originalSize = profile->size();
 	// swap rows/col for landscape
 	if (printer->orientation() == QPrinter::Landscape) {
@@ -149,13 +165,15 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 	const int padW = (divesPerColumn < 2) ? 0 : padDef;
 	const int padH = (divesPerRow < 2) ? 0 : padDef;
 	// estimate dimensions for a single dive
-	const int scaledW = ESTIMATE_DIVE_DIM(scaledPageW, divesPerColumn, padW);
-	const int scaledH = ESTIMATE_DIVE_DIM(scaledPageH, divesPerRow, padH);
+	const int scaledW = ESTIMATE_DIVE_DIM(pageW, divesPerColumn, padW);
+	const int scaledH = ESTIMATE_DIVE_DIM(pageH, divesPerRow, padH);
 	// padding in pixels between profile and table
 	const int padPT = 5;
 	// create a model and table
 	ProfilePrintModel model;
-	QPointer<QTableView> table(createProfileTable(&model, scaledW));
+	model.setFontsize(7); // if this is changed we also need to change 'const int sr' in the constructor
+	// if there is only one dive per page row we pass fitNotesToHeight to be almost half the page height
+	QPointer<QTableView> table(createProfileTable(&model, scaledW, (divesPerRow == 1) ? scaledH * 0.45 : 0.0));
 	// profilePrintTableMaxH updates after the table is created
 	const int tableH = profilePrintTableMaxH;
 	// resize the profile widget
@@ -168,7 +186,7 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 		yOffsetTable = scaledH - tableH;
 
 	// plot the dives at specific rows and columns on the page
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		if (!dive->selected && printOptions->print_selected)
 			continue;
 		if (col == divesPerColumn) {
@@ -179,18 +197,32 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 				printer->newPage();
 			}
 		}
-		QTransform origTransform = painter.transform();
-
 		// draw a profile
+		QTransform origTransform = painter.transform();
 		painter.translate((scaledW + padW) * col, (scaledH + padH) * row + yOffsetProfile);
-		profile->plotDives(QList<struct dive*>() << dive);
+		profile->plotDive(dive, true); // make sure the profile is actually redrawn
+#ifdef Q_OS_LINUX // on Linux there is a vector line bug (big lines in PDF), which forces us to render to QImage
+		QImage image(scaledW, scaledH - tableH - padPT, QImage::Format_ARGB32);
+		QPainter imgPainter(&image);
+		imgPainter.setRenderHint(QPainter::Antialiasing);
+		imgPainter.setRenderHint(QPainter::SmoothPixmapTransform);
+		profile->render(&imgPainter, QRect(0, 0, scaledW, scaledH - tableH - padPT));
+		imgPainter.end();
+		painter.drawImage(image.rect(),image);
+#else // for other OS we can try rendering the profile as vector
 		profile->render(&painter, QRect(0, 0, scaledW, scaledH - tableH - padPT));
+#endif
 		painter.setTransform(origTransform);
 
 		// draw a table
+		QPicture pic;
+		QPainter picPainter;
 		painter.translate((scaledW + padW) * col, (scaledH + padH) * row + yOffsetTable);
 		model.setDive(dive);
-		table->render(&painter);
+		picPainter.begin(&pic);
+		table->render(&picPainter);
+		picPainter.end();
+		painter.drawPicture(QPoint(0,0), pic);
 		painter.setTransform(origTransform);
 		col++;
 		printed++;
@@ -198,15 +230,17 @@ void PrintLayout::printProfileDives(int divesPerRow, int divesPerColumn)
 	}
 	// cleanup
 	painter.end();
-	delete table;
 	profile->setFrameStyle(profileFrameStyle);
 	profile->setPrintMode(false);
 	profile->resize(originalSize);
-	profile->plotDives(QList<struct dive*>() << current_dive);
+	// we need to force a redraw of the profile so it switches back from print mode
+	profile->plotDive(0, true);
+	// re-enable animations
+	prefs.animation_speed = animationOriginal;
 }
 
 /* we create a table that has a fixed height, but can stretch to fit certain width */
-QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int tableW)
+QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int tableW, const qreal fitNotesToHeight)
 {
 	// setup a new table
 	QTableView *table = new QTableView();
@@ -234,24 +268,27 @@ QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int 
 	const int cols = model->columnCount();
 	const int rows = model->rowCount();
 	// info on top
-	table->setSpan(0, 0, 1, 4);
-	table->setSpan(1, 0, 1, 4);
+	table->setSpan(0, 0, 1, 3);
+	table->setSpan(1, 0, 1, 3);
+	table->setSpan(0, 3, 1, 2);
+	table->setSpan(1, 3, 1, 2);
 	// gas used
 	table->setSpan(2, 0, 1, 2);
 	table->setSpan(3, 0, 1, 2);
 	// notes
 	table->setSpan(6, 0, 1, 5);
 	table->setSpan(7, 0, 5, 5);
-
 	/* resize row heights to the 'profilePrintRowHeights' indexes.
-	 * profilePrintTableMaxH will then hold the table height. */
+	 * profilePrintTableMaxH will then hold the table height.
+	 * what fitNotesToHeight does it to expand the notes section to fit a special height */
 	int i;
 	profilePrintTableMaxH = 0;
 	for (i = 0; i < rows; i++) {
-		int h = profilePrintRowHeights.at(i);
+		int h = (i == rows - 1 && fitNotesToHeight != 0.0) ? fitNotesToHeight : profilePrintRowHeights.at(i);
 		profilePrintTableMaxH += h;
 		vHeader->resizeSection(i, h);
 	}
+
 	// resize columns. columns widths are percentages from the table width.
 	int accW = 0;
 	for (i = 0; i < cols; i++) {
@@ -264,7 +301,9 @@ QTableView *PrintLayout::createProfileTable(ProfilePrintModel *model, const int 
 	// resize
 	table->resize(tableW, profilePrintTableMaxH);
 	// hide the grid and set a stylesheet
-	table->setItemDelegate(new ProfilePrintDelegate(this));
+	table->setItemDelegate(new ProfilePrintDelegate(table));
+	table->setItemDelegateForRow(7, new HTMLDelegate(table));
+
 	table->setShowGrid(false);
 	table->setStyleSheet(
 		"QTableView { border: none }"
@@ -298,7 +337,7 @@ void PrintLayout::printTable()
 	table.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	table.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	// fit table to one page initially
-	table.resize(scaledPageW, scaledPageH);
+	table.resize(pageW, pageH);
 
 	// don't show border
 	table.setStyleSheet(
@@ -309,7 +348,7 @@ void PrintLayout::printTable()
 	addTablePrintHeadingRow(&model, row); // add one heading row
 	row++;
 	progress = 0;
-	for_each_dive(i, dive) {
+	for_each_dive (i, dive) {
 		if (!dive->selected && printOptions->print_selected)
 			continue;
 		addTablePrintDataRow(&model, row, dive);
@@ -345,24 +384,30 @@ void PrintLayout::printTable()
 	 * use 10% each, then the sum of passes[] here should be 80%.
 	 * two should be enough! */
 	const int passes[] = { 70, 10 };
-	int tableHeight = 0, lastAccIndex = 0, rowH, accH, headings;
-	bool isHeading = false;
+	int tableHeight = 0, lastAccIndex = 0, rowH, accH, headings, headingRowHeightD2, headingRowHeight;
+	bool newHeading = false;
 
 	for (unsigned int pass = 0; pass < sizeof(passes) / sizeof(passes[0]); pass++) {
 		progress = headings = accH = 0;
 		total = model.rows - lastAccIndex;
 		for (i = lastAccIndex; i < model.rows; i++) {
 			rowH = table.rowHeight(i);
-			accH += rowH;
-			if (isHeading) {
-				headings += rowH;
-				isHeading = false;
+			if (i == 0) { // first row is always a heading. it's height is constant.
+				headingRowHeight = rowH;
+				headingRowHeightD2 = rowH / 2;
 			}
-			if (accH > scaledPageH) {
+			if (rowH > pageH - headingRowHeight) // skip huge rows. we don't support row spanning on multiple pages.
+				continue;
+			accH += rowH;
+			if (newHeading) {
+				headings += rowH;
+				newHeading = false;
+			}
+			if (accH > pageH) {
 				lastAccIndex = i;
 				pageIndexes.append(pageIndexes.last() + (accH - rowH));
 				addTablePrintHeadingRow(&model, i);
-				isHeading = true;
+				newHeading = true;
 				accH = 0;
 				i--;
 			}
@@ -374,22 +419,38 @@ void PrintLayout::printTable()
 	}
 	done = 90;
 	pageIndexes.append(pageIndexes.last() + accH + headings);
-	table.resize(scaledPageW, tableHeight);
+	table.resize(pageW, tableHeight);
 
-	// attach a painter and render pages by using pageIndexes
+	/* attach a painter and render pages by using pageIndexes
+	 * there is a weird QPicture dependency here; we need to offset a page
+	 * by headingRowHeightD2, which is half the heading height. the same doesn't
+	 * make sense if we are rendering the table widget directly to the printer-painter. */
 	QPainter painter(printer);
 	painter.setRenderHint(QPainter::Antialiasing);
 	painter.setRenderHint(QPainter::SmoothPixmapTransform);
-	painter.scale(scaleX, scaleY);
 	total = pageIndexes.size() - 1;
 	progress = 0;
 	for (i = 0; i < total; i++) {
 		if (i > 0)
 			printer->newPage();
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+		(void)headingRowHeightD2;
 		QRegion region(0, pageIndexes.at(i) - 1,
 			       table.width(),
 			       pageIndexes.at(i + 1) - pageIndexes.at(i) + 1);
 		table.render(&painter, QPoint(0, 0), region);
+#else
+		QRegion region(0, pageIndexes.at(i) + headingRowHeightD2 - 1,
+			       table.width(),
+			       pageIndexes.at(i + 1) - (pageIndexes.at(i) + headingRowHeightD2) + 1);
+		// vectorize the table first by using QPicture
+		QPicture pic;
+		QPainter picPainter;
+		picPainter.begin(&pic);
+		table.render(&picPainter, QPoint(0, 0), region);
+		picPainter.end();
+		painter.drawPicture(QPoint(0, headingRowHeightD2), pic);
+#endif
 		progress++;
 		emit signalProgress(done + (progress * 10) / total);
 	}
@@ -402,7 +463,7 @@ void PrintLayout::addTablePrintDataRow(TablePrintModel *model, int row, struct d
 	model->insertRow();
 	model->setData(model->index(row, 0), QString::number(dive->number), Qt::DisplayRole);
 	model->setData(model->index(row, 1), di.displayDate(), Qt::DisplayRole);
-	model->setData(model->index(row, 2), di.displayDepth(), Qt::DisplayRole);
+	model->setData(model->index(row, 2), di.displayDepthWithUnit(), Qt::DisplayRole);
 	model->setData(model->index(row, 3), di.displayDuration(), Qt::DisplayRole);
 	model->setData(model->index(row, 4), dive->divemaster, Qt::DisplayRole);
 	model->setData(model->index(row, 5), dive->buddy, Qt::DisplayRole);

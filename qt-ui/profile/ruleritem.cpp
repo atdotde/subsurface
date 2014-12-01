@@ -1,11 +1,15 @@
 #include "ruleritem.h"
 #include "divetextitem.h"
+#include "profilewidget2.h"
+#include "preferences.h"
+#include "mainwindow.h"
 
 #include <QFont>
 #include <QFontMetrics>
 #include <QPainter>
 #include <QGraphicsScene>
 #include <QGraphicsView>
+#include <qgraphicssceneevent.h>
 #include <QDebug>
 
 #include <stdint.h>
@@ -24,7 +28,7 @@ RulerNodeItem2::RulerNodeItem2() : entry(NULL), ruler(NULL)
 	setFlag(ItemIgnoresTransformations);
 }
 
-void RulerNodeItem2::setPlotInfo(plot_info& info)
+void RulerNodeItem2::setPlotInfo(plot_info &info)
 {
 	pInfo = info;
 	entry = pInfo.entry;
@@ -55,13 +59,14 @@ void RulerNodeItem2::recalculate()
 	}
 }
 
-QVariant RulerNodeItem2::itemChange(GraphicsItemChange change, const QVariant &value)
+void RulerNodeItem2::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
-	if (change == ItemPositionHasChanged) {
-		recalculate();
-		ruler->recalculate();
-	}
-	return QGraphicsEllipseItem::itemChange(change, value);
+	qreal x = event->scenePos().x();
+	if (x < 0.0)
+		x = 0.0;
+	setPos(x, event->scenePos().y());
+	recalculate();
+	ruler->recalculate();
 }
 
 RulerItem2::RulerItem2() : source(new RulerNodeItem2()),
@@ -79,6 +84,15 @@ RulerItem2::RulerItem2() : source(new RulerNodeItem2()),
 	textItemBack->setPen(QColor(Qt::white));
 	textItemBack->setFlag(QGraphicsItem::ItemIgnoresTransformations);
 	setPen(QPen(QColor(Qt::black), 0.0));
+	connect(PreferencesDialog::instance(), SIGNAL(settingsChanged()), this, SLOT(settingsChanged()));
+}
+
+void RulerItem2::settingsChanged()
+{
+	ProfileWidget2 *profWidget = NULL;
+	if (scene() && scene()->views().count())
+		profWidget = qobject_cast<ProfileWidget2 *>(scene()->views().first());
+	setVisible(profWidget->currentState == ProfileWidget2::PROFILE ? prefs.rulergraph : false);
 }
 
 void RulerItem2::recalculate()
@@ -156,4 +170,11 @@ void RulerItem2::setAxis(DiveCartesianAxis *time, DiveCartesianAxis *depth)
 	source->depthAxis = depth;
 	source->timeAxis = time;
 	recalculate();
+}
+
+void RulerItem2::setVisible(bool visible)
+{
+	QGraphicsLineItem::setVisible(visible);
+	source->setVisible(visible);
+	dest->setVisible(visible);
 }
