@@ -32,6 +32,19 @@ struct buehlmann_config {
 };
 struct buehlmann_config buehlmann_config = { 1.0, 1.01, 0, 0.75, 0.35, 1.0, false };
 
+//! Option structure for VPM-B decompression.
+struct vpmb_config {
+	double crit_radius_N2;            //! Critical radius of N2 nucleon (microns).
+	double crit_radius_He;            //! Critical radius of N2 nucleon (microns).
+	double crit_volume_lambda;        //! Constant corresponding to critical gas volume.
+	double start_gradient_of_imperm;  //! Gradient after which bubbles become impermeable.
+	double surface_tension_gamma;     //! Nucleons surface tension constant.
+	double skin_compression_gammaC;   //!
+	double regeneration_time;         //! Time needed for the bubble to come to the start radius.
+	double other_gases_pressure;      //! Always present pressure of other gasses in tissues (mmHg).
+};
+struct vpmb_config vpmb_config = { 0.6, 0.5, 7500.0, 8.2, 0.0179, 0.257, 20160, 102 };
+
 const double buehlmann_N2_a[] = { 1.1696, 1.0, 0.8618, 0.7562,
 				  0.62, 0.5043, 0.441, 0.4,
 				  0.375, 0.35, 0.3295, 0.3065,
