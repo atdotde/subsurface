@@ -102,6 +102,11 @@ double tolerated_by_tissue[16];
 double tissue_inertgas_saturation[16];
 double buehlmann_inertgas_a[16], buehlmann_inertgas_b[16];
 
+double max_n2_crushing_pressure[16];
+double max_he_crushing_pressure[16];
+double current_n2_radius[16];
+double current_he_radius[16];
+
 static double tissue_tolerance_calc(const struct dive *dive)
 {
 	int ci = -1;
@@ -197,6 +202,11 @@ double he_factor(int period_in_seconds, int ci)
 	return cache[ci].last_factor;
 }
 
+
+void calc_crushing_pressure(double pressure)
+{
+}
+
 /* add period_in_seconds at the given pressure and gas to the deco calculation */
 double add_segment(double pressure, const struct gasmix *gasmix, int period_in_seconds, int ccpo2, const struct dive *dive, int sac)
 {
@@ -219,6 +229,7 @@ double add_segment(double pressure, const struct gasmix *gasmix, int period_in_s
 		tissue_n2_sat[ci] += n2_satmult * pn2_oversat * n2_f;
 		tissue_he_sat[ci] += he_satmult * phe_oversat * he_f;
 	}
+	calc_crushing_pressure(pressure);
 	return tissue_tolerance_calc(dive);
 }
 

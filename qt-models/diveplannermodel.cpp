@@ -839,7 +839,7 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	dump_plan(&diveplan);
 #endif
 	if (recalcQ() && !diveplan_empty(&diveplan)) {
-		plan(&diveplan, &cache, isPlanner(), false);
+		plan(&diveplan, &cache, isPlanner(), false, false);
 		/* TODO:
 		 * Hook this signal to the mainwindow(s), the call to MainWindow
 		 * can't be here as we are now dealing with QML too.
@@ -880,7 +880,7 @@ void DivePlannerPointsModel::createPlan(bool replanCopy)
 	setRecalc(oldRecalc);
 
 	//TODO: C-based function here?
-	bool did_deco = plan(&diveplan, &cache, isPlanner(), true);
+	bool did_deco = plan(&diveplan, &cache, isPlanner(), true, false);
 	if (!current_dive || displayed_dive.id != current_dive->id) {
 		// we were planning a new dive, not re-planning an existing on
 		record_dive(clone_dive(&displayed_dive));

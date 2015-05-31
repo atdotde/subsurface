@@ -855,7 +855,7 @@ bool enough_gas(int current_cylinder)
 
 // Work out the stops. Return value is if there were any mandatory stops.
 
-bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool show_disclaimer)
+bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool show_disclaimer, bool is_vpmb)
 {
 	struct sample *sample;
 	int po2;
