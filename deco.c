@@ -106,8 +106,8 @@ double max_n2_crushing_pressure[16];
 double max_he_crushing_pressure[16];
 
 double crushing_onset_tension[16];				// total inert gas tension in the t* moment
-double crushing_n2_radius[16];				// r*
-double crushing_he_radius[16];
+double n2_radius[16];							// r* -> rm -> rs
+double he_radius[16];
 
 
 static double tissue_tolerance_calc(const struct dive *dive)
@@ -205,11 +205,20 @@ double he_factor(int period_in_seconds, int ci)
 	return cache[ci].last_factor;
 }
 
+void nuclear_regeneration(double time)
+{
+	// original code scales crushing pressure for some reason... cannot find any motive for this
+	int ci;
+	for (ci = 0; ci < 16; ++ci) {
+		n2_radius[ci] = n2_radius[ci] + (vpmb_config.crit_radius_N2 - n2_radius[ci]) * (1.0 - exp (-time / vpmb_config.regeneration_time));
+		he_radius[ci] = he_radius[ci] + (vpmb_config.crit_radius_He - he_radius[ci]) * (1.0 - exp (-time / vpmb_config.regeneration_time));
+	}
+}
+
 // Calculates the nucleons inner pressure during the impermeable period
-double calc_inner_pressure(double crit_radius, double crushing_onset_tension, double current_ambient_pressure)
+double calc_inner_pressure(double crit_radius, double crushing_onset_tension, double current_ambient_pressure, double *current_radius)
 {
 	double onset_radius;
-	double current_radius;
 	double A, B, C, low_bound, high_bound, root;
 	int ci;
 	// Probably will be removed later...
@@ -227,21 +236,21 @@ double calc_inner_pressure(double crit_radius, double crushing_onset_tension, do
 	low_bound = B / A;
 	high_bound = onset_radius;
 	
-	for (ci = 0; ci < max_iters; ++ci){
-		current_radius = (high_bound + low_bound) / 2.0;
-		root = current_radius * current_radius * (A * current_radius + B) + C;
+	for (ci = 0; ci < max_iters; ++ci) {
+		(*current_radius) = (high_bound + low_bound) / 2.0;
+		root = (*current_radius) * (*current_radius) * (A * (*current_radius) + B) + C;
 		if (root == 0.0)
 			break;
 		if (root > 0)
-			low_bound = current_radius;
+			low_bound = (*current_radius);
 		else
-			high_bound = current_radius;
+			high_bound = (*current_radius);
 	}
 	// some debug output?? root? should be ~0
-	return crushing_onset_tension * pow(onset_radius, 3) / pow(current_radius, 3);
+	return crushing_onset_tension * pow(onset_radius, 3) / pow((*current_radius), 3);
 }
 
-// Calculates the crushing pressure in the given moment. Updates crushing_onset_tension if needed
+// Calculates the crushing pressure in the given moment. Updates crushing_onset_tension and critical radius if needed
 void calc_crushing_pressure(double pressure)
 {
 	int ci;
@@ -259,8 +268,8 @@ void calc_crushing_pressure(double pressure)
 			crushing_onset_tension[ci] = gas_tension;
 		}
 		else {	//Impermeable
-			n2_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_N2, crushing_onset_tension[ci], pressure);
-			he_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_He, crushing_onset_tension[ci], pressure);
+			n2_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_N2, crushing_onset_tension[ci], pressure, &n2_radius[ci]);
+			he_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_He, crushing_onset_tension[ci], pressure, &he_radius[ci]);
 			
 			n2_crushing_pressure = pressure - n2_inner_pressure;
 			he_crushing_pressure = pressure - he_inner_pressure;

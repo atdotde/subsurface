@@ -915,6 +915,8 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 		create_dive_from_plan(diveplan, is_planner);
 		return(false);
 	}
+	
+	/* this runs the simulation of the dive */
 	tissue_tolerance = tissue_at_end(&displayed_dive, cached_datap);
 
 #if DEBUG_PLAN & 4
@@ -944,6 +946,10 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 	/* Keep time during the ascend */
 	bottom_time = clock = previous_point_time = displayed_dive.dc.sample[displayed_dive.dc.samples - 1].time.seconds;
 	gi = gaschangenr - 1;
+	
+	if (is_vpmb) {
+		nuclear_regeneration(clock / 60.0);
+	}
 	if(prefs.recreational_mode) {
 		bool safety_stop = prefs.safetystop && max_depth >= 10000;
 		track_ascent_gas(depth, &displayed_dive.cylinder[current_cylinder], avg_depth, bottom_time, safety_stop);
