@@ -205,40 +205,68 @@ double he_factor(int period_in_seconds, int ci)
 	return cache[ci].last_factor;
 }
 
-// Calculates the crushing pressure in the given moment. Updates crushing radius if needed
+// Calculates the nucleons inner pressure during the impermeable period
+double calc_inner_pressure(double crit_radius, double crushing_onset_tension, double current_ambient_pressure)
+{
+	double onset_radius;
+	double current_radius;
+	double A, B, C, low_bound, high_bound, root;
+	int ci;
+	// Probably will be removed later...
+	const int max_iters = 10;
+	
+	// const, depends only on config.
+	onset_radius = 1.0 / (vpmb_config.gradient_of_imperm / (2.0 * (vpmb_config.skin_compression_gammaC - vpmb_config.surface_tension_gamma)) + 1.0 / crit_radius);
+	
+	// A*r^3 + B*r^2 + C = 0
+	A = -(2.0 * (vpmb_config.skin_compression_gammaC - vpmb_config.surface_tension_gamma) / onset_radius + current_ambient_pressure - vpmb_config.gradient_of_imperm);
+	B = 2.0 * (vpmb_config.skin_compression_gammaC - vpmb_config.surface_tension_gamma);
+	C = crushing_onset_tension * pow(onset_radius, 3);
+	
+	// According to the algorithm's authors...
+	low_bound = B / A;
+	high_bound = onset_radius;
+	
+	for (ci = 0; ci < max_iters; ++ci){
+		current_radius = (high_bound + low_bound) / 2.0;
+		root = current_radius * current_radius * (A * current_radius + B) + C;
+		if (root == 0.0)
+			break;
+		if (root > 0)
+			low_bound = current_radius;
+		else
+			high_bound = current_radius;
+	}
+	// some debug output?? root? should be ~0
+	return crushing_onset_tension * pow(onset_radius, 3) / pow(current_radius, 3);
+}
+
+// Calculates the crushing pressure in the given moment. Updates crushing_onset_tension if needed
 void calc_crushing_pressure(double pressure)
 {
-	int i;
+	int ci;
 	double gradient;
 	double gas_tension;
-	double n2_onset_radius, he_onset_radius;
 	double n2_crushing_pressure, he_crushing_pressure;
 	double n2_inner_pressure, he_inner_pressure;
-	double current_radius = 1;
 	
-	for (i = 0; i < 16; ++i) {
-		gas_tension = tissue_n2_sat[i] + tissue_he_sat[i] + vpmb_config.other_gases_pressure;
+	for (ci = 0; ci < 16; ++ci) {
+		gas_tension = tissue_n2_sat[ci] + tissue_he_sat[ci] + vpmb_config.other_gases_pressure;
 		gradient = pressure - gas_tension;
 		
 		if (gradient <= vpmb_config.gradient_of_imperm) {	// permeable situation
 			n2_crushing_pressure = he_crushing_pressure = gradient;
-			crushing_onset_tension[i] = gas_tension;
+			crushing_onset_tension[ci] = gas_tension;
 		}
 		else {	//Impermeable
-			// const, depends only on config.
-			n2_onset_radius = 1 / (vpmb_config.gradient_of_imperm / (2 * (vpmb_config.skin_compression_gammaC - vpmb_config.surface_tension_gamma)) + 1 / vpmb_config.crit_radius_N2);
-			he_onset_radius = 1 / (vpmb_config.gradient_of_imperm / (2 * (vpmb_config.skin_compression_gammaC - vpmb_config.surface_tension_gamma)) + 1 / vpmb_config.crit_radius_He);
-			
-			
-			//Add calculating current_radius
-			n2_inner_pressure = crushing_onset_tension[i] * pow(n2_onset_radius, 3) / pow(current_radius, 3);
-			he_inner_pressure = crushing_onset_tension[i] * pow(he_onset_radius, 3) / pow(current_radius, 3);
+			n2_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_N2, crushing_onset_tension[ci], pressure);
+			he_inner_pressure = calc_inner_pressure(vpmb_config.crit_radius_He, crushing_onset_tension[ci], pressure);
 			
 			n2_crushing_pressure = pressure - n2_inner_pressure;
 			he_crushing_pressure = pressure - he_inner_pressure;
 		}
-		max_n2_crushing_pressure[i] = MAX(max_n2_crushing_pressure[i], n2_crushing_pressure);
-		max_he_crushing_pressure[i] = MAX(max_he_crushing_pressure[i], he_crushing_pressure);
+		max_n2_crushing_pressure[ci] = MAX(max_n2_crushing_pressure[ci], n2_crushing_pressure);
+		max_he_crushing_pressure[ci] = MAX(max_he_crushing_pressure[ci], he_crushing_pressure);
 	}
 }
 
