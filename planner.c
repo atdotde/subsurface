@@ -950,7 +950,9 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 	gi = gaschangenr - 1;
 	
 	if (is_vpmb) {
+		printf("vpm-b\n");
 		nuclear_regeneration(clock / 60.0);
+		printf("tissue tolerance: %lf, vpmb tolerance: %lf\n", tissue_tolerance, vpmb_start_gradient(clock / 60.0));
 	}
 	if(prefs.recreational_mode) {
 		bool safety_stop = prefs.safetystop && max_depth >= 10000;
@@ -1000,7 +1002,6 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 
 		free(stoplevels);
 		free(gaschanges);
-
 		return(false);
 	}
 
@@ -1019,7 +1020,7 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 		/* We will break out when we hit the surface */
 		do {
 			/* Ascend to next stop depth */
-			int deltad = ascent_velocity(depth, avg_depth, bottom_time) * TIMESTEP;
+			long long int deltad = ascent_velocity(depth, avg_depth, bottom_time) * TIMESTEP;
 			if (ascent_velocity(depth, avg_depth, bottom_time) != last_ascend_rate) {
 				plan_add_segment(diveplan, clock - previous_point_time, depth, gas, po2, false);
 				previous_point_time = clock;
