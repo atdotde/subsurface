@@ -87,7 +87,6 @@ public:
 	PlannerDetails *plannerDetails() const;
 	void setLoadedWithFiles(bool filesFromCommandLine);
 	bool filesFromCommandLine() const;
-	void setPlanNotes(const char *notes);
 	void printPlan();
 	void checkSurvey(QSettings *s);
 	void setApplicationState(const QByteArray& state);
@@ -187,6 +186,8 @@ slots:
 	void planCreated();
 	void setEnabledToolbar(bool arg1);
 	void enableDiveSiteCreation();
+	void setPlanNotes();
+
 
 private:
 	Ui::MainWindow ui;
