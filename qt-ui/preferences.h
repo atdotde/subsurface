@@ -34,8 +34,12 @@ slots:
 	void gfhighChanged(int gf);
 	void proxyType_changed(int idx);
 	void on_btnUseDefaultFile_toggled(bool toggle);
+	void on_noDefaultFile_toggled(bool toggle);
+	void on_localDefaultFile_toggled(bool toggle);
+	void on_cloudDefaultFile_toggled(bool toggle);
 	void facebookLoggedIn();
 	void facebookDisconnect();
+	void cloudPinNeeded();
 private:
 	explicit PreferencesDialog(QWidget *parent = 0, Qt::WindowFlags f = 0);
 	void setUiFromPrefs();

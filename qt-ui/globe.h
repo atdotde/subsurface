@@ -1,8 +1,9 @@
 #ifndef GLOBE_H
 #define GLOBE_H
-#ifndef NO_MARBLE
 
 #include <stdint.h>
+
+#ifndef NO_MARBLE
 #include <marble/MarbleWidget.h>
 #include <marble/GeoDataCoordinates.h>
 
@@ -64,6 +65,7 @@ public:
 	void reload();
 	void repopulateLabels();
 	void centerOnDiveSite(uint32_t uuid);
+	void centerOnCurrentDive();
 	bool eventFilter(QObject *, QEvent *);
 public
 slots:
@@ -72,4 +74,7 @@ slots:
 };
 
 #endif // NO_MARBLE
+
+extern "C" double getDistance(int lat1, int lon1, int lat2, int lon2);
+
 #endif // GLOBE_H

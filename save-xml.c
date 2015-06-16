@@ -11,6 +11,7 @@
 #include "device.h"
 #include "membuffer.h"
 #include "strndup.h"
+#include "git-access.h"
 
 /*
  * We're outputting utf8 in xml.
@@ -501,7 +502,7 @@ void save_dives_buffer(struct membuffer *b, const bool select_only)
 		put_format(b, "  <userid>%30s</userid>\n", prefs.userid);
 
 	/* save the dive computer nicknames, if any */
-	call_for_each_dc(b, save_one_device);
+	call_for_each_dc(b, save_one_device, select_only);
 	if (autogroup)
 		put_format(b, "  <autogroup state='1' />\n");
 	put_format(b, "</settings>\n");
@@ -509,10 +510,10 @@ void save_dives_buffer(struct membuffer *b, const bool select_only)
 	/* save the dive sites */
 	put_format(b, "<divesites>\n");
 	for (i = 0; i < dive_site_table.nr; i++) {
+		int j;
+		struct dive *d;
 		struct dive_site *ds = get_dive_site(i);
 		if (dive_site_is_empty(ds)) {
-			int j;
-			struct dive *d;
 			for_each_dive(j, d) {
 				if (d->dive_site_uuid == ds->uuid)
 					d->dive_site_uuid = 0;
@@ -520,6 +521,17 @@ void save_dives_buffer(struct membuffer *b, const bool select_only)
 			delete_dive_site(get_dive_site(i)->uuid);
 			i--; // since we just deleted that one
 			continue;
+		}
+		if (select_only) {
+			bool found = false;
+			for_each_dive(j, d) {
+				if (d->selected && d->dive_site_uuid == ds->uuid) {
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+				continue;
 		}
 		put_format(b, "<site uuid='%8x'", ds->uuid);
 		show_utf8(b, ds->name, " name='", "'", 1);
@@ -626,12 +638,12 @@ int save_dives_logic(const char *filename, const bool select_only)
 	struct membuffer buf = { 0 };
 	FILE *f;
 	void *git;
-	const char *branch;
+	const char *branch, *remote;
 	int error;
 
-	git = is_git_repository(filename, &branch);
+	git = is_git_repository(filename, &branch, &remote);
 	if (git)
-		return git_save_dives(git, branch, select_only);
+		return git_save_dives(git, branch, remote, select_only);
 
 	try_to_backup(filename);
 

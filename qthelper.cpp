@@ -24,6 +24,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QNetworkAccessManager>
+#include <QNetworkProxy>
 #include <QUrlQuery>
 #include <QEventLoop>
 #include <QDateTime>
@@ -32,6 +33,8 @@
 #include <QImageReader>
 #include <QtConcurrent>
 #include "divepicturewidget.h"
+#include "subsurfacewebservices.h"
+#include "mainwindow.h"
 
 #include <libxslt/documents.h>
 
@@ -352,11 +355,15 @@ extern "C" const char *system_default_directory(void)
 
 	if (!*filename) {
 		enum QStandardPaths::StandardLocation location;
-#if QT_VERSION >= 0x050400
-		location = QStandardPaths::AppDataLocation;
-#else
+
+		// allegedly once you're on Qt5.4 or later you should use
+		// QStandardPaths::AppDataLocation but on Mac that gives us
+		// paths starting with /Library/...
+		// #if QT_VERSION >= 0x050400
+		// location = QStandardPaths::AppDataLocation;
+		// #else
 		location = QStandardPaths::DataLocation;
-#endif
+		// #endif
 		QString name = QStandardPaths::standardLocations(location).first();
 		QDir dir(name);
 		dir.mkpath(name);
@@ -1024,14 +1031,56 @@ fraction_t string_to_fraction(const char *str)
 int getCloudURL(QString &filename)
 {
 	QString email = QString(prefs.cloud_storage_email);
-	email.replace("@", "_at_");
-	email.replace(QRegularExpression("[^a-zA-Z0-9._+-]"), "");
+	email.replace(QRegularExpression("[^a-zA-Z0-9@._+-]"), "");
 	if (email.isEmpty() || same_string(prefs.cloud_storage_password, ""))
 		return report_error("Please configure Cloud storage email and password in the preferences");
 	if (email != prefs.cloud_storage_email_encoded) {
 		free(prefs.cloud_storage_email_encoded);
 		prefs.cloud_storage_email_encoded = strdup(qPrintable(email));
 	}
-	filename = QString("https://cloud.subsurface-divelog.org/git/%1[%1]").arg(email);
+	filename = QString(QString(prefs.cloud_git_url) + "/%1[%1]").arg(email);
 	return 0;
+}
+
+extern "C" bool isCloudUrl(const char *filename)
+{
+	QString email = QString(prefs.cloud_storage_email);
+	email.replace(QRegularExpression("[^a-zA-Z0-9@._+-]"), "");
+	if (!email.isEmpty() &&
+	    QString(QString(prefs.cloud_git_url) + "/%1[%1]").arg(email) == filename)
+		return true;
+	return false;
+}
+
+extern "C" bool getProxyString(char **buffer)
+{
+	if (prefs.proxy_type == QNetworkProxy::HttpProxy) {
+		QString proxy;
+		if (prefs.proxy_auth)
+			proxy = QString("http://%1:%2@%3:%4").arg(prefs.proxy_user).arg(prefs.proxy_pass)
+					.arg(prefs.proxy_host).arg(prefs.proxy_port);
+		else
+			proxy = QString("http://%1:%2").arg(prefs.proxy_host).arg(prefs.proxy_port);
+		if (buffer)
+			*buffer = strdup(qPrintable(proxy));
+		return true;
+	}
+	return false;
+}
+
+extern "C" bool canReachCloudServer()
+{
+	return CheckCloudConnection::checkServer();
+}
+
+extern "C" void updateWindowTitle()
+{
+	MainWindow::instance()->setTitle();
+}
+
+extern "C" void subsurface_mkdir(const char *dir)
+{
+	QDir directory;
+	if (!directory.mkpath(QString(dir)))
+		qDebug() << "failed to create path" << dir;
 }

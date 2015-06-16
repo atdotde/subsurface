@@ -72,7 +72,7 @@ public:
 	DivePlannerWidget *divePlannerWidget();
 	PlannerSettingsWidget *divePlannerSettingsWidget();
 	LocationInformationWidget *locationInformationWidget();
-	void setTitle(enum MainWindowTitleFormat format);
+	void setTitle(enum MainWindowTitleFormat format = MWTF_FILENAME);
 
 	// Some shortcuts like "change DC" or "copy/paste dive components"
 	// should only be enabled when the profile's visible.
@@ -94,6 +94,7 @@ public:
 	void showV2Dialog();
 	QUndoStack *undoStack;
 	NotificationWidget *getNotificationWidget();
+	void enableDisableCloudActions();
 private
 slots:
 	/* file menu action */
@@ -195,6 +196,7 @@ private:
 	CurrentState state;
 	QString filter();
 	static MainWindow *m_Instance;
+	QString displayedFilename(QString fullFilename);
 	bool askSaveChanges();
 	bool okToClose(QString message);
 	void closeCurrentFile();

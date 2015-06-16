@@ -9,6 +9,8 @@
 #include <QNetworkProxy>
 #include <QNetworkCookieJar>
 
+#include "subsurfacewebservices.h"
+
 #if defined(FBSUPPORT)
 #include "socialnetworks.h"
 #endif
@@ -57,7 +59,6 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, Qt::WindowFlags f) : QDial
 	connect(ui.btnDisconnectFacebook, &QPushButton::clicked, fb, &FacebookManager::logout);
 	connect(fb, &FacebookManager::justLoggedOut, this, &PreferencesDialog::facebookDisconnect);
 #endif
-
 	connect(ui.proxyType, SIGNAL(currentIndexChanged(int)), this, SLOT(proxyType_changed(int)));
 	connect(ui.buttonBox, SIGNAL(clicked(QAbstractButton *)), this, SLOT(buttonClicked(QAbstractButton *)));
 	connect(ui.gflow, SIGNAL(valueChanged(int)), this, SLOT(gflowChanged(int)));
@@ -100,6 +101,24 @@ void PreferencesDialog::facebookDisconnect()
 		facebookWebView->show();
 	}
 #endif
+}
+
+void PreferencesDialog::cloudPinNeeded()
+{
+	ui.cloud_storage_pin->setEnabled(prefs.cloud_verification_status == CS_NEED_TO_VERIFY);
+	ui.cloud_storage_pin->setVisible(prefs.cloud_verification_status == CS_NEED_TO_VERIFY);
+	ui.cloud_storage_pin_label->setEnabled(prefs.cloud_verification_status == CS_NEED_TO_VERIFY);
+	ui.cloud_storage_pin_label->setVisible(prefs.cloud_verification_status == CS_NEED_TO_VERIFY);
+	if (prefs.cloud_verification_status == CS_VERIFIED) {
+		ui.cloudStorageGroupBox->setTitle(tr("Subsurface cloud storage (credentials verified)"));
+		ui.cloudDefaultFile->setEnabled(true);
+	} else {
+		ui.cloudStorageGroupBox->setTitle(tr("Subsurface cloud storage"));
+		if (ui.cloudDefaultFile->isChecked())
+			ui.noDefaultFile->setChecked(true);
+		ui.cloudDefaultFile->setEnabled(false);
+	}
+	MainWindow::instance()->enableDisableCloudActions();
 }
 
 #define DANGER_GF (gf > 100) ? "* { color: red; }" : ""
@@ -163,6 +182,9 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.font->setCurrentFont(QString(prefs.divelist_font));
 	ui.fontsize->setValue(prefs.font_size);
 	ui.defaultfilename->setText(prefs.default_filename);
+	ui.noDefaultFile->setChecked(prefs.default_file_behavior == NO_DEFAULT_FILE);
+	ui.cloudDefaultFile->setChecked(prefs.default_file_behavior == CLOUD_DEFAULT_FILE);
+	ui.localDefaultFile->setChecked(prefs.default_file_behavior == LOCAL_DEFAULT_FILE);
 	ui.default_cylinder->clear();
 	for (int i = 0; tank_info[i].name != NULL; i++) {
 		ui.default_cylinder->addItem(tank_info[i].name);
@@ -208,6 +230,8 @@ void PreferencesDialog::setUiFromPrefs()
 	ui.cloud_storage_email->setText(prefs.cloud_storage_email);
 	ui.cloud_storage_password->setText(prefs.cloud_storage_password);
 	ui.save_password_local->setChecked(prefs.save_password_local);
+	cloudPinNeeded();
+	ui.cloud_background_sync->setChecked(prefs.cloud_background_sync);
 }
 
 void PreferencesDialog::restorePrefs()
@@ -320,6 +344,12 @@ void PreferencesDialog::syncSettings()
 	s.setValue("default_filename", ui.defaultfilename->text());
 	s.setValue("default_cylinder", ui.default_cylinder->currentText());
 	s.setValue("use_default_file", ui.btnUseDefaultFile->isChecked());
+	if (ui.noDefaultFile->isChecked())
+		s.setValue("default_file_behavior", NO_DEFAULT_FILE);
+	else if (ui.localDefaultFile->isChecked())
+		s.setValue("default_file_behavior", LOCAL_DEFAULT_FILE);
+	else if (ui.cloudDefaultFile->isChecked())
+		s.setValue("default_file_behavior", CLOUD_DEFAULT_FILE);
 	s.setValue("defaultsetpoint", rint(ui.defaultSetpoint->value() * 1000.0));
 	s.setValue("o2consumption", rint(ui.psro2rate->value() *1000.0));
 	s.setValue("pscr_ratio", rint(1000.0 / ui.pscrfactor->value()));
@@ -360,12 +390,50 @@ void PreferencesDialog::syncSettings()
 	s.endGroup();
 
 	s.beginGroup("CloudStorage");
-	SAVE_OR_REMOVE("email", default_prefs.cloud_storage_email, ui.cloud_storage_email->text());
+	QString email = ui.cloud_storage_email->text();
+	QString password = ui.cloud_storage_password->text();
+	if (prefs.cloud_verification_status == CS_UNKNOWN ||
+	    prefs.cloud_verification_status == CS_INCORRECT_USER_PASSWD ||
+	    email != prefs.cloud_storage_email ||
+	    password != prefs.cloud_storage_password) {
+		// different credentials - reset verification status
+		prefs.cloud_verification_status = CS_UNKNOWN;
+
+		// connect to backend server to check / create credentials
+		QRegularExpression reg("^[a-zA-Z0-9@.+_-]+$");
+		if (!reg.match(email).hasMatch() || !reg.match(password).hasMatch()) {
+			report_error(qPrintable(tr("Cloud storage email and password can only consist of letters, numbers, and '.', '-', '_', and '+'.")));
+		}
+		CloudStorageAuthenticate *cloudAuth = new CloudStorageAuthenticate(this);
+		connect(cloudAuth, SIGNAL(finishedAuthenticate()), this, SLOT(cloudPinNeeded()));
+		QNetworkReply *reply = cloudAuth->authenticate(email, password);
+	} else if (prefs.cloud_verification_status == CS_NEED_TO_VERIFY) {
+		QString pin = ui.cloud_storage_pin->text();
+		if (!pin.isEmpty()) {
+			// connect to backend server to check / create credentials
+			QRegularExpression reg("^[a-zA-Z0-9@.+_-]+$");
+			if (!reg.match(email).hasMatch() || !reg.match(password).hasMatch()) {
+				report_error(qPrintable(tr("Cloud storage email and password can only consist of letters, numbers, and '.', '-', '_', and '+'.")));
+			}
+			CloudStorageAuthenticate *cloudAuth = new CloudStorageAuthenticate(this);
+			QNetworkReply *reply = cloudAuth->authenticate(email, password, pin);
+		}
+	}
+	SAVE_OR_REMOVE("email", default_prefs.cloud_storage_email, email);
 	SAVE_OR_REMOVE("save_password_local", default_prefs.save_password_local, ui.save_password_local->isChecked());
-	if (ui.save_password_local->isChecked())
-		SAVE_OR_REMOVE("password", default_prefs.cloud_storage_password, ui.cloud_storage_password->text());
-	else
+	if (ui.save_password_local->isChecked()) {
+		SAVE_OR_REMOVE("password", default_prefs.cloud_storage_password, password);
+	} else {
 		s.remove("password");
+		free(prefs.cloud_storage_password);
+		prefs.cloud_storage_password = strdup(qPrintable(password));
+	}
+	SAVE_OR_REMOVE("cloud_verification_status", default_prefs.cloud_verification_status, prefs.cloud_verification_status);
+	SAVE_OR_REMOVE("cloud_background_sync", default_prefs.cloud_background_sync, ui.cloud_background_sync->isChecked());
+
+	// at this point we intentionally do not have a UI for changing this
+	// it could go into some sort of "advanced setup" or something
+	SAVE_OR_REMOVE("cloud_base_url", default_prefs.cloud_base_url, prefs.cloud_base_url);
 	s.endGroup();
 	loadSettings();
 	emit settingsChanged();
@@ -434,6 +502,18 @@ void PreferencesDialog::loadSettings()
 
 	s.beginGroup("GeneralSettings");
 	GET_TXT("default_filename", default_filename);
+	GET_INT("default_file_behavior", default_file_behavior);
+	if (prefs.default_file_behavior == UNDEFINED_DEFAULT_FILE) {
+		// undefined, so check if there's a filename set and
+		// use that, otherwise go with no default file
+		if (QString(prefs.default_filename).isEmpty())
+			prefs.default_file_behavior = NO_DEFAULT_FILE;
+		else
+			prefs.default_file_behavior = LOCAL_DEFAULT_FILE;
+	}
+	ui.defaultfilename->setEnabled(prefs.default_file_behavior == LOCAL_DEFAULT_FILE);
+	ui.btnUseDefaultFile->setEnabled(prefs.default_file_behavior == LOCAL_DEFAULT_FILE);
+	ui.chooseFile->setEnabled(prefs.default_file_behavior == LOCAL_DEFAULT_FILE);
 	GET_TXT("default_cylinder", default_cylinder);
 	GET_BOOL("use_default_file", use_default_file);
 	GET_INT("defaultsetpoint", defaultsetpoint);
@@ -479,9 +559,18 @@ void PreferencesDialog::loadSettings()
 	s.endGroup();
 
 	s.beginGroup("CloudStorage");
-	GET_TXT("password", cloud_storage_password);
 	GET_TXT("email", cloud_storage_email);
 	GET_BOOL("save_password_local", save_password_local);
+	if (prefs.save_password_local) { // GET_TEXT macro is not a single statement
+		GET_TXT("password", cloud_storage_password);
+	}
+	GET_INT("cloud_verification_status", cloud_verification_status);
+	GET_BOOL("cloud_background_sync", cloud_background_sync);
+
+	// creating the git url here is simply a convenience when C code wants
+	// to compare against that git URL - it's always derived from the base URL
+	GET_TXT("cloud_base_url", cloud_base_url);
+	prefs.cloud_git_url = strdup(qPrintable(QString(prefs.cloud_base_url) + "/git"));
 	s.endGroup();
 }
 
@@ -567,4 +656,22 @@ void PreferencesDialog::on_btnUseDefaultFile_toggled(bool toggle)
 	} else {
 		ui.defaultfilename->setEnabled(true);
 	}
+}
+
+void PreferencesDialog::on_noDefaultFile_toggled(bool toggle)
+{
+	prefs.default_file_behavior = NO_DEFAULT_FILE;
+}
+
+void PreferencesDialog::on_localDefaultFile_toggled(bool toggle)
+{
+	ui.defaultfilename->setEnabled(toggle);
+	ui.btnUseDefaultFile->setEnabled(toggle);
+	ui.chooseFile->setEnabled(toggle);
+	prefs.default_file_behavior = LOCAL_DEFAULT_FILE;
+}
+
+void PreferencesDialog::on_cloudDefaultFile_toggled(bool toggle)
+{
+	prefs.default_file_behavior = CLOUD_DEFAULT_FILE;
 }

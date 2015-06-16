@@ -109,7 +109,31 @@ slots:
 	virtual void startDownload() { }
 	virtual void startUpload() { }
 	virtual void buttonClicked(QAbstractButton *button) { }
+};
 
+class CloudStorageAuthenticate : public QObject {
+	Q_OBJECT
+public:
+	QNetworkReply* authenticate(QString email, QString password, QString pin = "");
+	explicit CloudStorageAuthenticate(QObject *parent);
+signals:
+	void finishedAuthenticate();
+private
+slots:
+	void uploadError(QNetworkReply::NetworkError error);
+	void sslErrors(QList<QSslError> errorList);
+	void uploadFinished();
+private:
+	QNetworkReply *reply;
+	QString userAgent;
+
+};
+
+class CheckCloudConnection : public QObject {
+	Q_OBJECT
+public:
+	explicit CheckCloudConnection(QObject *parent = 0);
+	static bool checkServer();
 };
 
 #ifdef __cplusplus

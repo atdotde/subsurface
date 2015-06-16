@@ -28,6 +28,8 @@ struct preferences {
 	const char *divelist_font;
 	const char *default_filename;
 	const char *default_cylinder;
+	const char *cloud_base_url;
+	const char *cloud_git_url;
 	double font_size;
 	partial_pressure_graphs_t pp_graphs;
 	short mod;
@@ -89,16 +91,33 @@ struct preferences {
 	int defaultsetpoint; // default setpoint in mbar
 	bool show_pictures_in_profile;
 	bool use_default_file;
+	short default_file_behavior;
 	facebook_prefs_t facebook;
 	char *cloud_storage_password;
 	char *cloud_storage_email;
 	char *cloud_storage_email_encoded;
 	bool save_password_local;
+	short cloud_verification_status;
+	bool cloud_background_sync;
 };
 enum unit_system_values {
 	METRIC,
 	IMPERIAL,
 	PERSONALIZE
+};
+
+enum def_file_behavior {
+	UNDEFINED_DEFAULT_FILE,
+	LOCAL_DEFAULT_FILE,
+	NO_DEFAULT_FILE,
+	CLOUD_DEFAULT_FILE
+};
+
+enum cloud_status {
+	CS_UNKNOWN,
+	CS_INCORRECT_USER_PASSWD,
+	CS_NEED_TO_VERIFY,
+	CS_VERIFIED
 };
 
 extern struct preferences prefs, default_prefs;

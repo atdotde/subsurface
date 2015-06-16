@@ -2,6 +2,8 @@
 #include "divesite.h"
 #include "dive.h"
 
+#include <math.h>
+
 struct dive_site_table dive_site_table;
 
 /* there could be multiple sites of the same name - return the first one */
@@ -32,6 +34,41 @@ uint32_t get_dive_site_uuid_by_gps(degrees_t latitude, degrees_t longitude, stru
 		}
 	}
 	return 0;
+}
+
+// Calculate the distance in meters between two coordinates.
+static unsigned int get_distance(degrees_t lat1, degrees_t lon1, degrees_t lat2, degrees_t lon2)
+{
+	double lat1_r = udeg_to_radians(lat1.udeg);
+	double lat2_r = udeg_to_radians(lat2.udeg);
+	double lat_d_r = udeg_to_radians(lat2.udeg-lat1.udeg);
+	double lon_d_r = udeg_to_radians(lon2.udeg-lon1.udeg);
+
+	double a = sin(lat_d_r/2) * sin(lat_d_r/2) +
+		cos(lat2_r) * cos(lat2_r) * sin(lon_d_r/2) * sin(lon_d_r/2);
+	double c = 2 * atan2(sqrt(a), sqrt(1.0 - a));
+
+	// Earth radious in metres
+	return 6371000 * c;
+}
+
+/* find the closest one, no more than distance meters away - if more than one at same distance, pick the first */
+uint32_t get_dive_site_uuid_by_gps_proximity(degrees_t latitude, degrees_t longitude, int distance, struct dive_site **dsp)
+{
+	int i;
+	int uuid = 0;
+	struct dive_site *ds;
+	unsigned int cur_distance, min_distance = distance;
+	for_each_dive_site (i, ds) {
+		if (dive_site_has_gps_location(ds) &&
+		    (cur_distance = get_distance(ds->latitude, ds->longitude, latitude, longitude)) < min_distance) {
+			min_distance = cur_distance;
+			uuid = ds->uuid;
+			if (dsp)
+				*dsp = ds;
+		}
+	}
+	return uuid;
 }
 
 /* try to create a uniqe ID - fingers crossed */

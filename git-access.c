@@ -13,6 +13,9 @@
 #include "dive.h"
 #include "membuffer.h"
 #include "strndup.h"
+#include "qthelperfromc.h"
+#include "git-access.h"
+#include "gettext.h"
 
 /*
  * The libgit2 people are incompetent at making libraries. They randomly change
@@ -27,6 +30,13 @@
     #define git_remote_fetch(remote, refspecs, signature, reflog) git_remote_fetch(remote, signature, reflog)
   #endif
 #endif
+
+#if !USE_LIBGIT23_API && !LIBGIT2_VER_MAJOR && LIBGIT2_VER_MINOR == 22
+  #define git_remote_push(remote,refspecs,opts) git_remote_push(remote,refspecs,opts,NULL,NULL)
+  #define git_reference_set_target(out,ref,id,log_message) git_reference_set_target(out,ref,id,NULL,log_message)
+  #define git_reset(repo,target,reset_type,checkout_opts) git_reset(repo,target,reset_type,checkout_opts,NULL,NULL)
+#endif
+
 /*
  * api break introduced in libgit2 master after 0.22 - let's guess this is the v0.23 API
  */
@@ -63,11 +73,40 @@ static int check_clean(const char *path, unsigned int status, void *payload)
 	return 1;
 }
 
-static int try_to_update(git_repository *rep, git_reference *local, git_reference *remote)
+/*
+ * The remote is strictly newer than the local branch.
+ */
+static int reset_to_remote(git_repository *repo, git_reference *local, const git_oid *new_id)
 {
-	if (!git_reference_cmp(local, remote))
+	git_checkout_options opts = GIT_CHECKOUT_OPTIONS_INIT;
+	git_object *target;
+
+	// If it's not checked out (bare or not HEAD), just update the reference */
+	if (git_repository_is_bare(repo) || git_branch_is_head(local) != 1) {
+		git_reference *out;
+
+		if (git_reference_set_target(&out, local, new_id, "Update to remote"))
+			return report_error("Could not update local ref to newer remote ref");
+
+		git_reference_free(out);
+
+		// Not really an error, just informational
+		report_error("Updated local branch from remote");
+
 		return 0;
-	return report_error("Local and remote do not match, not updating");
+	}
+
+	if (git_object_lookup(&target, repo, new_id, GIT_OBJ_COMMIT))
+		return report_error("Could not look up remote commit");
+
+	opts.checkout_strategy = GIT_CHECKOUT_SAFE;
+	if (git_reset(repo, target, GIT_RESET_HARD, &opts))
+		return report_error("Local head checkout failed after update");
+
+	// Not really an error, just informational
+	report_error("Updated local information from remote");
+
+	return 0;
 }
 
 #if USE_LIBGIT23_API
@@ -94,18 +133,122 @@ int credential_https_cb(git_cred **out,
 }
 #endif
 
-static git_repository *update_local_repo(const char *localdir, const char *remote, const char *branch)
+static int update_remote(git_repository *repo, git_remote *origin, git_reference *local, git_reference *remote, enum remote_transport rt)
 {
-	int error;
-	git_repository *repo = NULL;
-	git_remote *origin;
+	git_push_options opts = GIT_PUSH_OPTIONS_INIT;
+	git_strarray refspec;
+	const char *name = git_reference_name(local);
+
+	refspec.count = 1;
+	refspec.strings = (char **)&name;
+
+#if USE_LIBGIT23_API
+	if (rt == RT_SSH)
+		opts.callbacks.credentials = credential_ssh_cb;
+	else if (rt == RT_HTTPS)
+		opts.callbacks.credentials = credential_https_cb;
+#endif
+	if (git_remote_push(origin, &refspec, &opts))
+		return report_error("Unable to update remote with current local cache state (%s)", giterr_last()->message);
+
+	return 0;
+}
+
+static int try_to_update(git_repository *repo, git_remote *origin, git_reference *local, git_reference *remote, enum remote_transport rt)
+{
+	git_oid base;
+	const git_oid *local_id, *remote_id;
+
+	if (!git_reference_cmp(local, remote))
+		return 0;
+
+	// Dirty modified state in the working tree? We're not going
+	// to update either way
+	if (git_status_foreach(repo, check_clean, NULL))
+		return report_error("local cached copy is dirty, skipping update");
+
+	local_id = git_reference_target(local);
+	remote_id = git_reference_target(remote);
+
+	if (!local_id || !remote_id)
+		return report_error("Unable to get local or remote SHA1");
+
+	if (git_merge_base(&base, repo, local_id, remote_id))
+		return report_error("Unable to find common commit of local and remote branches");
+
+	/* Is the remote strictly newer? Use it */
+	if (git_oid_equal(&base, local_id))
+		return reset_to_remote(repo, local, remote_id);
+
+	/* Is the local repo the more recent one? See if we can update upstream */
+	if (git_oid_equal(&base, remote_id))
+		return update_remote(repo, origin, local, remote, rt);
+
+	/* Merging a bare repository always needs user action */
+	if (git_repository_is_bare(repo))
+		return report_error("Local and remote have diverged, merge of bare branch needed");
+
+	/* Merging will definitely need the head branch too */
+	if (git_branch_is_head(local) != 1)
+		return report_error("Local and remote do not match, local branch not HEAD - cannot update");
+
+	/*
+	 * Some day we migth try a clean merge here.
+	 *
+	 * But I couldn't find any good examples of this, so for now
+	 * you'd need to merge divergent histories manually. But we've
+	 * at least verified above that we have a working tree and the
+	 * current branch is checked out and clean, so we *could* try
+	 * to merge.
+	 */
+	return report_error("Local and remote have diverged, need to merge");
+}
+
+static int check_remote_status(git_repository *repo, git_remote *origin, const char *branch, enum remote_transport rt)
+{
+	int error = 0;
+
 	git_reference *local_ref, *remote_ref;
 
-	error = git_repository_open(&repo, localdir);
-	if (error) {
-		report_error("Unable to open git cache repository at %s: %s",
-			localdir, giterr_last()->message);
-		return NULL;
+	if (git_branch_lookup(&local_ref, repo, branch, GIT_BRANCH_LOCAL))
+		return report_error("Git cache branch %s no longer exists", branch);
+
+	if (git_branch_upstream(&remote_ref, local_ref)) {
+		/* so there is no upstream branch for our branch; that's a problem.
+		/* let's push our branch */
+		git_strarray refspec;
+		git_reference_list(&refspec, repo);
+#if USE_LIBGIT23_API
+		git_push_options opts = GIT_PUSH_OPTIONS_INIT;
+		if (rt == RT_SSH)
+			opts.callbacks.credentials = credential_ssh_cb;
+		else if (rt == RT_HTTPS)
+			opts.callbacks.credentials = credential_https_cb;
+		error = git_remote_push(origin, &refspec, &opts);
+#else
+		error = git_remote_push(origin, &refspec, NULL);
+#endif
+	} else {
+		error = try_to_update(repo, origin, local_ref, remote_ref, rt);
+		git_reference_free(remote_ref);
+	}
+	git_reference_free(local_ref);
+	return error;
+}
+
+int sync_with_remote(git_repository *repo, const char *remote, const char *branch, enum remote_transport rt)
+{
+	int error;
+	git_remote *origin;
+	char *proxy_string;
+	git_config *conf;
+
+	git_repository_config(&conf, repo);
+	if (rt == RT_HTTPS && getProxyString(&proxy_string)) {
+		git_config_set_string(conf, "http.proxy", proxy_string);
+		free(proxy_string);
+	} else {
+		git_config_set_string(conf, "http.proxy", "");
 	}
 
 	/*
@@ -116,49 +259,101 @@ static git_repository *update_local_repo(const char *localdir, const char *remot
 	if (error) {
 		report_error("Repository '%s' origin lookup failed (%s)",
 			remote, giterr_last()->message);
-		return repo;
+		return 0;
 	}
 
-	// NOTE! A fetch error is not fatal, we just report it
+	if (rt == RT_HTTPS && !canReachCloudServer())
+		return 0;
 #if USE_LIBGIT23_API
 	git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
-	if (strncmp(remote, "ssh://", 6) == 0)
+	if (rt == RT_SSH)
 		opts.callbacks.credentials = credential_ssh_cb;
-	else if (strncmp(remote, "https://", 8) == 0)
+	else if (rt == RT_HTTPS)
 		opts.callbacks.credentials = credential_https_cb;
 	error = git_remote_fetch(origin, NULL, &opts, NULL);
 #else
 	error = git_remote_fetch(origin, NULL, NULL, NULL);
 #endif
-	git_remote_free(origin);
+	// NOTE! A fetch error is not fatal, we just report it
 	if (error) {
-		report_error("Unable to update cache for remote '%s'", remote);
-		return repo;
+		report_error("Unable to fetch remote '%s'", remote);
+		error = 0;
+	} else {
+		error = check_remote_status(repo, origin, branch, rt);
 	}
+	git_remote_free(origin);
+	return error;
+}
 
-	// Dirty modified state in the working tree? We're not going
-	// to tru to update
-	if (git_status_foreach(repo, check_clean, NULL))
-		return repo;
+static git_repository *update_local_repo(const char *localdir, const char *remote, const char *branch, enum remote_transport rt)
+{
+	int error;
+	git_repository *repo = NULL;
 
-	if (git_branch_lookup(&local_ref, repo, branch, GIT_BRANCH_LOCAL)) {
-		report_error("Git cache branch %s no longer exists", branch);
-		return repo;
+	error = git_repository_open(&repo, localdir);
+	if (error) {
+		report_error("Unable to open git cache repository at %s: %s",
+			localdir, giterr_last()->message);
+		return NULL;
 	}
-
-	if (git_branch_upstream(&remote_ref, local_ref)) {
-		report_error("Git cache branch %s no longer has an upstream branch", branch);
-		git_reference_free(local_ref);
-		return repo;
-	}
-
-	try_to_update(repo, local_ref, remote_ref);
-	git_reference_free(local_ref);
-	git_reference_free(remote_ref);
+	sync_with_remote(repo, remote, branch, rt);
 	return repo;
 }
 
-static git_repository *create_local_repo(const char *localdir, const char *remote, const char *branch)
+static int repository_create_cb(git_repository **out, const char *path, int bare, void *payload)
+{
+	char *proxy_string;
+	git_config *conf;
+
+	int ret = git_repository_init(out, path, bare);
+
+	if (getProxyString(&proxy_string)) {
+		git_repository_config(&conf, *out);
+		git_config_set_string(conf, "http.proxy", proxy_string);
+		free(proxy_string);
+	}
+	return ret;
+}
+
+/* this should correctly initialize both the local and remote
+ * repository for the Subsurface cloud storage */
+static git_repository *create_and_push_remote(const char *localdir, const char *remote, const char *branch)
+{
+	git_repository *repo;
+	git_config *conf;
+	int len;
+	char *variable_name, *merge_head;
+
+	/* first make sure the directory for the local cache exists */
+	subsurface_mkdir(localdir);
+
+	/* set up the origin to point to our remote */
+	git_repository_init_options init_opts = GIT_REPOSITORY_INIT_OPTIONS_INIT;
+	init_opts.origin_url = remote;
+
+	/* now initialize the repository with */
+	git_repository_init_ext(&repo, localdir, &init_opts);
+
+	/* create a config so we can set the remote tracking branch */
+	git_repository_config(&conf, repo);
+	len = sizeof("branch..remote") + strlen(branch);
+	variable_name = malloc(len);
+	snprintf(variable_name, len, "branch.%s.remote", branch);
+	git_config_set_string(conf, variable_name, "origin");
+	/* we know this is shorter than the previous one, so we reuse the variable*/
+	snprintf(variable_name, len, "branch.%s.merge", branch);
+	len = sizeof("refs/heads/") + strlen(branch);
+	merge_head = malloc(len);
+	snprintf(merge_head, len, "refs/heads/%s", branch);
+	git_config_set_string(conf, variable_name, merge_head);
+
+	/* finally create an empty commit and push it to the remote */
+	if (do_git_save(repo, branch, remote, false, true))
+		return NULL;
+	return(repo);
+}
+
+static git_repository *create_local_repo(const char *localdir, const char *remote, const char *branch, enum remote_transport rt)
 {
 	int error;
 	git_repository *cloned_repo = NULL;
@@ -168,12 +363,28 @@ static git_repository *create_local_repo(const char *localdir, const char *remot
 		opts.fetch_opts.callbacks.credentials = credential_ssh_cb;
 	else if (strncmp(remote, "https://", 8) == 0)
 		opts.fetch_opts.callbacks.credentials = credential_https_cb;
+	opts.repository_cb = repository_create_cb;
 #endif
 	opts.checkout_branch = branch;
+	if (rt == RT_HTTPS && !canReachCloudServer())
+		return 0;
 	error = git_clone(&cloned_repo, remote, localdir, &opts);
 	if (error) {
-		report_error("git clone of %s failed (%s)", remote, giterr_last()->message);
-		return NULL;
+		char *msg = giterr_last()->message;
+		int len = sizeof("Reference 'refs/remotes/origin/' not found" + strlen(branch));
+		char *pattern = malloc(len);
+		snprintf(pattern, len, "Reference 'refs/remotes/origin/%s' not found", branch);
+		if (strstr(remote, prefs.cloud_git_url) && strstr(msg, pattern)) {
+			/* we're trying to open the remote branch that corresponds
+			 * to our cloud storage and the branch doesn't exist.
+			 * So we need to create the branch and push it to the remote */
+			cloned_repo = create_and_push_remote(localdir, remote, branch);
+		} else if (strstr(remote, prefs.cloud_git_url)) {
+			report_error(translate("gettextFromC", "Error connecting to Subsurface cloud storage"));
+		} else {
+			report_error(translate("gettextFromC", "git clone of %s failed (%s)"), remote, msg);
+		}
+		free(pattern);
 	}
 	return cloned_repo;
 }
@@ -181,6 +392,15 @@ static git_repository *create_local_repo(const char *localdir, const char *remot
 static struct git_repository *get_remote_repo(const char *localdir, const char *remote, const char *branch)
 {
 	struct stat st;
+	enum remote_transport rt;
+
+	/* figure out the remote transport */
+	if (strncmp(remote, "ssh://", 6) == 0)
+		rt = RT_SSH;
+	else if (strncmp(remote, "https://", 8) == 0)
+		rt = RT_HTTPS;
+	else
+		rt = RT_OTHER;
 
 	/* Do we already have a local cache? */
 	if (!stat(localdir, &st)) {
@@ -188,9 +408,9 @@ static struct git_repository *get_remote_repo(const char *localdir, const char *
 			report_error("local git cache at '%s' is corrupt");
 			return NULL;
 		}
-		return update_local_repo(localdir, remote, branch);
+		return update_local_repo(localdir, remote, branch, rt);
 	}
-	return create_local_repo(localdir, remote, branch);
+	return create_local_repo(localdir, remote, branch, rt);
 }
 
 /*
@@ -250,11 +470,16 @@ static struct git_repository *is_remote_git_repository(char *remote, const char 
 	if  (!strncmp(remote, "https://", 8)) {
 		char *at = strchr(remote, '@');
 		if (at) {
-			/* grab the part between "https://" and "@" as encoded email address
-			 * (that's our username) and move the rest of the URL forward, remembering
-			 * to copy the closing NUL as well */
-			prefs.cloud_storage_email_encoded = strndup(remote + 8, at - remote - 8);
-			memmove(remote + 8, at + 1, strlen(at + 1) + 1);
+			/* was this the @ that denotes an account? that means it was before the
+			 * first '/' after the https:// - so let's find a '/' after that and compare */
+			char *slash = strchr(remote + 8, '/');
+			if (slash && slash > at) {
+				/* grab the part between "https://" and "@" as encoded email address
+				 * (that's our username) and move the rest of the URL forward, remembering
+				 * to copy the closing NUL as well */
+				prefs.cloud_storage_email_encoded = strndup(remote + 8, at - remote - 8);
+				memmove(remote + 8, at + 1, strlen(at + 1) + 1);
+			}
 		}
 	}
 	localdir = get_local_dir(remote, branch);
@@ -267,7 +492,7 @@ static struct git_repository *is_remote_git_repository(char *remote, const char 
 /*
  * If it's not a git repo, return NULL. Be very conservative.
  */
-struct git_repository *is_git_repository(const char *filename, const char **branchp)
+struct git_repository *is_git_repository(const char *filename, const char **branchp, const char **remote)
 {
 	int flen, blen, ret;
 	int offset = 1;
@@ -320,7 +545,10 @@ struct git_repository *is_git_repository(const char *filename, const char **bran
 
 	repo = is_remote_git_repository(loc, branch);
 	if (repo) {
-		free(loc);
+		if (remote)
+			*remote = loc;
+		else
+			free(loc);
 		*branchp = branch;
 		return repo;
 	}

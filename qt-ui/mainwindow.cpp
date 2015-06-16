@@ -43,6 +43,7 @@
 #include "usermanual.h"
 #endif
 #include "divepicturemodel.h"
+#include "git-access.h"
 #include <QNetworkProxy>
 #include <QUndoStack>
 #include <qthelper.h>
@@ -107,13 +108,14 @@ MainWindow::MainWindow() : QMainWindow(),
 	profLayout->addWidget(toolBar);
 	profLayout->addWidget(profileWidget);
 	profileContainer->setLayout(profLayout);
-
+	DivePictureWidget *divePictures = new DivePictureWidget(this);
+	divePictures->setModel(DivePictureModel::instance());
 	registerApplicationState("Default", mainTab, profileContainer, diveListView, globeGps );
 	registerApplicationState("AddDive", mainTab, profileContainer, diveListView, globeGps );
 	registerApplicationState("EditDive", mainTab, profileContainer, diveListView, globeGps );
 	registerApplicationState("PlanDive", plannerWidget, profileContainer, plannerSettings, plannerDetails );
 	registerApplicationState("EditPlannedDive", plannerWidget, profileContainer, diveListView, globeGps );
-	registerApplicationState("EditDiveSite",locationInformation, profileContainer, diveListView, globeGps );
+	registerApplicationState("EditDiveSite",locationInformation, divePictures, diveListView, globeGps );
 
 	setApplicationState("Default");
 
@@ -155,6 +157,8 @@ MainWindow::MainWindow() : QMainWindow(),
 	ui.menuFile->removeAction(ui.actionCloudstorageopen);
 	ui.menuFile->removeAction(ui.actionCloudstoragesave);
 	qDebug() << "disabled / made invisible the cloud storage stuff";
+#else
+	enableDisableCloudActions();
 #endif
 
 	ui.mainErrorMessage->hide();
@@ -200,6 +204,14 @@ MainWindow::~MainWindow()
 {
 	write_hashes();
 	m_Instance = NULL;
+}
+
+void MainWindow::enableDisableCloudActions()
+{
+#ifdef USE_LIBGIT23_API
+	ui.actionCloudstorageopen->setEnabled(prefs.cloud_verification_status == CS_VERIFIED);
+	ui.actionCloudstoragesave->setEnabled(prefs.cloud_verification_status == CS_VERIFIED);
+#endif
 }
 
 PlannerDetails *MainWindow::plannerDetails() const {
@@ -979,7 +991,8 @@ bool MainWindow::askSaveChanges()
 	QMessageBox response(this);
 
 	if (existing_filename)
-		message = tr("Do you want to save the changes that you made in the file %1?").arg(existing_filename);
+		message = tr("Do you want to save the changes that you made in the file %1?")
+				.arg(displayedFilename(existing_filename));
 	else
 		message = tr("Do you want to save the changes that you made in the data file?");
 
@@ -1414,6 +1427,18 @@ NotificationWidget *MainWindow::getNotificationWidget()
 	return ui.mainErrorMessage;
 }
 
+QString MainWindow::displayedFilename(QString fullFilename)
+{
+	QFile f(fullFilename);
+	QFileInfo fileInfo(f);
+	QString fileName(fileInfo.fileName());
+
+	if (fullFilename.contains(prefs.cloud_git_url))
+		return tr("[cloud storage for] %1").arg(fileName.left(fileName.indexOf('[')));
+	else
+		return fileName;
+}
+
 void MainWindow::setTitle(enum MainWindowTitleFormat format)
 {
 	switch (format) {
@@ -1425,10 +1450,8 @@ void MainWindow::setTitle(enum MainWindowTitleFormat format)
 			setTitle(MWTF_DEFAULT);
 			return;
 		}
-		QFile f(existing_filename);
-		QFileInfo fileInfo(f);
-		QString fileName(fileInfo.fileName());
-		setWindowTitle("Subsurface: " + fileName);
+		QString unsaved = (unsaved_changes() ? " *" : "");
+		setWindowTitle("Subsurface: " + displayedFilename(existing_filename) + unsaved);
 		break;
 	}
 }
@@ -1468,13 +1491,19 @@ void MainWindow::importTxtFiles(const QStringList fileNames)
 void MainWindow::showV2Dialog()
 {
 	// here we need to ask the user if / how they want to do the reverse geo coding
-	// for now this is just a warning that things could take a long time
+	//
+	// since the reverse geo coding now happens in its own thread the warning isn't needed
+	// anymore, but I'll leave this function / the logic to call it around because we are likely
+	// too have to add questions about how the user wants to do the reverse geo coding...
+	//
+#if 0
 	QMessageBox d(QMessageBox::Information,
 			  tr("Welcom to Subsurface %1").arg(subsurface_version()),
 			  tr("Importing data files from earlier versions of Subsurface can take a significant amount of time"),
 			  QMessageBox::Ok,
 			  this);
 	d.exec();
+#endif
 }
 
 void MainWindow::loadFiles(const QStringList fileNames)

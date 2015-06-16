@@ -10,6 +10,8 @@
 
 #include "dive.h"
 #include "file.h"
+#include "git-access.h"
+#include "qthelperfromc.h"
 
 /* For SAMPLE_* */
 #include <libdivecomputer/parser.h>
@@ -425,13 +427,19 @@ int parse_file(const char *filename)
 	char *fmt;
 	int ret;
 
-	git = is_git_repository(filename, &branch);
+	git = is_git_repository(filename, &branch, NULL);
+	if (strstr(filename, prefs.cloud_git_url) && git == dummy_git_repository)
+		/* opening the cloud storage repository failed for some reason
+		 * give up here and don't send errors about git repositories */
+		return 0;
+
 	if (git && !git_load_dives(git, branch))
 		return 0;
 
 	if (readfile(filename, &mem) < 0) {
-		/* we don't want to display an error if this was the default file */
-		if (prefs.default_filename && !strcmp(filename, prefs.default_filename))
+		/* we don't want to display an error if this was the default file or the cloud storage */
+		if ((prefs.default_filename && !strcmp(filename, prefs.default_filename)) ||
+		    isCloudUrl(filename))
 			return 0;
 
 		return report_error(translate("gettextFromC", "Failed to read '%s'"), filename);

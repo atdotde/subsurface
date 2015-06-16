@@ -85,6 +85,7 @@ static bool merge_locations_into_dives(void)
 							 */
 							if ((dive->when + dive->duration.seconds - gpsfix->when) < (nextgpsfix->when - gpsfix->when)) {
 								copy_gps_location(gpsfix, dive);
+								changed++;
 								tracer = j;
 								break;
 							}
@@ -333,6 +334,7 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton *button)
 		int i;
 		struct dive *d;
 		struct dive_site *ds;
+		bool changed = false;
 		clear_table(&gps_location_table);
 		QByteArray url = tr("Webservice").toLocal8Bit();
 		parse_xml_buffer(url.data(), downloadedData.data(), downloadedData.length(), &gps_location_table, NULL);
@@ -345,9 +347,8 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton *button)
 		}
 		/* now merge the data in the gps_location table into the dive_table */
 		if (merge_locations_into_dives()) {
+			changed = true;
 			mark_divelist_changed(true);
-			MainWindow::instance()->globe()->repopulateLabels();
-			MainWindow::instance()->globe()->centerOnDiveSite(current_dive->dive_site_uuid);
 			MainWindow::instance()->information()->updateDiveInfo();
 		}
 
@@ -378,9 +379,20 @@ void SubsurfaceWebServices::buttonClicked(QAbstractButton *button)
 				usedUuids.insert(d->dive_site_uuid);
 		}
 		for_each_dive_site(i, ds) {
-			if (!usedUuids.contains(ds->uuid) && same_string(ds->notes, "SubsurfaceWebservice"))
+			if (!usedUuids.contains(ds->uuid) && same_string(ds->notes, "SubsurfaceWebservice")) {
 				delete_dive_site(ds->uuid);
+				i--; // otherwise we skip one site
+			}
 		}
+#ifndef NO_MARBLE
+		// finally now that all the extra GPS fixes that weren't used have been deleted
+		// we can update the globe
+		if (changed) {
+			MainWindow::instance()->globe()->repopulateLabels();
+			MainWindow::instance()->globe()->centerOnDiveSite(current_dive->dive_site_uuid);
+		}
+#endif
+
 	} break;
 	case QDialogButtonBox::RejectRole:
 		if (reply != NULL && reply->isOpen()) {
@@ -927,4 +939,116 @@ QNetworkReply* UserSurveyServices::sendSurvey(QString values)
 	request.setRawHeader("User-Agent", userAgent.toUtf8());
 	reply = manager()->get(request);
 	return reply;
+}
+
+CloudStorageAuthenticate::CloudStorageAuthenticate(QObject *parent) : QObject(parent)
+{
+	userAgent = getUserAgent();
+}
+
+#define CLOUDURL QString(prefs.cloud_base_url)
+#define CLOUDBACKENDSTORAGE CLOUDURL + "/storage"
+#define CLOUDBACKENDVERIFY CLOUDURL + "/verify"
+
+QNetworkReply* CloudStorageAuthenticate::authenticate(QString email, QString password, QString pin)
+{
+	QString payload(email + " " + password);
+	QUrl requestUrl;
+	if (pin == "") {
+		requestUrl = QUrl(CLOUDBACKENDSTORAGE);
+	} else {
+		requestUrl = QUrl(CLOUDBACKENDVERIFY);
+		payload += " " + pin;
+	}
+	QNetworkRequest *request = new QNetworkRequest(requestUrl);
+	request->setRawHeader("Accept", "text/xml, text/plain");
+	request->setRawHeader("User-Agent", userAgent.toUtf8());
+	request->setHeader(QNetworkRequest::ContentTypeHeader, "text/plain");
+	reply = WebServices::manager()->post(*request, qPrintable(payload));
+	connect(reply, SIGNAL(finished()), this, SLOT(uploadFinished()));
+	connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrors(QList<QSslError>)));
+	connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this,
+		SLOT(uploadError(QNetworkReply::NetworkError)));
+	return reply;
+}
+
+void CloudStorageAuthenticate::uploadFinished()
+{
+	static QString myLastError;
+
+	QString cloudAuthReply(reply->readAll());
+	qDebug() << "Completed connection with cloud storage backend, response" << cloudAuthReply;
+	if (cloudAuthReply == "[VERIFIED]" || cloudAuthReply == "[OK]") {
+		prefs.cloud_verification_status = CS_VERIFIED;
+		NotificationWidget *nw = MainWindow::instance()->getNotificationWidget();
+		if (nw->getNotificationText() == myLastError)
+			nw->hideNotification();
+		myLastError.clear();
+	} else if (cloudAuthReply == "[VERIFY]") {
+		prefs.cloud_verification_status = CS_NEED_TO_VERIFY;
+	} else {
+		prefs.cloud_verification_status = CS_INCORRECT_USER_PASSWD;
+		myLastError = cloudAuthReply;
+		report_error("%s", qPrintable(cloudAuthReply));
+		MainWindow::instance()->getNotificationWidget()->showNotification(get_error_string(), KMessageWidget::Error);
+	}
+	emit finishedAuthenticate();
+}
+
+void CloudStorageAuthenticate::uploadError(QNetworkReply::NetworkError error)
+{
+	qDebug() << "Received error response from cloud storage backend:" << reply->errorString();
+}
+
+void CloudStorageAuthenticate::sslErrors(QList<QSslError> errorList)
+{
+	qDebug() << "Received error response trying to set up https connection with cloud storage backend:";
+	Q_FOREACH (QSslError err, errorList) {
+		qDebug() << err.errorString();
+	}
+}
+
+CheckCloudConnection::CheckCloudConnection(QObject *parent)
+{
+
+}
+
+#define TEAPOT "/make-latte?number-of-shots=3"
+#define HTTP_I_AM_A_TEAPOT 418
+#define MILK "Linus does not like non-fat milk"
+bool CheckCloudConnection::checkServer()
+{
+	QTimer timer;
+	timer.setSingleShot(true);
+	QEventLoop loop;
+	QNetworkRequest request;
+	request.setRawHeader("Accept", "text/plain");
+	request.setRawHeader("User-Agent", getUserAgent().toUtf8());
+	request.setUrl(QString(prefs.cloud_base_url) + TEAPOT);
+	QNetworkAccessManager *mgr = new QNetworkAccessManager();
+	QNetworkReply *reply = mgr->get(request);
+	connect(&timer, SIGNAL(timeout()), &loop, SLOT(quit()));
+	connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+	timer.start(2000); // wait two seconds
+	loop.exec();
+	if (timer.isActive()) {
+		// didn't time out, did we get the right response?
+		timer.stop();
+		if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == HTTP_I_AM_A_TEAPOT &&
+		    reply->readAll() == QByteArray(MILK)) {
+			reply->deleteLater();
+			mgr->deleteLater();
+			return true;
+		}
+		// qDebug() << "did not get expected response - server unreachable" <<
+		//	    reply->error() << reply->errorString() <<
+		//	    reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() <<
+		//	    reply->readAll();
+	} else {
+		disconnect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+		reply->abort();
+	}
+	reply->deleteLater();
+	mgr->deleteLater();
+	return false;
 }
