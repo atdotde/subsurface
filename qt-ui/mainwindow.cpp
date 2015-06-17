@@ -39,6 +39,7 @@
 #include "usersurvey.h"
 #include "divesitehelpers.h"
 #include "locationinformation.h"
+#include "windowtitleupdate.h"
 #ifndef NO_USERMANUAL
 #include "usermanual.h"
 #endif
@@ -148,7 +149,8 @@ MainWindow::MainWindow() : QMainWindow(),
 	connect(locationInformation, SIGNAL(startEditDiveSite(uint32_t)), globeGps, SLOT(prepareForGetDiveCoordinates()));
 	connect(locationInformation, SIGNAL(endEditDiveSite()), globeGps, SLOT(prepareForGetDiveCoordinates()));
 	connect(information(), SIGNAL(diveSiteChanged(uint32_t)), globeGps, SLOT(centerOnDiveSite(uint32_t)));
-
+	wtu = new WindowTitleUpdate();
+	connect(WindowTitleUpdate::instance(), SIGNAL(updateTitle()), this, SLOT(setAutomaticTitle()));
 #ifdef NO_PRINTING
 	plannerDetails->printPlan()->hide();
 	ui.menuFile->removeAction(ui.actionPrint);
@@ -1439,6 +1441,11 @@ QString MainWindow::displayedFilename(QString fullFilename)
 		return fileName;
 }
 
+void MainWindow::setAutomaticTitle()
+{
+	setTitle();
+}
+
 void MainWindow::setTitle(enum MainWindowTitleFormat format)
 {
 	switch (format) {
@@ -1488,26 +1495,9 @@ void MainWindow::importTxtFiles(const QStringList fileNames)
 	refreshDisplay();
 }
 
-void MainWindow::showV2Dialog()
-{
-	// here we need to ask the user if / how they want to do the reverse geo coding
-	//
-	// since the reverse geo coding now happens in its own thread the warning isn't needed
-	// anymore, but I'll leave this function / the logic to call it around because we are likely
-	// too have to add questions about how the user wants to do the reverse geo coding...
-	//
-#if 0
-	QMessageBox d(QMessageBox::Information,
-			  tr("Welcom to Subsurface %1").arg(subsurface_version()),
-			  tr("Importing data files from earlier versions of Subsurface can take a significant amount of time"),
-			  QMessageBox::Ok,
-			  this);
-	d.exec();
-#endif
-}
-
 void MainWindow::loadFiles(const QStringList fileNames)
 {
+	bool showWarning = false;
 	if (fileNames.isEmpty())
 		return;
 
@@ -1522,19 +1512,18 @@ void MainWindow::loadFiles(const QStringList fileNames)
 		if (!error) {
 			set_filename(fileNamePtr.data(), true);
 			setTitle(MWTF_FILENAME);
-		} else {
-			if (!v2_question_shown && abort_read_of_old_file) {
-				v2_question_shown = true;
-				abort_read_of_old_file = false;
-				showV2Dialog();
-				getNotificationWidget()->showNotification(tr("Please Wait, Importing your files..."), KMessageWidget::Information);
-				i--; // so we re-try this file
-				continue;
+			// if there were any messages, show them
+			QString warning = get_error_string();
+			if (!warning.isEmpty()) {
+				showWarning = true;
+				getNotificationWidget()->showNotification(warning , KMessageWidget::Information);
 			}
+		} else {
 			failedParses.append(fileNames.at(i));
 		}
 	}
-	getNotificationWidget()->hideNotification();
+	if (!showWarning)
+		getNotificationWidget()->hideNotification();
 	process_dives(false, false);
 	addRecentFile(fileNames);
 	removeRecentFile(failedParses);

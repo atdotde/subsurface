@@ -14,6 +14,7 @@
 
 #include "ui_mainwindow.h"
 #include "notificationwidget.h"
+#include "windowtitleupdate.h"
 
 struct DiveList;
 class QSortFilterProxyModel;
@@ -90,7 +91,6 @@ public:
 	void printPlan();
 	void checkSurvey(QSettings *s);
 	void setApplicationState(const QByteArray& state);
-	void showV2Dialog();
 	QUndoStack *undoStack;
 	NotificationWidget *getNotificationWidget();
 	void enableDisableCloudActions();
@@ -170,6 +170,7 @@ slots:
 	void on_actionConfigure_Dive_Computer_triggered();
 	void enableDiveSiteEdit(uint32_t id);
 	void setDefaultState();
+	void setAutomaticTitle();
 
 protected:
 	void closeEvent(QCloseEvent *);
@@ -229,6 +230,7 @@ private:
 	};
 	QHash<QByteArray, WidgetForQuadrant> applicationState;
 	QByteArray currentApplicationState;
+	WindowTitleUpdate *wtu;
 };
 
 #endif // MAINWINDOW_H
