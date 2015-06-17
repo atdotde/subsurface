@@ -521,7 +521,8 @@ static unsigned int *sort_stops(int *dstops, int dnr, struct gaschanges *gstops,
 static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive, bool show_disclaimer, int error)
 {
 	char buffer[2000000], temp[100000];
-	int len, lastdepth = 0, lasttime = 0, lastsetpoint = -1, newdepth = 0, lastprintdepth = 0;
+	int len, lastdepth = 0, lasttime = 0, lastsetpoint = -1, newdepth = 0, lastprintdepth = 0, lastprintsetpoint = -1;
+	struct gasmix lastprintgasmix = { -1, -1 };
 	struct divedatapoint *dp = diveplan->dp;
 	bool gaschange = !plan_verbatim, postponed = plan_verbatim;
 	struct divedatapoint *nextdp = NULL;
@@ -648,21 +649,17 @@ static void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive, bool
 					snprintf(temp, sizeof(temp), translate("gettextFromC", "%3dmin"), (dp->time + 30) / 60);
 					len += snprintf(buffer + len, sizeof(buffer) - len, "<td style='padding-left: 10px; float: right;'>%s</td>", temp);
 				}
-
-				if (gaschange) {
-					if(dp->depth == lastdepth && !postponed) {
-						postponed = true;
+				if (lastprintsetpoint != dp->setpoint || lastprintgasmix.he.permille != gasmix.he.permille ||
+					(lastprintgasmix.o2.permille - gasmix.o2.permille != 0 && abs(lastprintgasmix.o2.permille - gasmix.o2.permille) != O2_IN_AIR)) {
+					if (dp->setpoint) {
+						snprintf(temp, sizeof(temp), translate("gettextFromC", "(SP = %.1fbar)"), (double) dp->setpoint / 1000.0);
+						len += snprintf(buffer + len, sizeof(buffer) - len, "<td style='padding-left: 10px; color: red; float: left;'><b>%s %s</b></td>", gasname(&gasmix),
+							temp);
 					} else {
-						if (dp->setpoint) {
-							snprintf(temp, sizeof(temp), translate("gettextFromC", "(SP = %.1fbar)"), (double) dp->setpoint / 1000.0);
-							len += snprintf(buffer + len, sizeof(buffer) - len, "<td style='padding-left: 10px; color: red; float: left;'><b>%s %s</b></td>", gasname(&newgasmix),
-									temp);
-						} else {
-							len += snprintf(buffer + len, sizeof(buffer) - len, "<td style='padding-left: 10px; color: red; float: left;'><b>%s</b></td>", gasname(&newgasmix));
-						}
-						gaschange = false;
-						postponed = false;
+						len += snprintf(buffer + len, sizeof(buffer) - len, "<td style='padding-left: 10px; color: red; float: left;'><b>%s</b></td>", gasname(&gasmix));
 					}
+					lastprintsetpoint = dp->setpoint;
+					lastprintgasmix = gasmix;
 				} else {
 					len += snprintf(buffer + len, sizeof(buffer) - len, "<td>&nbsp;</td>");
 				}
