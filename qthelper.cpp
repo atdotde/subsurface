@@ -2,7 +2,6 @@
 #include "helpers.h"
 #include "gettextfromc.h"
 #include "statistics.h"
-#include "usersurvey.h"
 #include "membuffer.h"
 #include "subsurfacesysinfo.h"
 #include "version.h"
@@ -19,21 +18,13 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QJsonDocument>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
-#include <QUrlQuery>
-#include <QEventLoop>
 #include <QDateTime>
-#include <QSaveFile>
-#include <QDir>
 #include <QImageReader>
 #include <QtConcurrent>
-#include "divepicturewidget.h"
-#include "mainwindow.h"
 
 #include <libxslt/documents.h>
 
@@ -378,15 +369,16 @@ extern "C" char *get_file_name(const char *fileName)
 	return strdup(fileInfo.fileName().toUtf8());
 }
 
-extern "C" void copy_image_and_overwrite(const char *cfileName, const char *cnewName)
+extern "C" void copy_image_and_overwrite(const char *cfileName, const char *path, const char *cnewName)
 {
-	QString fileName = QString::fromUtf8(cfileName);
-	QString newName = QString::fromUtf8(cnewName);
-	newName += QFileInfo(cfileName).fileName();
+	QString fileName(cfileName);
+	QString newName(path);
+	newName += cnewName;
 	QFile file(newName);
 	if (file.exists())
 		file.remove();
-	QFile::copy(fileName, newName);
+	if (!QFile::copy(fileName, newName))
+		qDebug() << "copy of" << fileName << "to" << newName << "failed";
 }
 
 extern "C" bool string_sequence_contains(const char *string_sequence, const char *text)
@@ -828,10 +820,13 @@ QByteArray hashFile(const QString filename)
 {
 	QCryptographicHash hash(QCryptographicHash::Sha1);
 	QFile imagefile(filename);
-	imagefile.open(QIODevice::ReadOnly);
-	hash.addData(&imagefile);
-	add_hash(filename, hash.result());
-	return hash.result();
+	if (imagefile.open(QIODevice::ReadOnly)) {
+		hash.addData(&imagefile);
+		add_hash(filename, hash.result());
+		return hash.result();
+	} else {
+		return QByteArray();
+	}
 }
 
 void learnHash(struct picture *picture, QByteArray hash)
@@ -885,6 +880,39 @@ void learnImages(const QDir dir, int max_recursions, bool recursed)
 	}
 
 	QtConcurrent::blockingMap(files, hashFile);
+}
+
+extern "C" const char *local_file_path(struct picture *picture)
+{
+	QString localFileName = fileFromHash(picture->hash);
+	return strdup(qPrintable(localFileName));
+}
+
+extern "C" bool picture_exists(struct picture *picture)
+{
+	QString localFilename = fileFromHash(picture->hash);
+	QByteArray hash = hashFile(localFilename);
+	return same_string(hash.toHex().data(), picture->hash);
+}
+
+/* when we get a picture from git storage (local or remote) and can't find the picture
+ * based on its hash, we create a local copy with the hash as filename and the appropriate
+ * suffix */
+extern "C" void savePictureLocal(struct picture *picture, const char *data, int len)
+{
+	QString dirname(system_default_directory());
+	dirname += "/picturedata/";
+	QDir localPictureDir(dirname);
+	localPictureDir.mkpath(dirname);
+	QString suffix(picture->filename);
+	suffix.replace(QRegularExpression(".*\\."), "");
+	QString filename(dirname + picture->hash + "." + suffix);
+	QSaveFile out(filename);
+	if (out.open(QIODevice::WriteOnly)) {
+		out.write(data, len);
+		out.commit();
+		add_hash(filename, QByteArray::fromHex(picture->hash));
+	}
 }
 
 extern "C" void picture_load_exif_data(struct picture *p)

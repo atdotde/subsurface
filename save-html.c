@@ -1,4 +1,5 @@
 #include "save-html.h"
+#include "qthelperfromc.h"
 #include "gettext.h"
 #include "stdio.h"
 
@@ -22,10 +23,10 @@ void save_photos(struct membuffer *b, const char *photos_dir, struct dive *dive)
 	do {
 		put_string(b, separator);
 		separator = ", ";
-		char *fname = get_file_name(pic->filename);
+		char *fname = get_file_name(local_file_path(pic));
 		put_format(b, "{\"filename\":\"%s\"}", fname);
+		copy_image_and_overwrite(local_file_path(pic), photos_dir, fname);
 		free(fname);
-		copy_image_and_overwrite(pic->filename, photos_dir);
 		pic = pic->next;
 	} while (pic);
 	put_string(b, "],");
@@ -121,7 +122,10 @@ static void put_cylinder_HTML(struct membuffer *b, struct dive *dive)
 		separator = ", ";
 		write_attribute(b, "Type", cylinder->type.description, ", ");
 		if (cylinder->type.size.mliter) {
-			put_HTML_volume_units(b, cylinder->type.size.mliter, "\"Size\":\"", " \", ");
+			int volume = cylinder->type.size.mliter;
+			if (prefs.units.volume == CUFT && cylinder->type.workingpressure.mbar)
+				volume *= bar_to_atm(cylinder->type.workingpressure.mbar / 1000.0);
+			put_HTML_volume_units(b, volume, "\"Size\":\"", " \", ");
 		} else {
 			write_attribute(b, "Size", "--", ", ");
 		}
@@ -435,12 +439,13 @@ void export_HTML(const char *file_name, const char *photos_dir, const bool selec
 	export_list(&buf, photos_dir, selected_only, list_only);
 
 	f = subsurface_fopen(file_name, "w+");
-	if (!f)
+	if (!f) {
 		report_error(translate("gettextFromC", "Can't open file %s"), file_name);
-
-	flush_buffer(&buf, f); /*check for writing errors? */
+	} else {
+		flush_buffer(&buf, f); /*check for writing errors? */
+		fclose(f);
+	}
 	free_buffer(&buf);
-	fclose(f);
 }
 
 void export_translation(const char *file_name)
@@ -518,10 +523,11 @@ void export_translation(const char *file_name)
 	put_format(b, "}");
 
 	f = subsurface_fopen(file_name, "w+");
-	if (!f)
+	if (!f) {
 		report_error(translate("gettextFromC", "Can't open file %s"), file_name);
-
-	flush_buffer(&buf, f); /*check for writing errors? */
+	} else {
+		flush_buffer(&buf, f); /*check for writing errors? */
+		fclose(f);
+	}
 	free_buffer(&buf);
-	fclose(f);
 }

@@ -14,7 +14,7 @@
 #include "gettext.h"
 #include "libdivecomputer/parser.h"
 
-#define TIMESTEP 3 /* second */
+#define TIMESTEP 2 /* second */
 #define DECOTIMESTEP 60 /* seconds. Unit of deco stop times */
 
 int decostoplevels[] = { 0, 3000, 6000, 9000, 12000, 15000, 18000, 21000, 24000, 27000,
@@ -834,6 +834,7 @@ bool trial_ascent(int trial_depth, int stoplevel, int avg_depth, int bottom_time
 		trial_depth -= deltad;
 	}
 	restore_deco_state(trial_cache);
+	free(trial_cache);
 	return clear_to_ascend;
 }
 
@@ -1037,12 +1038,21 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 			previous_point_time = clock;
 			stopping = true;
 
-			current_cylinder = gaschanges[gi].gasidx;
-			gas = displayed_dive.cylinder[current_cylinder].gasmix;
+			/* Check we need to change cylinder.
+			 * We might not if the cylinder was chosen by the user */
+			if (current_cylinder != gaschanges[gi].gasidx) {
+				current_cylinder = gaschanges[gi].gasidx;
+				gas = displayed_dive.cylinder[current_cylinder].gasmix;
 #if DEBUG_PLAN & 16
-			printf("switch to gas %d (%d/%d) @ %5.2lfm\n", gaschanges[gi].gasidx,
-			       (get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[gi].depth / 1000.0);
+				printf("switch to gas %d (%d/%d) @ %5.2lfm\n", gaschanges[gi].gasidx,
+					(get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[gi].depth / 1000.0);
 #endif
+				/* Stop for the minimum duration to switch gas */
+				tissue_tolerance = add_segment(depth_to_mbar(depth, &displayed_dive) / 1000.0,
+					&displayed_dive.cylinder[current_cylinder].gasmix,
+					prefs.min_switch_duration, po2, &displayed_dive, prefs.decosac);
+				clock += prefs.min_switch_duration;
+			}
 			gi--;
 		}
 
@@ -1064,10 +1074,15 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 				previous_point_time = clock;
 				stopping = true;
 			}
+
+			/* Deco stop should end when runtime is at a whole minute */
+			int this_decotimestep;
+			this_decotimestep = DECOTIMESTEP - clock % DECOTIMESTEP;
+
 			tissue_tolerance = add_segment(depth_to_mbar(depth, &displayed_dive) / 1000.0,
 						       &displayed_dive.cylinder[current_cylinder].gasmix,
-						       DECOTIMESTEP, po2, &displayed_dive, prefs.decosac);
-			clock += DECOTIMESTEP;
+						       this_decotimestep, po2, &displayed_dive, prefs.decosac);
+			clock += this_decotimestep;
 			/* Finish infinite deco */
 			if(clock >= 48 * 3600 && depth >= 6000) {
 				error = LONGDECO;

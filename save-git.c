@@ -11,10 +11,12 @@
 #include <git2.h>
 
 #include "dive.h"
+#include "divelist.h"
 #include "device.h"
 #include "membuffer.h"
 #include "git-access.h"
 #include "version.h"
+#include "qthelperfromc.h"
 
 /*
  * handle libgit2 revision 0.20 and earlier
@@ -549,9 +551,22 @@ static void create_dive_name(struct dive *dive, struct membuffer *name, struct t
 	if (tm.tm_mon != dirtm->tm_mon)
 		put_format(name, "%02u-", tm.tm_mon+1);
 
-	put_format(name, "%02u-%s-%02u:%02u:%02u",
+	/* a colon is an illegal char in a file name on Windows - use an '=' instead */
+	put_format(name, "%02u-%s-%02u=%02u=%02u",
 		tm.tm_mday, weekday[tm.tm_wday],
 		tm.tm_hour, tm.tm_min, tm.tm_sec);
+}
+
+/* Write file at filepath to the git repo with given filename */
+static int blob_insert_fromdisk(git_repository *repo, struct dir *tree, const char *filepath, const char *filename)
+{
+	int ret;
+	git_oid blob_id;
+
+	ret = git_blob_create_fromdisk(&blob_id, repo, filepath);
+	if (ret)
+		return ret;
+	return tree_insert(tree->files, filename, 1, &blob_id, GIT_FILEMODE_BLOB);
 }
 
 /*
@@ -592,6 +607,7 @@ static int save_one_picture(git_repository *repo, struct dir *dir, struct pictur
 	struct membuffer buf = { 0 };
 	char sign = '+';
 	unsigned h;
+	int error;
 
 	show_utf8(&buf, "filename ", pic->filename, "\n");
 	show_gps(&buf, pic->latitude, pic->longitude);
@@ -606,8 +622,18 @@ static int save_one_picture(git_repository *repo, struct dir *dir, struct pictur
 	/* Use full hh:mm:ss format to make it all sort nicely */
 	h = offset / 3600;
 	offset -= h *3600;
-	return blob_insert(repo, dir, &buf, "%c%02u:%02u:%02u",
+	error = blob_insert(repo, dir, &buf, "%c%02u=%02u=%02u",
 		sign, h, FRACTION(offset, 60));
+	if (!error) {
+		/* next store the actual picture; we prefix all picture names
+		 * with "PIC-" to make things easier on the parsing side */
+		struct membuffer namebuf = { 0 };
+		const char *localfn = local_file_path(pic);
+		put_format(&namebuf, "PIC-%s", pic->hash);
+		error = blob_insert_fromdisk(repo, dir, localfn, mb_cstring(&namebuf));
+		free((void *)localfn);
+	}
+	return error;
 }
 
 static int save_pictures(git_repository *repo, struct dir *dir, struct dive *dive)
@@ -786,6 +812,23 @@ static int save_one_trip(git_repository *repo, struct dir *tree, dive_trip_t *tr
 	return 0;
 }
 
+static void save_units(void *_b)
+{
+	struct membuffer *b =_b;
+	if (prefs.unit_system == METRIC)
+		put_string(b, "units METRIC\n");
+	else if (prefs.unit_system == IMPERIAL)
+		put_string(b, "units IMPERIAL\n");
+	else
+		put_format(b, "units PERSONALIZE %s %s %s %s %s %s",
+			   prefs.units.length == METERS ? "METERS" : "FEET",
+			   prefs.units.volume == LITER ? "LITER" : "CUFT",
+			   prefs.units.pressure == BAR ? "BAR" : prefs.units.pressure == PSI ? "PSI" : "PASCAL",
+			   prefs.units.temperature == CELSIUS ? "CELSIUS" : prefs.units.temperature == FAHRENHEIT ? "FAHRENHEIT" : "KELVIN",
+			   prefs.units.weight == KG ? "KG" : "LBS",
+			   prefs.units.vertical_speed_time == SECONDS ? "SECONDS" : "MINUTES");
+}
+
 static void save_userid(void *_b)
 {
 	struct membuffer *b = _b;
@@ -814,16 +857,15 @@ static void save_one_device(void *_b, const char *model, uint32_t deviceid,
 	put_string(b, "\n");
 }
 
-#define VERSION 3
-
 static void save_settings(git_repository *repo, struct dir *tree)
 {
 	struct membuffer b = { 0 };
 
-	put_format(&b, "version %d\n", VERSION);
+	put_format(&b, "version %d\n", DATAFORMAT_VERSION);
 	save_userid(&b);
 	call_for_each_dc(&b, save_one_device, false);
 	cond_put_format(autogroup, &b, "autogroup\n");
+	save_units(&b);
 
 	blob_insert(repo, tree, &b, "00-Subsurface");
 }
@@ -960,19 +1002,19 @@ static int update_git_checkout(git_repository *repo, git_object *parent, git_tre
 static int get_authorship(git_repository *repo, git_signature **authorp)
 {
 #if LIBGIT2_VER_MAJOR || LIBGIT2_VER_MINOR >= 20
-	return git_signature_default(authorp, repo);
-#else
+	if (git_signature_default(authorp, repo) == 0)
+		return 0;
+#endif
 	/* Default name information, with potential OS overrides */
 	struct user_info user = {
 		.name = "Subsurface",
-		.email = "subsurace@hohndel.org"
+		.email = "subsurace@subsurface-divelog.org"
 	};
 
 	subsurface_user_info(&user);
 
 	/* git_signature_default() is too recent */
 	return git_signature_now(authorp, user.name, user.email);
-#endif
 }
 
 static void create_commit_message(struct membuffer *msg)
@@ -1004,7 +1046,7 @@ static void create_commit_message(struct membuffer *msg)
 	put_format(msg, "Created by subsurface %s\n", subsurface_version());
 }
 
-static int create_new_commit(git_repository *repo, const char *branch, git_oid *tree_id)
+static int create_new_commit(git_repository *repo, const char *remote, const char *branch, git_oid *tree_id)
 {
 	int ret;
 	git_reference *ref;
@@ -1029,8 +1071,12 @@ static int create_new_commit(git_repository *repo, const char *branch, git_oid *
 			return report_error("Unable to look up parent in branch '%s'", branch);
 
 		if (saved_git_id) {
+			if (existing_filename)
+				fprintf(stderr, "existing filename %s\n", existing_filename);
 			const git_oid *id = git_commit_id((const git_commit *) parent);
-			if (git_oid_strcmp(id, saved_git_id))
+			/* if we are saving to the same git tree we got this from, let's make
+			 * sure there is no confusion */
+			if (same_string(existing_filename, remote) && git_oid_strcmp(id, saved_git_id))
 				return report_error("The git branch does not match the git parent of the source");
 		}
 
@@ -1136,10 +1182,10 @@ int do_git_save(git_repository *repo, const char *branch, const char *remote, bo
 		return report_error("git tree write failed");
 
 	/* And save the tree! */
-	if (create_new_commit(repo, branch, &id))
+	if (create_new_commit(repo, remote, branch, &id))
 		return report_error("creating commit failed");
 
-	if (prefs.cloud_background_sync) {
+	if (remote && prefs.cloud_background_sync) {
 		/* now sync the tree with the cloud server */
 		if (strstr(remote, prefs.cloud_git_url)) {
 			return sync_with_remote(repo, remote, branch, RT_HTTPS);

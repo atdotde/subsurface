@@ -213,7 +213,7 @@ static bool uemis_init(const char *path)
 	/* let's check if this is indeed a Uemis DC */
 	reqtxt_path = build_filename(path, "req.txt");
 	reqtxt_file = subsurface_open(reqtxt_path, O_RDONLY, 0666);
-	if (!reqtxt_file) {
+	if (reqtxt_file < 0) {
 #if UEMIS_DEBUG & 1
 		fprintf(debugfile, ":EE req.txt can't be opened\n");
 #endif
@@ -534,6 +534,7 @@ static bool uemis_get_answer(const char *path, char *request, int n_param_in,
 			snprintf(fl, 13, "ANS%d.TXT", assembling_mbuf ? filenr - 2 : filenr - 1);
 			ans_path = build_filename(build_filename(path, "ANS"), fl);
 			ans_file = subsurface_open(ans_path, O_RDONLY, 0666);
+			free(ans_path);
 			size = bytes_available(ans_file);
 			if (size > 3) {
 				char *buf;
@@ -564,6 +565,7 @@ static bool uemis_get_answer(const char *path, char *request, int n_param_in,
 			snprintf(fl, 13, "ANS%d.TXT", filenr - 1);
 			ans_path = build_filename(build_filename(path, "ANS"), fl);
 			ans_file = subsurface_open(ans_path, O_RDONLY, 0666);
+			free(ans_path);
 			size = bytes_available(ans_file);
 			if (size > 3) {
 				int r;
@@ -578,12 +580,11 @@ static bool uemis_get_answer(const char *path, char *request, int n_param_in,
 				buffer_add(&mbuf, &mbuf_size, buf);
 				show_progress(buf, what);
 #if UEMIS_DEBUG & 8
-				fprintf(debugfile, "::r %s \"%s\"\n", ans_path, buf);
+				fprintf(debugfile, "::r %s \"%s\"\n", fl, buf);
 #endif
 			}
 			size -= 3;
 			close(ans_file);
-			free(ans_path);
 		} else {
 			ismulti = false;
 		}

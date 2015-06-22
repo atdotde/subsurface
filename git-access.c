@@ -215,7 +215,7 @@ static int check_remote_status(git_repository *repo, git_remote *origin, const c
 
 	if (git_branch_upstream(&remote_ref, local_ref)) {
 		/* so there is no upstream branch for our branch; that's a problem.
-		/* let's push our branch */
+		 * let's push our branch */
 		git_strarray refspec;
 		git_reference_list(&refspec, repo);
 #if USE_LIBGIT23_API
@@ -362,9 +362,9 @@ static git_repository *create_local_repo(const char *localdir, const char *remot
 	git_repository *cloned_repo = NULL;
 	git_clone_options opts = GIT_CLONE_OPTIONS_INIT;
 #if USE_LIBGIT23_API
-	if (strncmp(remote, "ssh://", 6) == 0)
+	if (rt == RT_SSH)
 		opts.fetch_opts.callbacks.credentials = credential_ssh_cb;
-	else if (strncmp(remote, "https://", 8) == 0)
+	else if (rt == RT_HTTPS)
 		opts.fetch_opts.callbacks.credentials = credential_https_cb;
 	opts.repository_cb = repository_create_cb;
 #endif
@@ -374,7 +374,7 @@ static git_repository *create_local_repo(const char *localdir, const char *remot
 	error = git_clone(&cloned_repo, remote, localdir, &opts);
 	if (error) {
 		char *msg = giterr_last()->message;
-		int len = sizeof("Reference 'refs/remotes/origin/' not found" + strlen(branch));
+		int len = sizeof("Reference 'refs/remotes/origin/' not found") + strlen(branch);
 		char *pattern = malloc(len);
 		snprintf(pattern, len, "Reference 'refs/remotes/origin/%s' not found", branch);
 		if (strstr(remote, prefs.cloud_git_url) && strstr(msg, pattern)) {
@@ -568,6 +568,8 @@ struct git_repository *is_git_repository(const char *filename, const char **bran
 		free(branch);
 		return dummy_git_repository;
 	}
+	if (remote)
+		*remote = NULL;
 	*branchp = branch;
 	return repo;
 }

@@ -490,6 +490,12 @@ void DivePlannerPointsModel::setDropStoneMode(bool value)
 	emit dataChanged(createIndex(0, 0), createIndex(rowCount() - 1, COLUMNS - 1));
 }
 
+void DivePlannerPointsModel::setMinSwitchDuration(int duration)
+{
+	prefs.min_switch_duration = duration * 60;
+	emit dataChanged(createIndex(0, 0), createIndex(rowCount() - 1, COLUMNS - 1));
+}
+
 void DivePlannerPointsModel::setStartDate(const QDate &date)
 {
 	startTime.setDate(date);
@@ -876,6 +882,7 @@ void DivePlannerPointsModel::createPlan(bool replanCopy)
 
 	//TODO: C-based function here?
 	bool did_deco = plan(&diveplan, &cache, isPlanner(), true);
+	free(cache);
 	if (!current_dive || displayed_dive.id != current_dive->id) {
 		// we were planning a new dive, not re-planning an existing on
 		record_dive(clone_dive(&displayed_dive));

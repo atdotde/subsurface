@@ -1151,7 +1151,7 @@ struct plot_data *ProfileWidget2::getEntryFromPos(QPointF pos)
 {
 	// find the time stamp corresponding to the mouse position
 	int seconds = timeAxis->valueAt(pos);
-	struct plot_data *entry;
+	struct plot_data *entry = NULL;
 
 	for (int i = 0; i < plotInfo.nr; i++) {
 		entry = plotInfo.entry + i;
@@ -1329,7 +1329,7 @@ void ProfileWidget2::hideEvents()
 	if (QMessageBox::question(MainWindow::instance(),
 				  TITLE_OR_TEXT(tr("Hide events"), tr("Hide all %1 events?").arg(event->name)),
 				  QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Ok) {
-		if (event->name) {
+		if (!same_string(event->name, "")) {
 			for (int i = 0; i < evn_used; i++) {
 				if (same_string(event->name, ev_namelist[i].ev_name)) {
 					ev_namelist[i].plot_ev = false;
@@ -1692,7 +1692,7 @@ void ProfileWidget2::keyRightAction()
 		if (DiveHandler *handler = qgraphicsitem_cast<DiveHandler *>(i)) {
 			int row = handles.indexOf(handler);
 			divedatapoint dp = plannerModel->at(row);
-			if (dp.time / 60 >= timeAxis->maximum())
+			if (dp.time / 60.0 >= timeAxis->maximum())
 				continue;
 
 			// don't overlap positions.

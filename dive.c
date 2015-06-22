@@ -8,6 +8,7 @@
 #include "dive.h"
 #include "libdivecomputer.h"
 #include "device.h"
+#include "divelist.h"
 
 /* one could argue about the best place to have this variable -
  * it's used in the UI, but it seems to make the most sense to have it
@@ -727,6 +728,8 @@ void per_cylinder_mean_depth(struct dive *dive, struct divecomputer *dc, int *me
 
 	for (i = 0; i < MAX_CYLINDERS; i++)
 		mean[i] = duration[i] = 0;
+	if (!dc)
+		return;
 	struct event *ev = get_next_event(dc->events, "gaschange");
 	if (!ev || (dc && dc->sample && ev->time.seconds == dc->sample[0].time.seconds && get_next_event(ev->next, "gaschange") == NULL)) {
 		// we have either no gas change or only one gas change and that's setting an explicit first cylinder
@@ -860,13 +863,14 @@ static int same_rounded_pressure(pressure_t a, pressure_t b)
  * first cylinder - in which case cylinder 0 is indeed the first cylinder */
 int explicit_first_cylinder(struct dive *dive, struct divecomputer *dc)
 {
-	struct event *ev = get_next_event(dc->events, "gaschange");
-	if (ev && dc && dc->sample && ev->time.seconds == dc->sample[0].time.seconds)
-		return get_cylinder_index(dive, ev);
-	else if (dc->divemode == CCR)
-		return MAX(get_cylinder_idx_by_use(dive, DILUENT), 0);
-	else
-		return 0;
+	if (dc) {
+		struct event *ev = get_next_event(dc->events, "gaschange");
+		if (ev && dc->sample && ev->time.seconds == dc->sample[0].time.seconds)
+			return get_cylinder_index(dive, ev);
+		else if (dc->divemode == CCR)
+			return MAX(get_cylinder_idx_by_use(dive, DILUENT), 0);
+	}
+	return 0;
 }
 
 /* this gets called when the dive mode has changed (so OC vs. CC)
@@ -1051,10 +1055,10 @@ static struct event *find_previous_event(struct divecomputer *dc, struct event *
 	struct event *ev = dc->events;
 	struct event *previous = NULL;
 
-	if (!event->name)
+	if (same_string(event->name, ""))
 		return NULL;
 	while (ev && ev != event) {
-		if (ev->name && !strcmp(ev->name, event->name))
+		if (same_string(ev->name, event->name))
 			previous = ev;
 		ev = ev->next;
 	}
@@ -1382,6 +1386,7 @@ struct dive *fixup_dive(struct dive *dive)
 		if (same_rounded_pressure(cyl->sample_end, cyl->end))
 			cyl->end.mbar = 0;
 	}
+	update_cylinder_related_info(dive);
 	for (i = 0; i < MAX_WEIGHTSYSTEMS; i++) {
 		weightsystem_t *ws = dive->weightsystem + i;
 		add_weightsystem_description(ws);
@@ -2858,6 +2863,53 @@ void set_userid(char *rUserId)
 	prefs.userid = strdup(rUserId);
 	if (strlen(prefs.userid) > 30)
 		prefs.userid[30]='\0';
+}
+
+/* this sets a usually unused copy of the preferences with the units
+ * that were active the last time the dive list was saved to git storage
+ * (this isn't used in XML files); storing the unit preferences in the
+ * data file is usually pointless (that's a setting of the software,
+ * not a property of the data), but it's a great hint of what the user
+ * might expect to see when creating a backend service that visualizes
+ * the dive list without Subsurface running - so this is basically a
+ * functionality for the core library that Subsurface itself doesn't
+ * use but that another consumer of the library (like an HTML exporter)
+ * will need */
+void set_informational_units(char *units)
+{
+	if (strstr(units, "METRIC")) {
+		informational_prefs.unit_system = METRIC;
+	} else if (strstr(units, "IMPERIAL")) {
+		informational_prefs.unit_system = IMPERIAL;
+	} else if (strstr(units, "PERSONALIZE")) {
+		informational_prefs.unit_system = PERSONALIZE;
+		if (strstr(units, "METERS"))
+			informational_prefs.units.length = METERS;
+		if (strstr(units, "FEET"))
+			informational_prefs.units.length = FEET;
+		if (strstr(units, "LITER"))
+			informational_prefs.units.volume = LITER;
+		if (strstr(units, "CUFT"))
+			informational_prefs.units.volume = CUFT;
+		if (strstr(units, "BAR"))
+			informational_prefs.units.pressure = BAR;
+		if (strstr(units, "PSI"))
+			informational_prefs.units.pressure = PSI;
+		if (strstr(units, "PASCAL"))
+			informational_prefs.units.pressure = PASCAL;
+		if (strstr(units, "CELSIUS"))
+			informational_prefs.units.temperature = CELSIUS;
+		if (strstr(units, "FAHRENHEIT"))
+			informational_prefs.units.temperature = FAHRENHEIT;
+		if (strstr(units, "KG"))
+			informational_prefs.units.weight = KG;
+		if (strstr(units, "LBS"))
+			informational_prefs.units.weight = LBS;
+		if (strstr(units, "SECONDS"))
+			informational_prefs.units.vertical_speed_time = SECONDS;
+		if (strstr(units, "MINUTES"))
+			informational_prefs.units.vertical_speed_time = MINUTES;
+	}
 }
 
 void average_max_depth(struct diveplan *dive, int *avg_depth, int *max_depth)

@@ -20,6 +20,7 @@ function showAllDives()
 	for (var i = 0; i < items.length; i++) {
 		itemsToShow.push(i);
 	}
+	change_sort_col('1');
 	olditemstoshow = itemsToShow;
 	start = 0;
 	viewInPage();
@@ -47,7 +48,7 @@ function updateView(start, end)
 	var divelist = document.getElementById('diveslist');
 	divelist.innerHTML = "";
 	for (var i = start; i <= end; i++) {
-		divelist.innerHTML += '<ul id="' + itemsToShow[i] + '" onclick="toggleExpantion(event, this)"</ul>';
+		divelist.innerHTML += '<ul id="' + itemsToShow[i] + '" onclick="toggleExpansion(event, this)"></ul>';
 		expand(document.getElementById(itemsToShow[i]));
 		items[itemsToShow[i]].expanded = true;
 	};
@@ -63,7 +64,7 @@ function addHTML(indexes)
 	var divelist = document.getElementById('diveslist');
 	divelist.innerHTML = "";
 	for (var i = 0; i < indexes.length; i++) {
-		divelist.innerHTML += '<ul id="' + indexes[i] + '" onclick="toggleExpantion(event, this)"</ul>';
+		divelist.innerHTML += '<ul id="' + indexes[i] + '" onclick="toggleExpansion(event, this)"></ul>';
 		expand(document.getElementById(indexes[i]));
 		itemsToShow[indexes[i]].expanded = true;
 	};
@@ -134,14 +135,19 @@ function view_pagging(start, end)
 */
 function expandAll()
 {
-	console.time('expnadAll');
-	for (var i = start; i < start + sizeofpage; i++) {
-		if (i >= itemsToShow.length)
-			break;
-		unexpand(document.getElementById(itemsToShow[i]));
-		items[itemsToShow[i]].expanded = false;
+	if (tripsShown) {
+		for (var i = 0 ; i < trips.length ; i++) {
+			if (trips[i].expanded === false)
+				expand_trip(i);
+		}
+	} else {
+		for (var i = start; i < start + sizeofpage; i++) {
+			if (i >= itemsToShow.length)
+				break;
+			unexpand(document.getElementById(itemsToShow[i]));
+			items[itemsToShow[i]].expanded = false;
+		}
 	}
-	console.timeEnd('expnadAll');
 }
 
 /**
@@ -149,11 +155,18 @@ function expandAll()
 */
 function collapseAll()
 {
-	for (var i = start; i < start + sizeofpage; i++) {
-		if (i >= itemsToShow.length)
-			break;
-		expand(document.getElementById(itemsToShow[i]));
-		items[itemsToShow[i]].expanded = true;
+	if (tripsShown) {
+		for (var i = 0 ; i < trips.length ; i++) {
+			if (trips[i].expanded === true)
+				unexpand_trip(i);
+		}
+	} else {
+		for (var i = start; i < start + sizeofpage; i++) {
+			if (i >= itemsToShow.length)
+				break;
+			expand(document.getElementById(itemsToShow[i]));
+			items[itemsToShow[i]].expanded = true;
+		}
 	}
 }
 
@@ -165,9 +178,9 @@ function setNumberOfDives(e)
 	viewInPage();
 }
 
-function toggleExpantion(e, ul)
+function toggleExpansion(e, ul)
 {
-	if (e.toElement.localName === "a" ) {
+	if (e.target.localName === "a" ) {
 		return;
 	}
 	if (!items[ul.id].expanded) {
@@ -738,14 +751,20 @@ function getDefaultColor(){
 function toggleTrips()
 {
 	var trip_button = document.getElementById('trip_button');
+	var controller = document.getElementById('controller');
+	var no_dives_selector = document.getElementById('no_dives_selector');
 	if (tripsShown) {
 		tripsShown = false;
 		trip_button.style.backgroundColor = BACKGROUND_COLOR;
 		viewInPage();
+		controller.style.display = '';
+		no_dives_selector.style.display = '';
 	} else {
 		showtrips();
 		trip_button.style.backgroundColor = HEADER_COLOR;
 		tripsShown = true;
+		dives_controller.style.display = 'none';
+		no_dives_selector.style.display = 'none';
 	}
 }
 
@@ -776,7 +795,7 @@ function expand_trip(trip)
 	trips[trip].expanded = true;
 	var d = document.getElementById("trip_dive_list_" + trip);
 	for (var j in trips[trip].dives) {
-		d.innerHTML += '<ul id="' + trips[trip].dives[j].number + '" onclick="toggleExpantion(event, this)" onmouseover="highlight(this)"' +
+		d.innerHTML += '<ul id="' + trips[trip].dives[j].number + '" onclick="toggleExpansion(event, this)" onmouseover="highlight(this)"' +
 			       ' onmouseout="unhighlight(this)">' + getlimited(trips[trip].dives[j]) + '</ul>';
 	}
 }
@@ -943,7 +962,7 @@ function getDiveCoor(dive)
 {
 	if (!dive.coordinates)
 		return "";
-	return '<td class="words">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + translate.Coordinates + ': </td><td>' + '<a href="http://www.google.com/maps/@' + dive.coordinates.lat + ',' + dive.coordinates.lon + ',13z" target="_blank">' + getDiveCoorString(dive.coordinates) + '</a></td>';
+	return '<td class="words">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + translate.Coordinates + ': </td><td>' + '<a href="http://maps.google.com/maps?t=k&q=loc:' + dive.coordinates.lat + ',' + dive.coordinates.lon + '" target="_blank">' + getDiveCoorString(dive.coordinates) + '</a></td>';
 }
 
 /**

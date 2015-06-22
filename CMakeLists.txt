@@ -15,6 +15,7 @@ option(NO_TESTS "disable the tests" OFF)
 option(NO_DOCS "disable the docs" OFF)
 option(NO_PRINTING "disable the printing support" ON)
 option(USE_LIBGIT23_API "allow building with libgit2 master" OFF)
+option(SUBSURFACE_MOBILE "build the QtQuick version for mobile device" OFF)
 
 set(CMAKE_MODULE_PATH
 	${CMAKE_MODULE_PATH}
@@ -99,7 +100,11 @@ endif()
 
 # setup Grantlee
 
-if(NOT NO_PRINTING)
+if(NO_PRINTING)
+	message(STATUS "building without printing support")
+	add_definitions(-DNO_PRINTING)
+	set(GRANTLEE_LIBRARIES "")
+else()
 	if(LIBGRANTLEE_FROM_PKGCONFIG)
 		pkg_config_library(GRANTLEE libgrantlee REQUIRED)
 		set(GRANTLEE_LIBRARIES "")
@@ -113,16 +118,15 @@ if(NOT NO_PRINTING)
 	)
 endif()
 
-if(NO_PRINTING)
-	message(STATUS "building without printing support")
-	add_definitions(-DNO_PRINTING)
-	set(GRANTLEE_LIBRARIES "")
-endif()
-
 set(SUBSURFACE_LINK_LIBRARIES ${SUBSURFACE_LINK_LIBRARIES} ${LIBDIVECOMPUTER_LIBRARIES} ${LIBGIT2_LIBRARIES} ${GRANTLEE_LIBRARIES} -lusb-1.0)
 
 # handle out of tree build correctly
 string(COMPARE EQUAL "${${PROJECT_NAME}_SOURCE_DIR}" "${${PROJECT_NAME}_BINARY_DIR}" insource)
+if (insource)
+	message(STATUS "building in Subsurface source tree - we recommend out of tree builds")
+else()
+	message(STATUS "out of source build from source in ${${PROJECT_NAME}_SOURCE_DIR}")
+endif()
 get_filename_component(PARENTDIR ${${PROJECT_NAME}_SOURCE_DIR} PATH)
 string(COMPARE EQUAL "${${PROJECT_NAME}_SOURCE_DIR}" "${PARENTDIR}" insourcesubdir)
 if(NOT (insource OR insourcedir))
@@ -132,8 +136,14 @@ if(NOT (insource OR insourcedir))
 endif()
 
 # configure Qt.
-find_package(Qt5 REQUIRED COMPONENTS Core Concurrent Widgets Network WebKitWidgets PrintSupport Svg Test LinguistTools)
+if(SUBSURFACE_MOBILE)
+	set(QT_QUICK Quick)
+endif()
+find_package(Qt5 REQUIRED COMPONENTS Core Concurrent Widgets Network WebKitWidgets PrintSupport Svg Test LinguistTools ${QT_QUICK})
 set(QT_LIBRARIES Qt5::Core Qt5::Concurrent Qt5::Widgets Qt5::Network Qt5::WebKitWidgets Qt5::PrintSupport Qt5::Svg)
+if(SUBSURFACE_MOBILE)
+	set(QT_LIBRARIES ${QT_LIBRARIES} Qt5::Quick)
+endif()
 set(QT_TEST_LIBRARIES ${QT_LIBRARIES} Qt5::Test)
 
 # Generate the ssrf-config.h every 'make'
@@ -278,7 +288,6 @@ set(SUBSURFACE_CORE_LIB_SRCS
 	windowtitleupdate.cpp
 	divelogexportlogic.cpp
 	qt-init.cpp
-	${SUBSURFACE_PRINTING_SRCS}
 	${PLATFORM_SRC}
 )
 source_group("Subsurface Core" FILES ${SUBSURFACE_CORE_LIB_SRCS})
@@ -348,6 +357,7 @@ set(SUBSURFACE_INTERFACE
 	qt-ui/undocommands.cpp
 	qt-ui/locationinformation.cpp
 	qt-ui/qtwaitingspinner.cpp
+	${SUBSURFACE_PRINTING_SRCS}
 	${SOCIALNETWORKS}
 )
 source_group("Subsurface Interface" FILES ${SUBSURFACE_INTERFACE})
@@ -413,17 +423,33 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # create the executables
-add_executable(${SUBSURFACE_TARGET} MACOSX_BUNDLE WIN32 ${SUBSURFACE_PKG} ${SUBSURFACE_APP} ${SUBSURFACE_RESOURCES})
-target_link_libraries(
-	${SUBSURFACE_TARGET}
-	subsurface_generated_ui
-	subsurface_interface
-	subsurface_profile
-	subsurface_statistics
-	subsurface_models
-	subsurface_corelib
-	${SUBSURFACE_LINK_LIBRARIES}
+if(SUBSURFACE_MOBILE)
+	set(MOBILE_SRC qt-mobile/qmlmanager.cpp qt-models/divelistmodel.cpp)
+	add_definitions(-DSUBSURFACE_MOBILE)
+	qt5_add_resources(MOBILE_RESOURCES qt-mobile/mobile-resources.qrc)
+	add_executable(subsurface-mobile ${MOBILE_SRC} ${SUBSURFACE_PKG} ${SUBSURFACE_APP} ${SUBSURFACE_RESOURCES} ${MOBILE_RESOURCES})
+	target_link_libraries(
+		subsurface-mobile
+		subsurface_generated_ui
+		subsurface_interface
+		subsurface_profile
+		subsurface_statistics
+		subsurface_models
+		subsurface_corelib
+		${SUBSURFACE_LINK_LIBRARIES})
+else()
+	add_executable(${SUBSURFACE_TARGET} MACOSX_BUNDLE WIN32 ${SUBSURFACE_PKG} ${SUBSURFACE_APP} ${SUBSURFACE_RESOURCES})
+	target_link_libraries(
+		${SUBSURFACE_TARGET}
+		subsurface_generated_ui
+		subsurface_interface
+		subsurface_profile
+		subsurface_statistics
+		subsurface_models
+		subsurface_corelib
+		${SUBSURFACE_LINK_LIBRARIES}
 )
+endif()
 
 add_dependencies(subsurface_statistics subsurface_generated_ui)
 add_dependencies(subsurface_profile subsurface_generated_ui)
@@ -467,11 +493,34 @@ if(NOT NO_TESTS)
 	TEST(TestParse testparse.cpp)
 endif()
 
+# install a few things so that one can run Subsurface from the build
+# directory
+if(NOT insource)
+	add_custom_target(themeLink ALL
+		COMMAND
+		rm -f ${CMAKE_BINARY_DIR}/theme &&
+		ln -s ${CMAKE_SOURCE_DIR}/theme ${CMAKE_BINARY_DIR}/theme
+	)
+	if(NOT NO_PRINTING)
+		add_custom_target(printing_templatesLink ALL
+			COMMAND
+			rm -f ${CMAKE_BINARY_DIR}/printing_templates &&
+			ln -s ${CMAKE_SOURCE_DIR}/printing_templates ${CMAKE_BINARY_DIR}/printing_templates
+		)
+	endif()
+	if(NOT NO_DOCS)
+		add_custom_target(
+			documentationLink ALL
+			COMMAND
+			mkdir -p ${CMAKE_BINARY_DIR}/Documentation/ &&
+			rm -rf ${CMAKE_BINARY_DIR}/Documentation/images &&
+			ln -s ${CMAKE_SOURCE_DIR}/Documentation/images ${CMAKE_BINARY_DIR}/Documentation/images
+		)
+	endif()
+endif()
 if(NOT NO_DOCS)
 	add_custom_target(
 		documentation ALL
-		mkdir -p ${CMAKE_BINARY_DIR}/Documentation/ \\;
-		cp -a ${CMAKE_SOURCE_DIR}/Documentation/images ${CMAKE_BINARY_DIR}/Documentation/ \\;
 		make -C ${CMAKE_SOURCE_DIR}/Documentation OUT=${CMAKE_BINARY_DIR}/Documentation/ doc
 	)
 endif()
@@ -549,6 +598,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	install(FILES ${CMAKE_SOURCE_DIR}/gpl-2.0.txt ${CMAKE_SOURCE_DIR}/packaging/windows/subsurface.ico DESTINATION ${WINDOWSSTAGING})
 	install(TARGETS ${SUBSURFACE_TARGET} DESTINATION ${WINDOWSSTAGING})
 	install(FILES ${CMAKE_BINARY_DIR}/qt.conf DESTINATION ${WINDOWSSTAGING})
+	install(DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib/grantlee DESTINATION ${WINDOWSSTAGING})
 	if(NOT DEFINED MAKENSIS)
 		set(MAKENSIS makensis)
 	endif()
@@ -634,7 +684,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	install(DIRECTORY theme DESTINATION share/subsurface)
 	install(DIRECTORY printing_templates DESTINATION share/subsurface)
 	install(FILES ${TRANSLATIONS} DESTINATION share/subsurface/translations)
-	install(TARGETS ${SUBSURFACE_TARGET} DESTINATION bin)
+	if(SUBSURFACE_MOBILE)
+		install(TARGETS subsurface-mobile DESTINATION bin)
+	else()
+		install(TARGETS ${SUBSURFACE_TARGET} DESTINATION bin)
+	endif()
 	if(DEFINED LIBMARBLEDEVEL)
 		install(
 			CODE "file(GLOB SSRFMARBLE_SHLIBS \"${LIBMARBLEDEVEL}/lib/libssrfmarblewidget.so*\")"

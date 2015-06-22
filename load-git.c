@@ -13,11 +13,21 @@
 #include "gettext.h"
 
 #include "dive.h"
+#include "divelist.h"
 #include "device.h"
 #include "membuffer.h"
 #include "git-access.h"
+#include "qthelperfromc.h"
 
 const char *saved_git_id = NULL;
+
+struct picture_entry_list {
+	void *data;
+	int len;
+	const char *hash;
+	struct picture_entry_list *next;
+};
+struct picture_entry_list *pel = NULL;
 
 struct keyword_action {
 	const char *keyword;
@@ -26,6 +36,21 @@ struct keyword_action {
 #define ARRAY_SIZE(array) (sizeof(array)/sizeof(array[0]))
 
 extern degrees_t parse_degrees(char *buf, char **end);
+git_blob *git_tree_entry_blob(git_repository *repo, const git_tree_entry *entry);
+
+static void save_picture_from_git(struct picture *picture)
+{
+	struct picture_entry_list *pic_entry = pel;
+
+	while (pic_entry) {
+		if (same_string(pic_entry->hash, picture->hash)) {
+			savePictureLocal(picture, pic_entry->data, pic_entry->len);
+			return;
+		}
+		pic_entry = pic_entry->next;
+	}
+	fprintf(stderr, "didn't find picture entry for %s\n", picture->filename);
+}
 
 static char *get_utf8(struct membuffer *b)
 {
@@ -159,9 +184,10 @@ static void parse_dive_gps(char *line, struct membuffer *str, void *_dive)
 	} else {
 		if (dive_site_has_gps_location(ds) &&
 		    (ds->latitude.udeg != latitude.udeg || ds->longitude.udeg != longitude.udeg)) {
+			const char *coords = printGPSCoords(latitude.udeg, longitude.udeg);
 			// we have a dive site that already has GPS coordinates
-			ds->notes = add_to_string(ds->notes, translate("gettextFromC", "multiple gps locations for this dive site; also %s\n"),
-						  printGPSCoords(latitude.udeg, longitude.udeg));
+			ds->notes = add_to_string(ds->notes, translate("gettextFromC", "multiple gps locations for this dive site; also %s\n"), coords);
+			free((void *)coords);
 		}
 		ds->latitude = latitude;
 		ds->longitude = longitude;
@@ -193,6 +219,7 @@ static void parse_dive_location(char *line, struct membuffer *str, void *_dive)
 				ds->notes = add_to_string(ds->notes, translate("gettextFromC", "additional name for site: %s\n"), name);
 		}
 	}
+	free(name);
 }
 
 static void parse_dive_divemaster(char *line, struct membuffer *str, void *_dive)
@@ -727,6 +754,12 @@ static void parse_trip_notes(char *line, struct membuffer *str, void *_trip)
 static void parse_settings_autogroup(char *line, struct membuffer *str, void *_unused)
 { set_autogroup(1); }
 
+static void parse_settings_units(char *line, struct membuffer *str, void *unused)
+{
+	if (line)
+		set_informational_units(line);
+}
+
 static void parse_settings_userid(char *line, struct membuffer *str, void *_unused)
 {
 	if (line) {
@@ -739,13 +772,15 @@ static void parse_settings_userid(char *line, struct membuffer *str, void *_unus
  * Our versioning is a joke right now, but this is more of an example of what we
  * *can* do some day. And if we do change the version, this warning will show if
  * you read with a version of subsurface that doesn't know about it.
+ * We MUST keep this in sync with the XML version (so we can report a consistent
+ * minimum datafile version)
  */
-#define VERSION 3
 static void parse_settings_version(char *line, struct membuffer *str, void *_unused)
 {
 	int version = atoi(line);
-	if (version > VERSION)
-		report_error("Git save file version %d is newer than version %d I know about", version, VERSION);
+	report_datafile_version(version);
+	if (version > DATAFORMAT_VERSION)
+		report_error("Git save file version %d is newer than version %d I know about", version, DATAFORMAT_VERSION);
 }
 
 /* The string in the membuffer is the version string of subsurface that saved things, just FYI */
@@ -895,7 +930,7 @@ static void trip_parser(char *line, struct membuffer *str, void *_trip)
 static struct keyword_action settings_action[] = {
 #undef D
 #define D(x) { #x, parse_settings_ ## x }
-	D(autogroup), D(divecomputerid), D(subsurface), D(userid), D(version),
+	D(autogroup), D(divecomputerid), D(subsurface), D(units), D(userid), D(version),
 };
 
 static void settings_parser(char *line, struct membuffer *str, void *_unused)
@@ -1060,6 +1095,18 @@ static void finish_active_dive(void)
 	struct dive *dive = active_dive;
 
 	if (dive) {
+		/* check if we need to save pictures */
+		FOR_EACH_PICTURE(dive) {
+			if (!picture_exists(picture))
+				save_picture_from_git(picture);
+		}
+		/* free any memory we allocated to track pictures */
+		while (pel) {
+			free(pel->data);
+			void *lastone = pel;
+			pel = pel->next;
+			free(lastone);
+		}
 		active_dive = NULL;
 		record_dive(dive);
 	}
@@ -1123,7 +1170,8 @@ static int dive_trip_directory(const char *root, const char *name)
 }
 
 /*
- * Dive directory, name is [[yyyy-]mm-]nn-ddd-hh:mm:ss[~hex],
+ * Dive directory, name is [[yyyy-]mm-]nn-ddd-hh:mm:ss[~hex] in older git repositories
+ * but [[yyyy-]mm-]nn-ddd-hh=mm=ss[~hex] in newer repos as ':' is an illegal character for Windows files
  * and 'timeoff' points to what should be the time part of
  * the name (the first digit of the hour).
  *
@@ -1150,8 +1198,8 @@ static int dive_directory(const char *root, const char *name, int timeoff)
 	if (mday_off < 0)
 		return GIT_WALK_SKIP;
 
-	/* Get the time of day */
-	if (sscanf(name+timeoff, "%d:%d:%d", &h, &m, &s) != 3)
+	/* Get the time of day -- parse both time formats so we can read old repos when not on Windows */
+	if (sscanf(name+timeoff, "%d:%d:%d", &h, &m, &s) != 3 && sscanf(name+timeoff, "%d=%d=%d", &h, &m, &s) != 3)
 		return GIT_WALK_SKIP;
 	if (!validate_time(h, m, s))
 		return GIT_WALK_SKIP;
@@ -1252,7 +1300,10 @@ static int nonunique_length(const char *str)
  *
  *  - It's a dive directory. The name will be of the form
  *
- *       [[yyyy-]mm-]nn-ddd-hh:mm:ss[~hex]
+ *       [[yyyy-]mm-]nn-ddd-hh=mm=ss[~hex]
+ *
+ *    (older versions had this as [[yyyy-]mm-]nn-ddd-hh:mm:ss[~hex]
+ *     but that faile on Windows)
  *
  *    which describes the date and time of a dive (yyyy and mm
  *    are optional, and may be encoded in the path leading up to
@@ -1262,10 +1313,8 @@ static int nonunique_length(const char *str)
  *
  *  - It's some random non-dive-data directory.
  *
- *    Subsurface doesn't create these yet, but maybe we'll encode
- *    pictures etc. If it doesn't match the above patterns, we'll
- *    ignore them for dive loading purposes, and not even recurse
- *    into them.
+ *    If it doesn't match the above patterns, we'll ignore them
+ *    for dive loading purposes, and not even recurse into them.
  */
 static int walk_tree_directory(const char *root, const git_tree_entry *entry)
 {
@@ -1301,7 +1350,7 @@ static int walk_tree_directory(const char *root, const git_tree_entry *entry)
 	 * We know the len is at least 3, because we had at least
 	 * two digits and a dash
 	 */
-	if (name[len-3] == ':')
+	if (name[len-3] == ':' || name[len-3] == '=')
 		return dive_directory(root, name, len-8);
 
 	if (digits != 2)
@@ -1409,6 +1458,24 @@ static int parse_settings_entry(git_repository *repo, const git_tree_entry *entr
 	return 0;
 }
 
+static int parse_picture_file(git_repository *repo, const git_tree_entry *entry, const char *name)
+{
+	/* remember the picture data so we can handle it when all dive data has been loaded
+	 * the name of the git file is PIC-<hash> */
+	git_blob *blob = git_tree_entry_blob(repo, entry);
+	const void *rawdata = git_blob_rawcontent(blob);
+	int len = git_blob_rawsize(blob);
+	struct picture_entry_list *new_pel = malloc(sizeof(struct picture_entry_list));
+	new_pel->next = pel;
+	pel = new_pel;
+	pel->data = malloc(len);
+	memcpy(pel->data, rawdata, len);
+	pel->len = len;
+	pel->hash = strdup(name + 4);
+	git_blob_free(blob);
+	return 0;
+}
+
 static int parse_picture_entry(git_repository *repo, const git_tree_entry *entry, const char *name)
 {
 	git_blob *blob;
@@ -1417,12 +1484,13 @@ static int parse_picture_entry(git_repository *repo, const git_tree_entry *entry
 	char sign;
 
 	/*
-	 * The format of the picture name files is just the offset
-	 * within the dive in form [[+-]hh:mm:ss, possibly followed
-	 * by a hash to make the filename unique (which we can just
-	 * ignore).
+	 * The format of the picture name files is just the offset within
+	 * the dive in form [[+-]hh=mm=ss (previously [[+-]hh:mm:ss, but
+	 * that didn't work on Windows), possibly followed by a hash to
+	 * make the filename unique (which we can just ignore).
 	 */
-	if (sscanf(name, "%c%d:%d:%d", &sign, &hh, &mm, &ss) != 4)
+	if (sscanf(name, "%c%d:%d:%d", &sign, &hh, &mm, &ss) != 4 &&
+	    sscanf(name, "%c%d=%d=%d", &sign, &hh, &mm, &ss) != 4)
 		return report_error("Unknown file name %s", name);
 	offset = ss + 60*(mm + 60*hh);
 	if (sign == '-')
@@ -1430,7 +1498,7 @@ static int parse_picture_entry(git_repository *repo, const git_tree_entry *entry
 
 	blob = git_tree_entry_blob(repo, entry);
 	if (!blob)
-		return report_error("Unable to read trip file");
+		return report_error("Unable to read picture file");
 
 	pic = alloc_picture();
 	pic->offset.seconds = offset;
@@ -1467,6 +1535,10 @@ static int walk_tree_file(const char *root, const git_tree_entry *entry, git_rep
 			return parse_trip_entry(repo, entry);
 		if (!strcmp(name, "00-Subsurface"))
 			return parse_settings_entry(repo, entry);
+		break;
+	case 'P':
+		if (dive && !strncmp(name, "PIC-", 4))
+			return parse_picture_file(repo, entry, name);
 		break;
 	}
 	report_error("Unknown file %s%s (%p %p)", root, name, dive, trip);

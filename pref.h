@@ -84,6 +84,7 @@ struct preferences {
 	bool recreational_mode;
 	bool safetystop;
 	int reserve_gas;
+	int min_switch_duration; // seconds
 	int bottomsac;
 	int decosac;
 	int o2consumption; // ml per min
@@ -120,7 +121,7 @@ enum cloud_status {
 	CS_VERIFIED
 };
 
-extern struct preferences prefs, default_prefs;
+extern struct preferences prefs, default_prefs, informational_prefs;
 
 #define PP_GRAPHS_ENABLED (prefs.pp_graphs.po2 || prefs.pp_graphs.pn2 || prefs.pp_graphs.phe)
 
