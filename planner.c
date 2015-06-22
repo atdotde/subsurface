@@ -1017,7 +1017,6 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 		       (get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[best_first_ascend_cylinder].depth / 1000.0);
 #endif
 	}
-
 	
 	// VPM-B Deco
 	nuclear_regeneration(clock / 60.0);
@@ -1068,7 +1067,6 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 	#endif
 				gi--;
 			}
-
 
 			--stopidx;
 
