@@ -526,6 +526,13 @@ void dump_tissues()
 	printf("\n");
 }
 
+void dump_gradients()
+{
+	int ci;
+	for (ci = 0; ci < 16 ; ci++)
+		printf("%d:\t%f\t%f\n", ci, bottom_n2_gradient[ci], bottom_he_gradient[ci]);
+}
+
 void clear_deco(double surface_pressure)
 {
 	int ci;
