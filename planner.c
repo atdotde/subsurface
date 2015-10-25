@@ -34,7 +34,6 @@ double plangflow, plangfhigh;
 bool plan_verbatim, plan_display_runtime, plan_display_duration, plan_display_transitions;
 
 pressure_t first_ceiling_pressure, max_bottom_ceiling_pressure = {};
-
 const char *disclaimer;
 
 #if DEBUG_PLAN
@@ -1332,6 +1331,10 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 		}
 
 		deco_time = clock - bottom_time;
+		if (!is_final_plan) {
+			printf("%d:\n", deco_time);
+			dump_gradients();
+		}
 	} while (!is_final_plan);
 
 	plan_add_segment(diveplan, clock - previous_point_time, 0, gas, po2, false);

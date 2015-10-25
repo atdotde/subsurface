@@ -19,6 +19,7 @@ extern void set_display_transitions(bool display);
 extern void get_gas_at_time(struct dive *dive, struct divecomputer *dc, duration_t time, struct gasmix *gas);
 extern int get_gasidx(struct dive *dive, struct gasmix *mix);
 extern bool diveplan_empty(struct diveplan *diveplan);
+extern void dump_gradients();
 
 extern void free_dps(struct diveplan *diveplan);
 extern struct dive *planned_dive;
