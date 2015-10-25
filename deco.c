@@ -382,11 +382,28 @@ void vpmb_next_gradient(double deco_time, double surface_pressure)
 	double n2_b, n2_c;
 	double he_b, he_c;
 	double desat_time;
+	double n2_volume, he_volume;
 	deco_time /= 60.0;
 
 	for (ci = 0; ci < 16; ++ci) {
 		desat_time = deco_time + calc_surface_phase(surface_pressure, tissue_he_sat[ci], tissue_n2_sat[ci], log(2.0) / buehlmann_He_t_halflife[ci], log(2.0) / buehlmann_N2_t_halflife[ci]);
 
+		n2_volume = (bottom_n2_gradient[ci] - initial_n2_gradient[ci])
+				/ (vpmb_config.skin_compression_gammaC / vpmb_config.surface_tension_gamma * bottom_n2_gradient[ci] - max_n2_crushing_pressure[ci])
+				* bottom_n2_gradient[ci]
+				* desat_time
+				* vpmb_config.skin_compression_gammaC * vpmb_config.skin_compression_gammaC
+				/ vpmb_config.surface_tension_gamma / vpmb_config.surface_tension_gamma;
+
+		he_volume = (bottom_he_gradient[ci] - initial_he_gradient[ci])
+				/ (vpmb_config.skin_compression_gammaC / vpmb_config.surface_tension_gamma * bottom_he_gradient[ci] - max_he_crushing_pressure[ci])
+				* bottom_he_gradient[ci]
+				* desat_time
+				* vpmb_config.skin_compression_gammaC * vpmb_config.skin_compression_gammaC
+				/ vpmb_config.surface_tension_gamma / vpmb_config.surface_tension_gamma;
+
+
+		printf("%d:\tn2:%f%%\the:%f%%\n", ci, 100.0 * n2_volume / vpmb_config.crit_volume_lambda, 100.0 * he_volume / vpmb_config.crit_volume_lambda);
 		n2_b = initial_n2_gradient[ci] + (vpmb_config.crit_volume_lambda * vpmb_config.surface_tension_gamma) / (vpmb_config.skin_compression_gammaC * desat_time);
 		he_b = initial_he_gradient[ci] + (vpmb_config.crit_volume_lambda * vpmb_config.surface_tension_gamma) / (vpmb_config.skin_compression_gammaC * desat_time);
 
