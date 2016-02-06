@@ -226,7 +226,7 @@ if(${SUBSURFACE_TARGET_EXECUTABLE} MATCHES "MobileExecutable")
 	set(MOBILE_SRC
 		qt-mobile/qmlmanager.cpp
 		qt-mobile/qmlprofile.cpp
-		subsurface-mobile-main.cpp
+		subsurface-mobile-planner-main.cpp
 		subsurface-mobile-helper.cpp
 	)
 	qt5_add_resources(MOBILE_RESOURCES qt-mobile/qml/mobile-resources.qrc)
