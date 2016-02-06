@@ -121,4 +121,18 @@ signals:
 	void startPageTextChanged();
 };
 
+class finalPlan : public QObject
+{
+	Q_OBJECT
+	Q_PROPERTY(QString plan READ plan WRITE setPlan NOTIFY planChanged)
+public:
+	void setPlan(const QString &a);
+	QString plan();
+signals:
+	void planChanged();
+private:
+	QString m_plan;
+};
+
+
 #endif

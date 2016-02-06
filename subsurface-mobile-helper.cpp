@@ -22,6 +22,8 @@
 
 QObject *qqWindowObject = NULL;
 
+extern 	finalPlan finalplan;
+
 void init_ui()
 {
 	init_qt_late();
@@ -61,6 +63,7 @@ void run_ui()
 	QQmlContext *ctxt = engine.rootContext();
 	ctxt->setContextProperty("diveModel", sortModel);
 	ctxt->setContextProperty("gpsModel", gpsSortModel);
+	ctxt->setContextProperty("plan",&finalplan);
 	engine.load(QUrl(QStringLiteral("qrc:///qml/main.qml")));
 	qqWindowObject = engine.rootObjects().value(0);
 	if (!qqWindowObject) {

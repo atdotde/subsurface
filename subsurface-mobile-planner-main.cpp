@@ -23,6 +23,7 @@
 #include "subsurfacestartup.h"
 #include "qthelper.h"
 #include <QDebug>
+#include "qt-mobile/qmlmanager.h"
 
 #define DEBUG  1
 
@@ -31,6 +32,7 @@ extern bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner
 
 extern pressure_t first_ceiling_pressure;
 
+finalPlan finalplan;
 
 QTranslator *qtTranslator, *ssrfTranslator;
 
@@ -130,6 +132,7 @@ int main(int argc, char **argv)
 	plan(&testPlan, &cache, 1, 0);
 
 	qDebug() << displayed_dive.notes;
+	finalplan.setPlan(displayed_dive.notes);
 
 #if DEBUG
 	free(displayed_dive.notes);

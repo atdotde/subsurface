@@ -764,3 +764,16 @@ QString QMLManager::getDate(const QString& diveId)
 		datestring = get_dive_date_string(d->when);
 	return datestring;
 }
+
+void finalPlan::setPlan(const QString &a)
+{
+	if (a != m_plan) {
+		m_plan = a;
+		emit planChanged();
+	}
+}
+
+QString finalPlan::plan()
+{
+	return m_plan;
+}
