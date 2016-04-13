@@ -43,7 +43,9 @@ void init_ui()
 extern void nakedDownload();
 void run_ui()
 {
+	parse_file("foo[helling@atdotde.de]");
 	nakedDownload();
+	save_dives("foo[bar]");
 	return;
 	window->show();
 	qApp->exec();
