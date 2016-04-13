@@ -40,8 +40,11 @@ void init_ui()
 		window->setTitle(MWTF_DEFAULT);
 }
 
+extern void nakedDownload();
 void run_ui()
 {
+	nakedDownload();
+	return;
 	window->show();
 	qApp->exec();
 }

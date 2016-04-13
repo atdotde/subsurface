@@ -321,6 +321,78 @@ void DownloadFromDCWidget::on_downloadCancelRetryButton_clicked()
 	ostcFirmwareCheck = new OstcFirmwareCheck(product);
 }
 
+// Downloading without UI
+void nakedDownload()
+{
+	device_data_t data;
+	data.vendor = strdup(default_dive_computer_vendor);
+	data.product = strdup(default_dive_computer_product);
+	data.devname = strdup(default_dive_computer_device);
+	qDebug() << "nakedDownload from " << data.vendor << data.product;
+#if defined(BT_SUPPORT)
+	// fixme
+	data.bluetooth_mode = false;
+//	if (data.bluetooth_mode && btDeviceSelectionDialog != NULL) {
+		// Get the selected device address
+//		data.devname = strdup(btDeviceSelectionDialog->getSelectedDeviceAddress().toUtf8().data());
+//	} // else
+		// this breaks an "else if" across lines... not happy...
+#endif
+//	if (same_string(data.vendor, "Uemis")) {
+//		char *colon;
+//		char *devname = strdup(ui.device->currentText().toUtf8().data());
+
+//		if ((colon = strstr(devname, ":\\ (UEMISSDA)")) != NULL) {
+//			*(colon + 2) = '\0';
+//			fprintf(stderr, "shortened devname to \"%s\"", data.devname);
+//		}
+//		data.devname = devname;
+//	} else {
+//		data.devname = strdup(ui.device->currentText().toUtf8().data());
+//	}
+	data.descriptor = NULL;
+	dc_iterator_t *iterator = NULL;
+	dc_descriptor_t *descriptor = NULL;
+	struct mydescriptor *mydescriptor;
+
+	dc_descriptor_iterator(&iterator);
+	while (dc_iterator_next(iterator, &descriptor) == DC_STATUS_SUCCESS) {
+		const char *vendor = dc_descriptor_get_vendor(descriptor);
+		const char *product = dc_descriptor_get_product(descriptor);
+
+		if(strstr(dc_descriptor_get_vendor(descriptor), data.vendor) &&
+		   strstr(dc_descriptor_get_product(descriptor), data.product))
+			data.descriptor = descriptor;
+	}
+	dc_iterator_free(iterator);
+
+	if (!data.descriptor)
+		qDebug() << "Did not find descriptor for " << data.vendor << data.product;
+
+	data.force_download = false;
+	data.create_new_trip = true;
+	data.trip = NULL;
+	data.deviceid = data.diveid = 0;
+
+	// before we start, remember where the dive_table ended
+
+	const char *errorText;
+
+	data.download_table = &downloadTable;
+	qDebug() << "Ab die Post";
+	if (!strcmp(data.vendor, "Uemis"))
+		errorText = do_uemis_import(&data);
+	else
+		errorText = do_libdivecomputer_import(&data);
+	for (int i = 0; i < downloadTable.nr; i++) {
+		qDebug() << "downloaded dive" << downloadTable.dives[i];
+		record_dive(downloadTable.dives[i]);
+		downloadTable.dives[i] = NULL;
+	}
+	downloadTable.nr = 0;
+
+}
+
 bool DownloadFromDCWidget::preferDownloaded()
 {
 	return ui.preferDownloaded->isChecked();
