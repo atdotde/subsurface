@@ -282,7 +282,7 @@
                   <xsl:value-of select="$size"/>
                 </xsl:when>
                 <xsl:otherwise>
-                  <xsl:value-of select="format-number((translate($size, translate($size, '0123456789', ''), '') * 14.7 div 3000) div 0.35315, '#.#')"/>
+                  <xsl:value-of select="format-number((translate($size, translate($size, '0123456789', ''), '') * 14.7 div 3000) div 0.035315, '#.#')"/>
                 </xsl:otherwise>
               </xsl:choose>
             </xsl:attribute>
@@ -375,7 +375,7 @@
                   <xsl:value-of select="translate($meanDepth, translate($meanDepth, '1234567890,.', ''), '')"/>
                 </xsl:when>
                 <xsl:otherwise>
-                  <xsl:value-of select="translate(translate($meanDepth, translate($meanDepth, '1234567890,.', ''), ''), ',', '.')"/>
+                  <xsl:value-of select="translate(translate($meanDepth, translate($meanDepth, '1234567890,.', ''), ''), ',', '.') * 0.3048"/>
                 </xsl:otherwise>
               </xsl:choose>
             </xsl:attribute>

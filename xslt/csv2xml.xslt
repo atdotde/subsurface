@@ -214,7 +214,7 @@
     </xsl:variable>
 
 
-    <xsl:if test="number($value) = $value or number(substring-before($value, ':')) = substring-before($value, ':')">
+    <xsl:if test="number(translate($value, ',', '.')) = translate($value, ',', '.') or number(substring-before($value, ':')) = substring-before($value, ':')">
       <sample>
         <xsl:attribute name="time">
           <xsl:choose>
@@ -225,15 +225,18 @@
                 </xsl:with-param>
               </xsl:call-template>
             </xsl:when>
-            <xsl:when test="number($value) = $value">
-              <!-- We assume time in seconds -->
+            <xsl:when test="number(translate($value, ',', '.')) = translate($value, ',', '.')">
 
+              <!-- We assume time in seconds with possibly fractions -->
               <xsl:call-template name="sec2time">
                 <xsl:with-param name="timeSec">
                   <xsl:choose>
                     <xsl:when test="substring-after($value, '.') != ''">
                       <!-- Well, I suppose it was min.sec -->
-                      <xsl:value-of select="substring-before($value, '.') * 60 + substring-after($value, '.')" />
+                      <xsl:value-of select="substring-before($value, '.') * 60 + concat('.', substring-after($value, '.')) * 60" />
+                    </xsl:when>
+                    <xsl:when test="substring-after($value, ',') != ''">
+                      <xsl:value-of select="substring-before($value, ',') * 60 + concat('.', substring-after($value, ',')) * 60" />
                     </xsl:when>
                     <xsl:otherwise>
                       <xsl:value-of select="$value"/>
@@ -268,10 +271,10 @@
         <xsl:attribute name="depth">
           <xsl:choose>
             <xsl:when test="$units = 0">
-              <xsl:value-of select="$depth"/>
+              <xsl:value-of select="translate($depth, ',', '.')"/>
             </xsl:when>
             <xsl:otherwise>
-              <xsl:value-of select="$depth * 0.3048"/>
+              <xsl:value-of select="translate($depth, ',', '.') * 0.3048"/>
             </xsl:otherwise>
           </xsl:choose>
         </xsl:attribute>
@@ -286,10 +289,10 @@
           <xsl:attribute name="temp">
             <xsl:choose>
               <xsl:when test="$units = 0">
-                <xsl:value-of select="$temp"/>
+                <xsl:value-of select="translate($temp, ',', '.')"/>
               </xsl:when>
               <xsl:otherwise>
-                <xsl:value-of select="concat(format-number(($temp - 32) * 5 div 9, '0.0'), ' C')"/>
+                <xsl:value-of select="concat(format-number((translate($temp, ',', '.') - 32) * 5 div 9, '0.0'), ' C')"/>
               </xsl:otherwise>
             </xsl:choose>
           </xsl:attribute>
