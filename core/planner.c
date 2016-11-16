@@ -37,7 +37,7 @@ bool plan_verbatim, plan_display_runtime, plan_display_duration, plan_display_tr
 pressure_t first_ceiling_pressure, max_bottom_ceiling_pressure = {};
 
 const char *disclaimer;
-
+int plot_depth = 0;
 #if DEBUG_PLAN
 void dump_plan(struct diveplan *diveplan)
 {
@@ -1190,6 +1190,9 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 								TIMESTEP, po2, &displayed_dive, prefs.decosac);
 				clock += TIMESTEP;
 				depth -= deltad;
+				/* Print VPM-Gradient as gradient factor, this has to be done from within deco.c */
+				if (decodive)
+					plot_depth = depth;
 			} while (depth > 0 && depth > stoplevels[stopidx]);
 
 			if (depth <= 0)
@@ -1235,6 +1238,7 @@ bool plan(struct diveplan *diveplan, char **cached_datap, bool is_planner, bool 
 				gi--;
 			}
 			--stopidx;
+
 
 			/* Save the current state and try to ascend to the next stopdepth */
 			while (1) {

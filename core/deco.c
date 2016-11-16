@@ -30,6 +30,7 @@
 
 
 extern bool in_planner();
+extern int plot_depth;
 
 extern pressure_t first_ceiling_pressure;
 
@@ -289,6 +290,19 @@ double tissue_tolerance_calc(const struct dive *dive, double pressure)
 				ret_tolerance_limit_ambient_pressure = tolerated;
 			}
 		}
+		if (plot_depth) {
+			printf("{%d, %d, {", plot_depth / 1000, ci_pointing_to_guiding_tissue);
+			for (ci = 0; ci < 16; ci++) {
+
+				double buehlmann_gradient = (1.0 / buehlmann_inertgas_b[ci] - 1.0) * depth_to_bar(plot_depth, &displayed_dive) + buehlmann_inertgas_a[ci];
+				printf("%f, ", (tissue_inertgas_saturation[ci] - tolerated_by_tissue[ci]) / buehlmann_gradient);
+			}
+			printf("0}},\n");
+			plot_depth = 0;
+
+
+		}
+
 	} else {
 		// VPM-B ceiling
 		double reference_pressure;
@@ -308,6 +322,23 @@ double tissue_tolerance_calc(const struct dive *dive, double pressure)
 			}
 		// We are doing ok if the gradient was computed within ten centimeters of the ceiling.
 		} while (fabs(ret_tolerance_limit_ambient_pressure - reference_pressure) > 0.01);
+
+		if (plot_depth) {
+			double n2_gradient, he_gradient, total_gradient;
+			printf("{%d, %d, {", plot_depth / 1000, ci_pointing_to_guiding_tissue);
+			for (ci = 0; ci < 16; ci++) {
+				n2_gradient = update_gradient(depth_to_bar(plot_depth, &displayed_dive), bottom_n2_gradient[ci]);
+				he_gradient = update_gradient(depth_to_bar(plot_depth, &displayed_dive), bottom_he_gradient[ci]);
+				total_gradient = ((n2_gradient * tissue_n2_sat[ci]) + (he_gradient * tissue_he_sat[ci])) / (tissue_n2_sat[ci] + tissue_he_sat[ci]);
+
+				double buehlmann_gradient = (1.0 / buehlmann_inertgas_b[ci] - 1.0) * depth_to_bar(plot_depth, &displayed_dive) + buehlmann_inertgas_a[ci];
+				printf("%f, ", (total_gradient - vpmb_config.other_gases_pressure) / buehlmann_gradient);
+			}
+			printf("0}},\n");
+			plot_depth = 0;
+
+
+		}
 	}
 	return ret_tolerance_limit_ambient_pressure;
 }
