@@ -888,10 +888,10 @@ void DivePlannerPointsModel::createPlan(bool replanCopy)
 		// If we don't manage to identify old plan start but there is a 
 		// table, delete everything
 		QString oldnotes(current_dive->notes);
-		if (oldnotes.indexOf(QString("*!*")) >= 0)
-			oldnotes.truncate(oldnotes.indexOf(QString("*!*")));
-		else if (oldnotes.indexOf(QString("***")) >= 0)
-			oldnotes.truncate(oldnotes.indexOf(QString("***")));
+		if (oldnotes.indexOf(QString("<a name=\"HEREISTHEDISCLAIMER\">")) >= 0)
+			oldnotes.truncate(oldnotes.indexOf(QString("<a name=\"HEREISTHEDISCLAIMER\">")));
+		else if (oldnotes.indexOf(QString("<a name=\"HEREISTHEPLAN\">")) >= 0)
+			oldnotes.truncate(oldnotes.indexOf(QString("<a name=\"HEREISTHEPLAN\">")));
 		else if (oldnotes.indexOf(QString("<table")) >= 0)
 			oldnotes.truncate(0);
 		oldnotes.append(displayed_dive.notes);
