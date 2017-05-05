@@ -1056,21 +1056,21 @@ int parse_csv_file(const char *filename, char **params, int pnr, const char *csv
 }
 
 #define SBPARAMS 40
-int parse_seabear_log(const char *filename)
+int parse_seabear_log(const char *filename, struct dive_table *table)
 {
 	char *params[SBPARAMS];
 	int pnr = 0;
 
 	pnr = parse_seabear_header(filename, params, pnr);
 
-	if (parse_seabear_csv_file(filename, params, pnr, "csv") < 0) {
+	if (parse_seabear_csv_file(filename, params, pnr, "csv", table) < 0) {
 		return -1;
 	}
 
 	return 0;
 }
 
-int parse_seabear_csv_file(const char *filename, char **params, int pnr, const char *csvtemplate)
+int parse_seabear_csv_file(const char *filename, char **params, int pnr, const char *csvtemplate, struct dive_table *table)
 {
 	int ret, i;
 	struct memblock mem;
@@ -1189,7 +1189,7 @@ int parse_seabear_csv_file(const char *filename, char **params, int pnr, const c
 		fprintf(stderr, "xslt/csv2xml.xslt\n");
 	}
 
-	ret = parse_xml_buffer(filename, mem.buffer, mem.size, &dive_table, (const char **)params);
+	ret = parse_xml_buffer(filename, mem.buffer, mem.size, table, (const char **)params);
 	free(mem.buffer);
 	for (i = 0; params[i]; i += 2)
 		free(params[i + 1]);

@@ -847,7 +847,7 @@ void DiveLogImportDialog::on_buttonBox_accepted()
 		for (int i = 0; i < fileNames.size(); ++i) {
 			if (ui->knownImports->currentText() == "Seabear CSV") {
 
-				parse_seabear_log(fileNames[i].toUtf8().data());
+				parse_seabear_log(fileNames[i].toUtf8().data(), &dive_table);
 
 			} else {
 				char *params[49];

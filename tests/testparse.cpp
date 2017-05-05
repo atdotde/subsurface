@@ -246,7 +246,7 @@ void TestParse::testParseNewFormat()
 	for (int i = 0; i < files.size(); ++i) {
 
 		QCOMPARE(parse_seabear_log(QString::fromLatin1(SUBSURFACE_TEST_DATA
-			"/dives/").append(files.at(i)).toLatin1().data()), 0);
+			"/dives/").append(files.at(i)).toLatin1().data(), &dive_table), 0);
 		QCOMPARE(dive_table.nr, i + 1);
 	}
 

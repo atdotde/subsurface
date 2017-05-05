@@ -226,6 +226,8 @@ void DownloadFromDCWidget::on_vendor_currentIndexChanged(const QString &vendor)
 
 	if (vendor == QString("Uemis"))
 		dcType = DC_TYPE_UEMIS;
+	else if (vendor == QString("Seabear"))
+		dcType = DC_TYPE_SEABEAR;
 	fill_device_list(dcType);
 
 	// Memleak - but deleting gives me a crash.
@@ -292,14 +294,29 @@ void DownloadFromDCWidget::fill_computer_list()
 
 	descriptorLookup["UemisZurich"] = (dc_descriptor_t *)mydescriptor;
 
+	// And the same for Seabear
+	mydescriptor = (struct mydescriptor *)malloc(sizeof(struct mydescriptor));
+	mydescriptor->vendor = "Seabear";
+	mydescriptor->product = "H3";
+	mydescriptor->type = DC_FAMILY_NULL;
+	mydescriptor->model = 0;
+
+	if (!vendorList.contains("Seabear"))
+		vendorList.append("Seabear");
+
+	if (!productList["Seabear"].contains("H3"))
+		productList["Seabear"].push_back("H3");
+
+	descriptorLookup["SeabearH3"] = (dc_descriptor_t *)mydescriptor;
+
 	qSort(vendorList);
 }
 
 void DownloadFromDCWidget::on_search_clicked()
 {
-	if (ui.vendor->currentText() == "Uemis") {
+	if (ui.vendor->currentText() == "Uemis" || ui.vendor->currentText() == "Seabear") {
 		QString dirName = QFileDialog::getExistingDirectory(this,
-								    tr("Find Uemis dive computer"),
+								    tr("Find dive computer"),
 								    QDir::homePath(),
 								    QFileDialog::ShowDirsOnly);
 		if (ui.device->findText(dirName) == -1)
@@ -645,6 +662,8 @@ void DownloadThread::run()
 	data->download_table = &downloadTable;
 	if (!strcmp(data->vendor, "Uemis"))
 		errorText = do_uemis_import(data);
+	else if(!strcmp(data->vendor, "Seabear"))
+		errorText = do_seabear_import(data);
 	else
 		errorText = do_libdivecomputer_import(data);
 	if (errorText)
@@ -763,3 +782,19 @@ void DiveImportedModel::setImportedDivesIndexes(int first, int last)
 	memset(checkStates, true, last - first + 1);
 	endInsertRows();
 }
+
+const char *DownloadThread::do_seabear_import(device_data_t *data)
+{
+	QDir mountpoint(data->devname);
+	QStringList filters;
+	filters << "*.csv" << "*.CSV";
+	mountpoint.setNameFilters(filters);
+	QStringList dives = mountpoint.entryList();
+
+	Q_FOREACH(QString csv_file, dives) {
+		parse_seabear_log(mountpoint.absoluteFilePath(csv_file).toUtf8().data(), &downloadTable);
+	}
+
+	return NULL;
+}
+

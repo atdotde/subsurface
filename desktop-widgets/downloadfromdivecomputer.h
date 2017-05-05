@@ -28,6 +28,7 @@ public:
 
 private:
 	device_data_t *data;
+	const char *do_seabear_import(device_data_t *data);
 };
 
 class DiveImportedModel : public QAbstractTableModel
