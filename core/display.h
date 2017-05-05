@@ -48,6 +48,7 @@ typedef void (*device_callback_t)(const char *name, void *userdata);
 #define DC_TYPE_SERIAL 1
 #define DC_TYPE_UEMIS 2
 #define DC_TYPE_OTHER 3
+#define DC_TYPE_SEABEAR 4
 
 int enumerate_devices(device_callback_t callback, void *userdata, int dc_type);
 
