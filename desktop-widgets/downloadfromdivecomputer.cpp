@@ -324,10 +324,12 @@ void DownloadFromDCWidget::on_downloadCancelRetryButton_clicked()
 // Downloading without UI
 void nakedDownload()
 {
+	auto dc = SettingsObjectWrapper::instance()->dive_computer_settings;
+
 	device_data_t data;
-	data.vendor = strdup(default_dive_computer_vendor);
-	data.product = strdup(default_dive_computer_product);
-	data.devname = strdup(default_dive_computer_device);
+	data.vendor = strdup(dc->dc_vendor().toUtf8().data());
+	data.product = strdup(dc->dc_product().toUtf8().data());
+	data.devname = strdup(dc->dc_device().toUtf8().data());
 	qDebug() << "nakedDownload from " << data.vendor << data.product;
 #if defined(BT_SUPPORT)
 	// fixme

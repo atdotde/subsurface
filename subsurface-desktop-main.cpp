@@ -100,12 +100,12 @@ int main(int argc, char **argv)
 				files.push_back(cloudURL);
 		}
 	}
-	MainWindow *m = MainWindow::instance();
-	filesOnCommandLine = !files.isEmpty() || !importedFiles.isEmpty();
-	m->loadFiles(files);
-	m->importFiles(importedFiles);
+//	MainWindow *m = MainWindow::instance();
+//	filesOnCommandLine = !files.isEmpty() || !importedFiles.isEmpty();
+//	m->loadFiles(files);
+//	m->importFiles(importedFiles);
 	// in case something has gone wrong make sure we show the error message
-	m->showError();
+//	m->showError();
 
 	if (verbose > 0)
 		print_files();

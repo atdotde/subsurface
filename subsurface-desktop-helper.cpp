@@ -30,6 +30,7 @@ static MainWindow *window = NULL;
 void init_ui()
 {
 	init_qt_late();
+	return;
 
 	PluginManager::instance().loadPlugins();
 

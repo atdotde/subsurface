@@ -2254,33 +2254,33 @@ void SettingsObjectWrapper::load()
 	GET_INT("pscr_ratio", pscr_ratio);
 	s.endGroup();
 
-	s.beginGroup("Display");
+//	s.beginGroup("Display");
 	// get the font from the settings or our defaults
 	// respect the system default font size if none is explicitly set
-	QFont defaultFont = s.value("divelist_font", prefs.divelist_font).value<QFont>();
-	if (IS_FP_SAME(system_divelist_default_font_size, -1.0)) {
-		prefs.font_size = qApp->font().pointSizeF();
-		system_divelist_default_font_size = prefs.font_size; // this way we don't save it on exit
-	}
-	prefs.font_size = s.value("font_size", prefs.font_size).toFloat();
-	// painful effort to ignore previous default fonts on Windows - ridiculous
-	QString fontName = defaultFont.toString();
-	if (fontName.contains(","))
-		fontName = fontName.left(fontName.indexOf(","));
-	if (subsurface_ignore_font(fontName.toUtf8().constData())) {
-		defaultFont = QFont(prefs.divelist_font);
-	} else {
-		free((void *)prefs.divelist_font);
-		prefs.divelist_font = strdup(fontName.toUtf8().constData());
-	}
-	defaultFont.setPointSizeF(prefs.font_size);
-	qApp->setFont(defaultFont);
-	GET_INT("displayinvalid", display_invalid_dives);
-	s.endGroup();
+//	QFont defaultFont = s.value("divelist_font", prefs.divelist_font).value<QFont>();
+//	if (IS_FP_SAME(system_divelist_default_font_size, -1.0)) {
+//		prefs.font_size = qApp->font().pointSizeF();
+//		system_divelist_default_font_size = prefs.font_size; // this way we don't save it on exit
+//	}
+//	prefs.font_size = s.value("font_size", prefs.font_size).toFloat();
+//	// painful effort to ignore previous default fonts on Windows - ridiculous
+//	QString fontName = defaultFont.toString();
+//	if (fontName.contains(","))
+//		fontName = fontName.left(fontName.indexOf(","));
+//	if (subsurface_ignore_font(fontName.toUtf8().constData())) {
+//		defaultFont = QFont(prefs.divelist_font);
+//	} else {
+//		free((void *)prefs.divelist_font);
+//		prefs.divelist_font = strdup(fontName.toUtf8().constData());
+//	}
+//	defaultFont.setPointSizeF(prefs.font_size);
+//	qApp->setFont(defaultFont);
+//	GET_INT("displayinvalid", display_invalid_dives);
+//	s.endGroup();
 
-	s.beginGroup("Animations");
-	GET_INT("animation_speed", animation_speed);
-	s.endGroup();
+//	s.beginGroup("Animations");
+//	GET_INT("animation_speed", animation_speed);
+//	s.endGroup();
 
 	s.beginGroup("Network");
 	GET_INT_DEF("proxy_type", proxy_type, QNetworkProxy::DefaultProxy);

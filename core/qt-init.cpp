@@ -34,6 +34,7 @@ void init_qt_late()
 	}
 	// find plugins installed in the application directory (without this SVGs don't work on Windows)
 	SettingsObjectWrapper::instance()->load();
+	return;
 
 	QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
 	QLocale loc;
