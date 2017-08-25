@@ -627,7 +627,6 @@ int wait_until(struct dive *dive, int clock, int min, int leap, int stepsize, in
 {
 	// Round min + leap up to the next multiple of stepsize
 	int upper = min + leap + stepsize - 1 - (min + leap - 1) % stepsize;
-	printf("clock: %d min: %d leap: %d, depth %d\n", clock / 60, min / 60, leap, depth);
 	// Is the upper boundary too small?
 	if (!trial_ascent(upper - clock, depth, target_depth, avg_depth, bottom_time, gasmix, po2, surface_pressure, dive))
 		return wait_until(dive, clock, upper, leap, stepsize, depth, target_depth, avg_depth, bottom_time, gasmix, po2, surface_pressure);
@@ -639,8 +638,6 @@ int wait_until(struct dive *dive, int clock, int min, int leap, int stepsize, in
 }
 
 // Work out the stops. Return value is if there were any mandatory stops.
-
-int cache_misses;
 
 bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct deco_state **cached_datap, bool is_planner, bool show_disclaimer)
 {
@@ -678,7 +675,6 @@ bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct dec
 	int laststoptime = timestep;
 	bool o2breaking = false;
 
-	cache_misses = 0;
 	set_gf(diveplan->gflow, diveplan->gfhigh, prefs.gf_low_at_maxdepth);
 	set_vpmb_conservatism(diveplan->vpmb_conservatism);
 	if (!diveplan->surface_pressure)
@@ -1035,7 +1031,6 @@ bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct dec
 
 		deco_time = clock - bottom_time;
 	} while (!is_final_plan);
-	printf("Cache misses: %d\n", cache_misses);
 
 	plan_add_segment(diveplan, clock - previous_point_time, 0, current_cylinder, po2, false);
 	if (decoMode() == VPMB) {
