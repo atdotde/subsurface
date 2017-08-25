@@ -331,14 +331,17 @@ struct factor_cache {
 	double last_factor;
 };
 
+extern int cache_misses;
+
 double n2_factor(int period_in_seconds, int ci)
 {
 	static struct factor_cache cache[16];
 
 	if (period_in_seconds == 1)
 		return buehlmann_N2_factor_expositon_one_second[ci];
-
 	if (period_in_seconds != cache[ci].last_period) {
+		if (!ci)
+			++cache_misses;
 		cache[ci].last_period = period_in_seconds;
 		// ln(2)/60 = 1.155245301e-02
 		cache[ci].last_factor = 1 - exp(-period_in_seconds * 1.155245301e-02 / buehlmann_N2_t_halflife[ci]);
