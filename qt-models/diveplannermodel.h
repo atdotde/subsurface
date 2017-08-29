@@ -116,6 +116,7 @@ private:
 	QDateTime startTime;
 	int tempGFHigh;
 	int tempGFLow;
+	int instanceCounter = 0;
 };
 
 #endif

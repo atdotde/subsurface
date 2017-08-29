@@ -9,6 +9,7 @@
 #include "core/subsurface-qt/SettingsObjectWrapper.h"
 #include <QApplication>
 #include <QTextDocument>
+#include <QtConcurrent>
 
 /* TODO: Port this to CleanerTableModel to remove a bit of boilerplate and
  * use the signal warningMessage() to communicate errors to the MainWindow.
@@ -844,7 +845,7 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	if (recalcQ() && !diveplan_empty(&diveplan)) {
 		struct decostop stoptable[60];
 		plan(&diveplan, &displayed_dive, DECOTIMESTEP, stoptable, &cache, isPlanner(), false);
-		computeVariations();
+		QtConcurrent::run(this, &DivePlannerPointsModel::computeVariations);
 		emit calculatedPlanNotes();
 	}
 	// throw away the cache
@@ -929,8 +930,12 @@ void DivePlannerPointsModel::computeVariations()
 	struct diveplan plan_copy;
 	struct divedatapoint *last_segment;
 
+	int my_instance = ++instanceCounter;
+
 	cache_deco_state(&save);
 	cloneDiveplan(&plan_copy);
+	if (my_instance != instanceCounter)
+		return;
 	plan(&plan_copy, dive, 1, original, &cache, true, false);
 	free_dps(&plan_copy);
 	restore_deco_state(save, false);
@@ -938,6 +943,8 @@ void DivePlannerPointsModel::computeVariations()
 	last_segment = cloneDiveplan(&plan_copy);
 	last_segment->depth.mm += 1000;
 	last_segment->next->depth.mm += 1000;
+	if (my_instance != instanceCounter)
+		return;
 	plan(&plan_copy, dive, 1, deeper, &cache, true, false);
 	free_dps(&plan_copy);
 	restore_deco_state(save, false);
@@ -945,23 +952,31 @@ void DivePlannerPointsModel::computeVariations()
 	last_segment = cloneDiveplan(&plan_copy);
 	last_segment->depth.mm -= 1000;
 	last_segment->next->depth.mm -= 1000;
+	if (my_instance != instanceCounter)
+		return;
 	plan(&plan_copy, dive, 1, shallower, &cache, true, false);
 	free_dps(&plan_copy);
 	restore_deco_state(save, false);
 
 	last_segment = cloneDiveplan(&plan_copy);
 	last_segment->next->time += 60;
+	if (my_instance != instanceCounter)
+		return;
 	plan(&plan_copy, dive, 1, longer, &cache, true, false);
 	free_dps(&plan_copy);
 	restore_deco_state(save, false);
 
 	last_segment = cloneDiveplan(&plan_copy);
 	last_segment->next->time -= 60;
+	if (my_instance != instanceCounter)
+		return;
 	plan(&plan_copy, dive, 1, shorter, &cache, true, false);
 	free_dps(&plan_copy);
 	restore_deco_state(save, false);
 
 	printf("\n\n");
+	if (my_instance != instanceCounter)
+		return;
 	analyzeVariations(shallower, original, deeper, "m");
 	analyzeVariations(shorter, original, longer, "min");
 	setRecalc(oldRecalc);

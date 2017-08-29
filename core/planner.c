@@ -685,6 +685,7 @@ bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct dec
 	bool o2breaking = false;
 	int decostopcounter = 0;
 
+	lock_planner();
 	set_gf(diveplan->gflow, diveplan->gfhigh, prefs.gf_low_at_maxdepth);
 	set_vpmb_conservatism(diveplan->vpmb_conservatism);
 	if (!diveplan->surface_pressure)
@@ -1064,6 +1065,7 @@ bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct dec
 	free(stoplevels);
 	free(gaschanges);
 	free(bottom_cache);
+	unlock_planner();
 	return decodive;
 }
 

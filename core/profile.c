@@ -960,6 +960,7 @@ void calculate_deco_information(struct dive *dive, struct divecomputer *dc, stru
 	bool first_iteration = true;
 	int deco_time = 0, prev_deco_time = 10000000;
 	struct deco_state *cache_data_initial = NULL;
+	lock_planner();
 	/* For VPM-B outside the planner, cache the initial deco state for CVA iterations */
 	if (decoMode() == VPMB && !in_planner())
 		cache_deco_state(&cache_data_initial);
@@ -1090,6 +1091,7 @@ void calculate_deco_information(struct dive *dive, struct divecomputer *dc, stru
 #if DECO_CALC_DEBUG & 1
 	dump_tissues();
 #endif
+	unlock_planner();
 }
 #endif
 
