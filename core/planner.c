@@ -942,7 +942,8 @@ bool plan(struct diveplan *diveplan, struct dive *dive, int timestep, struct dec
 						pendinggaschange = true;
 					}
 				}
-				gi--;
+				while (stoplevels[stopidx] <= gaschanges[gi].depth && gi > 0)
+					gi--;
 			}
 			--stopidx;
 
