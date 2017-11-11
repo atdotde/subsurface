@@ -44,7 +44,7 @@
 #      /libssh2                <- from git - v1.6 seems to work
 #      /libcurl                <- from git - 7.42.1 seems to work - rename folder!
 #      /subsurface             <- current subsurface git
-#      /libdivecomputer        <- appropriate libdc/Subsurface-branch branch
+#      /subsurface/libdivecomputer   <- libdivecomputer submodule
 #      /libgit2                <- libgit2 0.23.1 or similar
 #      /googlemaps             <- Google Maps plugin for QtLocation from git
 #
@@ -228,7 +228,7 @@ if [[ ! -d libdivecomputer || -f build.libdivecomputer ]] ; then
 	mkdir -p libdivecomputer
 	cd libdivecomputer
 
-	"$BASEDIR"/libdivecomputer/configure --host=i686-w64-mingw32.shared \
+	"$BASEDIR"/subsurface/libdivecomputer/configure --host=i686-w64-mingw32.shared \
 		--enable-shared \
 		--prefix="$BASEDIR"/"$MXEDIR"/usr/i686-w64-mingw32.shared
 	make $JOBS

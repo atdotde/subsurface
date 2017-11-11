@@ -3,7 +3,7 @@
 # this should be run from the src directory, the layout is supposed to
 # look like this:
 #.../src/subsurface
-#       /libdivecomputer
+#       /subsurface/libdivecomputer
 #
 # the script will build these three libraries from source, even if
 # they are installed as part of the host OS since we have seen
@@ -336,24 +336,14 @@ fi
 
 cd $SRC
 
-# build libdivecomputer
+# build libdivecomputer - first make sure the submodule is initialized
 
+cd subsurface
 if [ ! -d libdivecomputer ] ; then
-	if [[ $1 = local ]] ; then
-		git clone $SRC/../libdivecomputer libdivecomputer
-	else
-		git clone -b Subsurface-branch https://github.com/Subsurface-divelog/libdc.git libdivecomputer
-	fi
+	git submodule update --init --recursive
 fi
-cd libdivecomputer
-git pull --rebase
-if ! git checkout Subsurface-branch ; then
-	echo "can't check out the Subsurface-branch branch of libdivecomputer -- giving up"
-	exit 1
-fi
-
-mkdir -p build
-cd build
+mkdir -p libdivecomputer/build
+cd libdivecomputer/build
 
 if [ ! -f ../configure ] ; then
 	# this is not a typo
