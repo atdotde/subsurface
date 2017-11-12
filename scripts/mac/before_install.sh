@@ -29,6 +29,8 @@ else
 	brew install xz hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
 	touch ${TRAVIS_BUILD_DIR}/Homebrew/complete
 	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz
+	echo "Homebrew cache setup"
+	ls -lh ${TRAVIS_BUILD_DIR}/Homebrew
 fi
 
 # prep things so we can build for Mac
@@ -43,5 +45,5 @@ wget -q http://subsurface-divelog.org/downloads/Qt-5.9.1-mac.tar.xz
 tar -xJ -C Qt/5.9.1 -f Qt-5.9.1-mac.tar.xz
 
 sudo mkdir -p /Users/hohndel
-cd /Users/hohndel
-sudo ln -s /Users/travis/build/Subsurface-divelog/subsurface/Qt/5.9.1 Qt5.9.1
+sudo ln -s ${TRAVIS_BUILD_DIR}//Qt/5.9.1 /Users/hohndel/Qt5.9.1
+ls -l /Users/hohndel
