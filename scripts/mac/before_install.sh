@@ -31,6 +31,7 @@ else
 	brew update
 	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
 	touch ${TRAVIS_BUILD_DIR}/Homebrew/updated
+	brew install xz # tar xJf works but there's no xz? Crazy
 	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz
 fi
 
