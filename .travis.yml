@@ -4,7 +4,9 @@ matrix:
     - env: SUBSURFACE_PLATFORM='mac'
       os: osx
       osx_image: xcode6.4
-      language: c++
+      language: c++ ruby
+      rvm:
+        - 2.3.5
 
   exclude:
     - env: SUBSURFACE_PLATFORM='windows'
