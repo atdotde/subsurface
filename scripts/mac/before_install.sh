@@ -8,17 +8,15 @@
 #rvm install 2.3.0
 
 # install a couple more homebrew components
-if [ ! -d ${TRAVIS_BUILD_DIR}/Homebrew ] ; then
+if [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz ] ; then
+	echo "Homebrew is in cache - overwriting /usr/local"
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
+else
 	# trying to get Homebrew taken care of and hopefully get cached
 	brew update
 	brew install hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
 	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
 	tar cJf ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
-else
-	echo "Homebrew is in cache"
-	find /usr/local
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
-	find /usr/local
 fi
 
 # prep things so we can build for Mac
@@ -26,15 +24,11 @@ fi
 
 cd ${TRAVIS_BUILD_DIR}
 
-if [ ! -d Qt ] ; then
-	mkdir -p Qt/5.9.1
+mkdir -p Qt/5.9.1
 
-	echo "Get custom Qt build and unpack it"
-	wget -q http://subsurface-divelog.org/downloads/Qt-5.9.1-mac.tar.xz
-	tar -xJ -C Qt/5.9.1 -f Qt-5.9.1-mac.tar.xz
-else
-	echo "Hoorray - caching worked"
-fi
+echo "Get custom Qt build and unpack it"
+wget -q http://subsurface-divelog.org/downloads/Qt-5.9.1-mac.tar.xz
+tar -xJ -C Qt/5.9.1 -f Qt-5.9.1-mac.tar.xz
 
 sudo mkdir -p /Users/hohndel
 cd /Users/hohndel
