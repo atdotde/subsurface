@@ -444,6 +444,10 @@ fi
 cd googlemaps
 git checkout master
 git pull --rebase
+
+# remove the qt_build_config from .qmake.conf as that fails on Travis
+sed -i '' 's/.*qt_build_config.*//' .qmake.conf
+
 mkdir -p build
 cd build
 $QMAKE "INCLUDEPATH=$INSTALL_ROOT/include" ../googlemaps.pro
