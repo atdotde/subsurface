@@ -24,13 +24,13 @@ elif [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/up
 	echo "now get our dependencies brewed"
 	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
 	brew install hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
-	touch c${TRAVIS_BUILD_DIR}/Homebrew/complete
+	touch ${TRAVIS_BUILD_DIR}/Homebrew/complete
 	tar cJf ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
 else
 	# get Homebrew updated and written to the cache
 	brew update
 	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
-	touch c${TRAVIS_BUILD_DIR}/Homebrew/updated
+	touch ${TRAVIS_BUILD_DIR}/Homebrew/updated
 	tar cJf ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
 fi
 
