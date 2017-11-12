@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# try to get the cache filled
+exit 0
+
 # this gets executed by Travis when building an AppImage for Linux
 # it gets started from inside the subsurface directory
 

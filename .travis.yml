@@ -8,6 +8,7 @@ matrix:
       language: c++ ruby
       cache:
         directories:
+          - ${TRAVIS_BUILD_DIR}/Qt
           - $HOME/Library/Caches/Homebrew
           - $HOME/.rvm
 
