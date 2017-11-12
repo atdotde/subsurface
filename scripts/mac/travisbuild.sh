@@ -11,7 +11,8 @@ export CMAKE_PREFIX_PATH=$QT_ROOT/lib/cmake
 cd ${TRAVIS_BUILD_DIR}/..
 DIR=$(pwd)
 
-bash -e -x ./subsurface/scripts/build.sh -desktop -build-with-webkit # we need to build 'both' and need to build without BT and other variations that we want to exercise
+#bash -e -x ./subsurface/scripts/build.sh -desktop -build-with-webkit # we need to build 'both' and need to build without BT and other variations that we want to exercise
+bash -e -x ./subsurface/scripts/build.sh -desktop 
 
 cd ${TRAVIS_BUILD_DIR}
 

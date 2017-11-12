@@ -4,7 +4,7 @@ rvm get stable --auto-dotfiles
 rvm install 2.3.0
 
 # install a couple more homebrew components
-brew install hidapi libusb libxml2 libxslt libzip openssl pka-config
+brew install hidapi libusb libxml2 libxslt libzip openssl pka-config libgit2
 
 # prep things so we can build for Mac
 # we have a custom built Qt some gives us just what we need, including QtWebKit

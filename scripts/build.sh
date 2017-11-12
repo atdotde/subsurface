@@ -192,6 +192,8 @@ else
 	LIBGIT=$(ldconfig -p | grep libgit2\\.so\\. | awk -F. '{ print $NF }')
 fi
 
+: <<'SKIP'
+
 if [[ $PLATFORM = Darwin || "$LIBGIT" < "24" ]] ; then
 	# when building distributable binaries on a Mac, we cannot rely on anything from Homebrew,
 	# because that always requires the latest OS (how stupid is that - and they consider it a
@@ -333,6 +335,8 @@ if [[ $PLATFORM = Darwin || "$LIBGIT" < "24" ]] ; then
 	fi
 fi
 
+SKIP
+
 cd $SRC
 
 # build libdivecomputer
@@ -432,6 +436,7 @@ fi
 
 # build the googlemaps map plugin
 
+: <<'SKIP'
 cd $SRC
 if [ ! -d googlemaps ] ; then
 	if [[ $1 = local ]] ; then
@@ -458,7 +463,11 @@ sed -i 's/std=c++1z/std=c++11/g ; s/-Wdate-time//' Makefile
 make -j4
 make install
 
+SKIP
+
 # finally, build Subsurface
+
+set -x
 
 cd $SRC/subsurface
 for (( i=0 ; i < ${#BUILDS[@]} ; i++ )) ; do
