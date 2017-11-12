@@ -9,32 +9,31 @@ git pull --tags
 git describe
 
 # for our build we need an updated Homebrew with a few more components
-# installed. We keep this in a Travis cache to reduce build time
-if [ ! -d ${TRAVIS_BUILD_DIR}/Homebrew ] ; then
-	echo "Something is wrong with the cache, this directory should have been created. Giving up."
-	exit 1
-fi
-
-ls -lh ${TRAVIS_BUILD_DIR}/Homebrew
-
-if [ -f ${TRAVIS_BUILD_DIR}/Homebrew/complete ] ; then
-	echo "Homebrew with all our packages is in cache - overwriting /usr/local"
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
+# installed. Since the Travis cache doesn't seem to work, we put it on
+# our own server
+if curl --output /dev/null --silent --head --fail \
+	http://subsurface-divelog.org/downloads/TravisMacBuildCache.tar.xz
+then
+	echo "Download Homebrew with all our packages and overwritw /usr/local"
+	curl --output ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz \
+		http://subsurface-divelog.org/downloads/TravisMacBuildCache.tar.xz
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/ TravisMacBuildCache.tar.xz /usr/local
 else
-	echo "cache appears to be empty - let's first update homebrew"
+	echo "Cannot find TravisMacBuildCache: recreate it by first updating Homebrew"
 	brew update
-	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
-	touch ${TRAVIS_BUILD_DIR}/Homebrew/updated
-	echo "updated Homebrew, now get our dependencies brewed"
+	echo "Updated Homebrew, now get our dependencies brewed"
 	brew install xz hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
-	touch ${TRAVIS_BUILD_DIR}/Homebrew/complete
-	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz
-	echo "Homebrew cache setup"
-	ls -lh ${TRAVIS_BUILD_DIR}/Homebrew
+	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz
+	echo "Sending new cache to transfer.sh - move it into place, please"
+	ls -lh ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz
+	curl --upload-file  ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz https://transfer.sh/TravisMacBuildCache.tar.xz
 fi
 
 # prep things so we can build for Mac
 # we have a custom built Qt some gives us just what we need, including QtWebKit
+#
+# we should just build and install this into /usr/local/ as well and have
+# it all be part of the cache...
 
 cd ${TRAVIS_BUILD_DIR}
 

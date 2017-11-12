@@ -6,10 +6,6 @@ matrix:
       os: osx
       osx_image: xcode6.4
       language: c++ ruby
-      cache:
-        directories:
-          - ${TRAVIS_BUILD_DIR}/Homebrew
-          - $HOME/.rvm
 
   exclude:
     - env: SUBSURFACE_PLATFORM='windows'
