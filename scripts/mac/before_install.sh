@@ -8,30 +8,26 @@ git fetch --unshallow
 git pull --tags
 git describe
 
-#
-# maybe I don't need to do this if I use brew update? The documentation
-# is not all that great
-#
-#rvm get stable --auto-dotfiles
-#rvm install 2.3.0
+# for our build we need an updated Homebrew with a few more components
+# installed. We keep this in a Travis cache to reduce build time
+if [ ! -d ${TRAVIS_BUILD_DIR}/Homebrew ] ; then
+	echo "Something is wrong with the cache, this directory should have been created. Giving up."
+	exit 1
+fi
 
-# install a couple more homebrew components
-if [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/complete ] ; then
+ls -lh ${TRAVIS_BUILD_DIR}/Homebrew
+
+if [ -f ${TRAVIS_BUILD_DIR}/Homebrew/complete ] ; then
 	echo "Homebrew with all our packages is in cache - overwriting /usr/local"
 	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
-elif [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/updated ] ; then
-	echo "updated Homebrew is in cache - overwriting /usr/local"
-	echo "now get our dependencies brewed"
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
-	brew install hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
-	touch ${TRAVIS_BUILD_DIR}/Homebrew/complete
-	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz
 else
-	# get Homebrew updated and written to the cache
+	echo "cache appears to be empty - let's first update homebrew"
 	brew update
 	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
 	touch ${TRAVIS_BUILD_DIR}/Homebrew/updated
-	brew install xz # tar xJf works but there's no xz? Crazy
+	echo "updated Homebrew, now get our dependencies brewed"
+	brew install xz hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
+	touch ${TRAVIS_BUILD_DIR}/Homebrew/complete
 	tar cf - /usr/local | xz -v -z -0 --threads=0 > ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz
 fi
 
