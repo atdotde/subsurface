@@ -8,10 +8,14 @@ export PATH=$QT_ROOT/bin:$PATH # Make sure correct qmake is found on the $PATH
 export CMAKE_PREFIX_PATH=$QT_ROOT/lib/cmake
 
 # the global build script expects to be called from the directory ABOVE subsurface
+set +x
 cd ..
-bash -e ./subsurface/scripts/build.sh -desktop -build-with-webkit # we need to build 'both' and need to build without BT and other variations that we want to exercise
+set -x
+bash -e -x ./subsurface/scripts/build.sh -desktop -build-with-webkit # we need to build 'both' and need to build without BT and other variations that we want to exercise
 
+set +x
 cd ${TRAVIS_BUILD_DIR}
+set -x
 
 DIR=${TRAVIS_BUILD_DIR}/..
 
