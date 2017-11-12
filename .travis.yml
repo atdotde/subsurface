@@ -1,6 +1,11 @@
 
 matrix:
   include:
+    - env: SUBSURFACE_PLATFORM='mac'
+      os: osx
+      osx_image: xcode6.4
+
+  exclude:
     - env: SUBSURFACE_PLATFORM='windows'
       os: linux
       dist: trusty
