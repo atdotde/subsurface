@@ -1,5 +1,13 @@
 #!/bin/bash
 
+set -x
+
+# Travis only pulls shallow repos. But that messes with git describe.
+# Sorry Travis, fetching the whole thing and the tags as well...
+git fetch --unshallow
+git pull --tags
+git describe
+
 #
 # maybe I don't need to do this if I use brew update? The documentation
 # is not all that great
