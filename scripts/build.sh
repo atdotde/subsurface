@@ -430,7 +430,6 @@ else
 	PRINTING="-DNO_PRINTING=ON"
 fi
 
-
 # build the googlemaps map plugin
 
 cd $SRC
@@ -450,6 +449,7 @@ sed -i '' 's/.*qt_build_config.*//' .qmake.conf
 
 mkdir -p build
 cd build
+$QMAKE -query
 $QMAKE "INCLUDEPATH=$INSTALL_ROOT/include" ../googlemaps.pro
 # on Travis the compiler doesn't support c++1z, yet qmake adds that flag;
 # since things compile fine with c++11, let's just hack that away

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -x
+rvm get stable --auto-dotfiles
+rvm install 2.3.0
 
 # install a couple more homebrew components
 brew install hidapi libusb libxml2 libxslt libzip openssl pka-config
@@ -19,4 +20,4 @@ tar -xJ -C Qt/5.9.1 -f Qt-5.9.1-mac.tar.xz
 
 sudo mkdir -p /Users/hohndel
 cd /Users/hohndel
-ln -s /Users/travis/build/Subsurface-divelog/subsurface/Qt/5.9.1 Qt5.9.1
+sudo ln -s /Users/travis/build/Subsurface-divelog/subsurface/Qt/5.9.1 Qt5.9.1

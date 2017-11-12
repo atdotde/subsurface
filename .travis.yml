@@ -1,12 +1,15 @@
 
+
 matrix:
   include:
     - env: SUBSURFACE_PLATFORM='mac'
       os: osx
       osx_image: xcode6.4
       language: c++ ruby
-      rvm:
-        - 2.3.5
+      cache:
+        directories:
+          - $HOME/Library/Caches/Homebrew
+          - $HOME/.rvm
 
   exclude:
     - env: SUBSURFACE_PLATFORM='windows'

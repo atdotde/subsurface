@@ -8,20 +8,18 @@ export PATH=$QT_ROOT/bin:$PATH # Make sure correct qmake is found on the $PATH
 export CMAKE_PREFIX_PATH=$QT_ROOT/lib/cmake
 
 # the global build script expects to be called from the directory ABOVE subsurface
-cd ..
+cd ${TRAVIS_BUILD_DIR}/..
+DIR=$(pwd)
+
 bash -e -x ./subsurface/scripts/build.sh -desktop -build-with-webkit # we need to build 'both' and need to build without BT and other variations that we want to exercise
 
 cd ${TRAVIS_BUILD_DIR}
-
-DIR=${TRAVIS_BUILD_DIR}/..
 
 # same git version magic as in the Makefile
 # for the naming of volume and dmg we want the 3 digits of the full version number
 VERSION=$(cd ${DIR}/subsurface; ./scripts/get-version linux)
 
 # first build and install Subsurface and then clean up the staging area
-# make sure we didn't lose the minimum OS version
-rm -rf ./Subsurface.app
 LIBRARY_PATH=${DIR}/install-root/lib make -j2 install
 
 # now adjust a few references that macdeployqt appears to miss
