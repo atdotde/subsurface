@@ -8,14 +8,21 @@
 #rvm install 2.3.0
 
 # install a couple more homebrew components
-if [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz ] ; then
-	echo "Homebrew is in cache - overwriting /usr/local"
+if [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/complete ] ; then
+	echo "Homebrew with all our packages is in cache - overwriting /usr/local"
 	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
-else
-	# trying to get Homebrew taken care of and hopefully get cached
-	brew update
+elif [ -d ${TRAVIS_BUILD_DIR}/Homebrew ] && [ -f ${TRAVIS_BUILD_DIR}/Homebrew/updated ] ; then
+	echo "updated Homebrew is in cache - overwriting /usr/local"
+	echo "now get our dependencies brewed"
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
 	brew install hidapi libusb libxml2 libxslt libzip openssl pkg-config libgit2
+	touch c${TRAVIS_BUILD_DIR}/Homebrew/complete
+	tar cJf ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
+else
+	# get Homebrew updated and written to the cache
+	brew update
 	mkdir -p ${TRAVIS_BUILD_DIR}/Homebrew
+	touch c${TRAVIS_BUILD_DIR}/Homebrew/updated
 	tar cJf ${TRAVIS_BUILD_DIR}/Homebrew/local.tar.xz /usr/local
 fi
 
