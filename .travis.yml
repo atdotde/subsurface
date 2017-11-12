@@ -4,6 +4,7 @@ matrix:
     - env: SUBSURFACE_PLATFORM='mac'
       os: osx
       osx_image: xcode6.4
+      language: c++
 
   exclude:
     - env: SUBSURFACE_PLATFORM='windows'
