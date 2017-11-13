@@ -17,7 +17,7 @@ then
 	echo "Download Homebrew with all our packages and overwritw /usr/local"
 	curl --output ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz \
 		http://subsurface-divelog.org/downloads/TravisMacBuildCache.tar.xz
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/ TravisMacBuildCache.tar.xz /usr/local
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz /usr/local
 else
 	echo "Cannot find TravisMacBuildCache: recreate it by first updating Homebrew"
 	brew update
