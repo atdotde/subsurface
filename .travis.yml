@@ -49,6 +49,7 @@ matrix:
             - libicu52
 
 before_install:
+    - unset rvm_debug
     - source ${TRAVIS_BUILD_DIR}/scripts/${SUBSURFACE_PLATFORM}/before_install.sh
 
 script:
