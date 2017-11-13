@@ -1,9 +1,6 @@
 #!/bin/bash
 
-# try to get the cache filled
-exit 0
-
-# this gets executed by Travis when building an AppImage for Linux
+# this gets executed by Travis when building an App for Mac
 # it gets started from inside the subsurface directory
 
 export QT_ROOT=${TRAVIS_BUILD_DIR}/Qt/5.9.1

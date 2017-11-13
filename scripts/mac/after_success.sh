@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# try to get the cache filled
-exit 0
-
 if [ ! -z $TRAVIS_BRANCH ] && [ "$TRAVIS_BRANCH" != "master" ] ; then
 	export UPLOADTOOL_SUFFIX=$TRAVIS_BRANCH
 fi
 
-cd ${TRAVIS_BUILD_DIR}
+cd ${TRAVIS_BUILD_DIR}/build
 find . -name Subsurface.app -ls
 zip Subsurface.app
 
