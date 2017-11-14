@@ -21,7 +21,7 @@ then
 	echo "Download Homebrew with all our packages and overwritw /usr/local"
 	curl --output ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz \
 		http://subsurface-divelog.org/downloads/TravisMacBuildCache.tar.xz
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz /usr/local
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz /
 else
 	echo "Cannot find TravisMacBuildCache: recreate it by first updating Homebrew"
 	brew update
@@ -32,6 +32,8 @@ else
 	ls -lh ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz
 	curl --upload-file  ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz https://transfer.sh/TravisMacBuildCache.tar.xz
 fi
+
+find /usr/local -name libgit2.pc
 
 # prep things so we can build for Mac
 # we have a custom built Qt some gives us just what we need, including QtWebKit
