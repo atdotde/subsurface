@@ -5,6 +5,8 @@ set -x
 # try to get rid of the insane debug crap
 unalias -a
 unset rvm_debug
+type cd
+type pushd
 
 # Travis only pulls shallow repos. But that messes with git describe.
 # Sorry Travis, fetching the whole thing and the tags as well...
@@ -21,7 +23,9 @@ then
 	echo "Download Homebrew with all our packages and overwritw /usr/local"
 	curl --output ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz \
 		http://subsurface-divelog.org/downloads/TravisMacBuildCache.tar.xz
-	sudo tar xJfC ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz /
+	sudo tar xJfC ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz /tmp
+	sudo mv /usr/local /usr/local2
+	sudo mv /tmp/usr/local /usr/local
 else
 	echo "Cannot find TravisMacBuildCache: recreate it by first updating Homebrew"
 	brew update
@@ -46,7 +50,7 @@ sudo ln -s /usr/local/include/libusb-1.0 /usr/local/include/libusb-1.0/libusb-1.
 # we should just build and install this into /usr/local/ as well and have
 # it all be part of the cache...
 
-cd ${TRAVIS_BUILD_DIR}
+pushd ${TRAVIS_BUILD_DIR}
 
 mkdir -p Qt/5.9.1
 
