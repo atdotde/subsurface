@@ -2,6 +2,10 @@
 
 set -x
 
+# try to get rid of the insane debug crap
+unalias -a
+unset rvm_debug
+
 # Travis only pulls shallow repos. But that messes with git describe.
 # Sorry Travis, fetching the whole thing and the tags as well...
 git fetch --unshallow
