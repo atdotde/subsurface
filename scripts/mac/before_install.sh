@@ -39,12 +39,13 @@ else
 	curl --upload-file  ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz https://transfer.sh/TravisMacBuildCache.tar.xz
 fi
 
-# libdivecomputer uses the wrong include path for libusb
-# the pkgconfig file for libusb already gives the include path as
-# ../include/libusb-1.0  yet libdivecomputer wants to use
-# include <libusb-1.0/libusb.h>
+# libdivecomputer uses the wrong include path for libusb and hidapi
+# the pkgconfig file for libusb/hidapi already gives the include path as
+# ../include/libusb-1.0 (../include/hidapi) yet libdivecomputer wants to use
+# include <libusb-1.0/libusb.h> and include <hidapi/hidapi.h>
 
 sudo ln -s /usr/local/include/libusb-1.0 /usr/local/include/libusb-1.0/libusb-1.0
+sudo ln -s /usr/local/include/hidapi /usr/local/include/libusb-1.0/hidapi
 
 # prep things so we can build for Mac
 # we have a custom built Qt some gives us just what we need, including QtWebKit
