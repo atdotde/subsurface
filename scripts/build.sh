@@ -132,7 +132,8 @@ INSTALL_ROOT=$SRC/install-root
 export INSTALL_ROOT
 
 # make sure we find our own packages first (e.g., libgit2 only uses pkg_config to find libssh2)
-export PKG_CONFIG_PATH=$INSTALL_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH=$INSTALL_ROOT/lib/pkgconfig:/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+pkg-config --list-all
 
 echo Building in $SRC, installing in $INSTALL_ROOT
 
