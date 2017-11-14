@@ -494,6 +494,7 @@ for (( i=0 ; i < ${#BUILDS[@]} ; i++ )) ; do
 		-DBTSUPPORT=${BTSUPPORT} \
 		-DCMAKE_INSTALL_PREFIX=${INSTALL_ROOT} \
 		-DLIBGIT2_FROM_PKGCONFIG=ON \
+		-DFORCE_LIBSSH=OFF \
 		$PRINTING $EXTRA_OPTS
 
 	if [ $PLATFORM = Darwin ] ; then
