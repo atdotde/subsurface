@@ -39,6 +39,9 @@ else
 	curl --upload-file  ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz https://transfer.sh/TravisMacBuildCache.tar.xz
 fi
 
+# HACK - needs to be part of cache
+brew install libssh2
+
 # libdivecomputer uses the wrong include path for libusb and hidapi
 # the pkgconfig file for libusb/hidapi already gives the include path as
 # ../include/libusb-1.0 (../include/hidapi) yet libdivecomputer wants to use
