@@ -33,7 +33,12 @@ else
 	curl --upload-file  ${TRAVIS_BUILD_DIR}/TravisMacBuildCache.tar.xz https://transfer.sh/TravisMacBuildCache.tar.xz
 fi
 
-find /usr/local -name libgit2.pc
+# libdivecomputer uses the wrong include path for libusb
+# the pkgconfig file for libusb already gives the include path as
+# ../include/libusb-1.0  yet libdivecomputer wants to use
+# include <libusb-1.0/libusb.h>
+
+sudo ln -s /usr/local/include/libusb-1.0 /usr/local/include/libusb-1.0/libusb-1.0
 
 # prep things so we can build for Mac
 # we have a custom built Qt some gives us just what we need, including QtWebKit
