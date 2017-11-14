@@ -4,7 +4,9 @@ set -x
 
 # try to get rid of the insane debug crap
 unalias -a
-unset rvm_debug
+unset -f rvm_debug
+unset -f cd
+unset -f popd
 type cd
 type pushd
 
