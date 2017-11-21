@@ -994,7 +994,7 @@ void calculate_deco_information(struct deco_state *ds, struct dive *dive, struct
 	bool first_iteration = true;
 	int prev_deco_time = 10000000, time_deep_ceiling = 0;
 	if (!in_planner())
-		deco_state->deco_time = 0;
+		ds->deco_time = 0;
 	struct deco_state *cache_data_initial = NULL;
 	lock_planner();
 	/* For VPM-B outside the planner, cache the initial deco state for CVA iterations */
@@ -1003,7 +1003,7 @@ void calculate_deco_information(struct deco_state *ds, struct dive *dive, struct
 	}
 	/* For VPM-B outside the planner, iterate until deco time converges (usually one or two iterations after the initial)
 	 * Set maximum number of iterations to 10 just in case */
-	while ((abs(prev_deco_time - deco_state->deco_time) >= 30) && (count_iteration < 10)) {
+	while ((abs(prev_deco_time - ds->deco_time) >= 30) && (count_iteration < 10)) {
 		int last_ndl_tts_calc_time = 0, first_ceiling = 0, current_ceiling, last_ceiling, final_tts = 0 , time_clear_ceiling = 0;
 		if (decoMode() == VPMB)
 			ds->first_ceiling_pressure.mbar = depth_to_mbar(first_ceiling, dive);
@@ -1114,10 +1114,10 @@ void calculate_deco_information(struct deco_state *ds, struct dive *dive, struct
 		}
 		if (decoMode() == VPMB && !in_planner()) {
 			int this_deco_time;
-			prev_deco_time = deco_state->deco_time;
+			prev_deco_time = ds->deco_time;
 			// Do we need to update deco_time?
 			if (final_tts > 0)
-				deco_state->deco_time = last_ndl_tts_calc_time + final_tts - time_deep_ceiling;
+				ds->deco_time = last_ndl_tts_calc_time + final_tts - time_deep_ceiling;
 			else if (time_clear_ceiling > 0)
 				/* Consistent with planner, deco_time ends after ascending (20s @9m/min from 3m)
 				 * at end of whole minute after clearing ceiling. The deepest ceiling when planning a dive
@@ -1136,7 +1136,7 @@ void calculate_deco_information(struct deco_state *ds, struct dive *dive, struct
 			restore_deco_state(cache_data_initial, ds, true);
 		} else {
 			// With Buhlmann iterating isn't needed.  This makes the while condition false.
-			prev_deco_time = deco_state->deco_time = 0;
+			prev_deco_time = ds->deco_time = 0;
 		}
 	}
 	free(cache_data_initial);
