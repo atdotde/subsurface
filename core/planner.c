@@ -732,6 +732,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		transitiontime = depth / 75; /* this still needs to be made configurable */
 		plan_add_segment(diveplan, transitiontime, 0, current_cylinder, po2, false);
 		create_dive_from_plan(diveplan, dive, is_planner);
+		unlock_planner();
 		return false;
 	}
 
