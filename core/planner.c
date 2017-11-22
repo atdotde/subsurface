@@ -819,6 +819,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 
 		free(stoplevels);
 		free(gaschanges);
+		unlock_planner();
 		return false;
 	}
 
