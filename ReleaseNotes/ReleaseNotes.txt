@@ -20,6 +20,7 @@ Some of the changes since _Subsurface_ 4.7.4
   of the previous templates would be created (#847)
 - Fix issues with filters not updating after changes to the dive list
   (#551, #675)
+- Compute plan variations in the background to improve UI responsivity
 
 
 Some of the changes since _Subsurface_ 4.7.2
