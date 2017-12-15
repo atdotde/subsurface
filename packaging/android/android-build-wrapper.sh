@@ -15,6 +15,15 @@
 
 exec 1> >(tee ./build.log) 2>&1
 
+# for debugging
+set -x
+
+# make sure there is at least some display so things don't fail
+if [ -z $DISPLAY ] ; then
+	export DISPLAY=:99.0
+	sh -e /etc/init.d/xvfb start
+fi
+
 USE_X=$(case $- in *x*) echo "-x" ;; esac)
 
 # these are the current versions for Qt, Android SDK & NDK:
