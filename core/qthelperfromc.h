@@ -27,5 +27,7 @@ void cache_insert(int tissue, int timestep, enum inertgas gas, double value);
 void print_qt_versions();
 void lock_planner();
 void unlock_planner();
+char *float2string(float f, int precision);
+
 
 #endif // QTHELPERFROMC_H

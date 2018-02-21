@@ -1388,7 +1388,7 @@ static void plot_string(struct plot_info *pi, struct plot_data *entry, struct me
 	}
 	if (entry->temperature) {
 		tempvalue = get_temp_units(entry->temperature, &temp_unit);
-		put_format(b, translate("gettextFromC", "T: %.1f%s\n"), tempvalue, temp_unit);
+		put_format(b, translate("gettextFromC", "T: %s%s\n"), float2string(tempvalue, 1), temp_unit);
 	}
 	speedvalue = get_vertical_speed_units(abs(entry->speed), NULL, &vertical_speed_unit);
 	/* Ascending speeds are positive, descending are negative */

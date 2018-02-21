@@ -1745,3 +1745,8 @@ extern "C" void unlock_planner()
 {
 	planLock.unlock();
 }
+
+extern "C" char *float2string(float f, int precision)
+{
+	return strdup(QString("%1").arg(QLocale().toString(f, 'f', precision)).toUtf8().data());
+}
