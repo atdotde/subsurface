@@ -140,6 +140,7 @@ struct event {
 		 * case, the get_cylinder_index() function will give the best
 		 * match with the cylinders in the dive based on gasmix.
 		 */
+		int divemode;
 		struct {
 			int index;
 			struct gasmix mix;
@@ -974,6 +975,8 @@ static inline struct gasmix *get_gasmix(struct dive *dive, struct divecomputer *
  * used to fill the combobox in the add/edit cylinder
  * dialog
  */
+
+struct event *get_next_divemodechange(struct event **evd);
 
 struct tank_info_t {
 	const char *name;

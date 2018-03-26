@@ -225,6 +225,24 @@ void update_event_name(struct dive *d, struct event *event, const char *name)
 	invalidate_dive_cache(d);
 }
 
+struct event *get_next_divemodechange(struct event **evd)
+{
+	struct event *ev = *evd;
+	while (ev) { // Step through the events.
+		for (int i=0; i<3; i++) { // For each event name search for one of the above strings
+			if (!strcmp(ev->name,divemode_text[i])) { // if the event name is one of the divemode names
+				ev->type = 50 + i;
+				ev->divemode = i; // set the event type to the dive mode
+				*evd = ev->next;
+				return (ev);
+			}
+		}
+		ev = ev->next;
+	}
+	*evd = NULL;
+	return (NULL);
+}
+
 void add_extra_data(struct divecomputer *dc, const char *key, const char *value)
 {
 	struct extra_data **ed = &dc->extra_data;
@@ -2038,7 +2056,7 @@ int gasmix_distance(const struct gasmix *a, const struct gasmix *b)
 }
 
 /* fill_pressures(): Compute partial gas pressures in bar from gasmix and ambient pressures, possibly for OC or CCR, to be
- * extended to PSCT. This function does the calculations of gas pressures applicable to a single point on the dive profile.
+ * extended to PSCR. This function does the calculations of gas pressures applicable to a single point on the dive profile.
  * The structure "pressures" is used to return calculated gas pressures to the calling software.
  * Call parameters:	po2 = po2 value applicable to the record in calling function
  *			amb_pressure = ambient pressure applicable to the record in calling function
