@@ -336,7 +336,7 @@ bool DivePlannerPointsModel::setData(const QModelIndex &index, const QVariant &v
 			if (value.toInt() < FREEDIVE) // FIXME: I want to be a combo box and translate strings to enum values
 				p.divemode = (enum dive_comp_type) value.toInt();
 			if (index.row() == 0)
-				current_dc->divemode = (enum dive_comp_type) value.toInt();
+				displayed_dive.dc.divemode = (enum dive_comp_type) value.toInt();
 			break;
 		}
 		editStop(index.row(), p);
