@@ -11,6 +11,7 @@
 
 #if defined(Q_OS_WIN)
 	#include <QThread>
+	#include <QMutex>
 	#include <winsock2.h>
 	#include <ws2bth.h>
 
@@ -44,7 +45,15 @@ public:
 	virtual void stop();
 
 private:
-	bool running;
+	WSAQUERYSET queryset;
+	HANDLE hLookup;
+	BYTE buffer[4096];
+	void resetState();
+	int initWork();
+	int doWork();
+
+	mutable QMutex lock;
+	bool inLoop;		// We are in the syscall loop - don't wait for thread to exit
 	bool stopped;
 	QString lastErrorToString;
 	QBluetoothDeviceDiscoveryAgent::Error lastError;
