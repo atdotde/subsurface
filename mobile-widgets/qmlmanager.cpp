@@ -1776,3 +1776,27 @@ int QMLManager::getDetectedProductIndex(const QString &currentVendorText)
 {
 	return m_device_data->getDetectedProductIndex(currentVendorText);
 }
+
+void QMLManager::showDownloadPage(QString deviceString)
+{
+	QString name("unknown");
+
+	// try to extract the device name from the string that
+	// we get from the Intent
+	QStringList deviceStringTokens = deviceString.split(",");
+	foreach (QString deviceStringToken, deviceStringTokens) {
+		if (deviceStringToken.contains("mName")) {
+			appendTextToLog(QString("found token with mName: ") + deviceStringToken);
+			QStringList tokenParts = deviceStringToken.split("=");
+			if (tokenParts.count() > 1) {
+				QString maybeName = tokenParts.at(1);
+				if (!maybeName.isEmpty())
+					name = maybeName;
+			}
+		}
+	}
+	// set the device name that we found (or unknown) and inform
+	// the QML UI that it should show the download page
+	m_pluggedInDeviceName = strdup(qPrintable(name));
+	emit pluggedInDeviceNameChanged();
+}
