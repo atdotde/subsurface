@@ -65,5 +65,15 @@ Kirigami.ScrollablePage {
 				rootItem.returnTopPage()
 				}
 		}
+		SsrfButton {
+			id: reportBug
+			Layout.alignment: Qt.AlignHCenter
+			text: qsTr("Report a bug")
+			onClicked: {
+				rootItem.returnTopPage()
+				stackView.push(reportBugPage)
+			}
+		}
 	}
+
 }

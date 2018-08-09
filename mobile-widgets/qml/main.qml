@@ -355,6 +355,17 @@ if you have network connectivity and want to sync your data to cloud storage."),
 			},
 			Kirigami.Action {
 				icon {
+					name: ":/icons/document-edit.svg"
+				}
+				text: qsTr("Report a bug")
+				onTriggered: {
+//					globalDrawer.close()
+					stackView.push(reportBugWindow)
+//					detailsWindow.endEditMode()
+				}
+			},
+			Kirigami.Action {
+				icon {
 					name: ":/icons/ic_adb.svg"
 				}
 				text: qsTr("Developer")
@@ -575,6 +586,11 @@ if you have network connectivity and want to sync your data to cloud storage."),
 		visible: false
 	}
 
+	ReportBug {
+		id: reportBugWindow
+		visible: false
+	}
+
 	About {
 		id: aboutWindow
 		visible: false
@@ -588,7 +604,7 @@ if you have network connectivity and want to sync your data to cloud storage."),
 
 	Log {
 		id: logWindow
-		visible: false
+//		visible: false
 	}
 
 	GpsList {

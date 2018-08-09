@@ -2,6 +2,7 @@
 #include "qmlmanager.h"
 #include "qmlprefs.h"
 #include <QUrl>
+#include <QUrlQuery>
 #include <QSettings>
 #include <QDebug>
 #include <QNetworkAccessManager>
@@ -329,13 +330,8 @@ void QMLManager::mergeLocalRepo()
 	process_imported_dives(false);
 }
 
-void QMLManager::copyAppLogToClipboard()
+QString QMLManager::logMessage()
 {
-	/*
-	 * The user clicked the button, so copy the log file
-	 * to the clipboard for easy access
-	 */
-
 	// Add heading and append subsurface.log
 	QString copyString = "---------- subsurface.log ----------\n";
 	copyString += MessageHandlerModel::self()->logAsString();
@@ -351,6 +347,16 @@ void QMLManager::copyAppLogToClipboard()
 	LOG_STP_CLIPBOARD(&copyString);
 
 	copyString += "---------- finish ----------\n";
+	return copyString;
+}
+
+void QMLManager::copyAppLogToClipboard()
+{
+	/*
+	 * The user clicked the button, so copy the log file
+	 * to the clipboard for easy access
+	 */
+	QString copyString = logMessage();
 
 #if defined(Q_OS_ANDROID)
 	// on Android, the clipboard is effectively limited in size, but there is no
@@ -367,6 +373,35 @@ void QMLManager::copyAppLogToClipboard()
 
 	// and copy to clipboard
 	QApplication::clipboard()->setText(copyString, QClipboard::Clipboard);
+}
+
+void QMLManager::onResult(QNetworkReply *reply)
+{
+	qDebug() << reply->error() << reply->readAll();
+}
+
+void QMLManager::sendBugReport(QString description, QString email, bool includeLog)
+{
+	QString copyString = logMessage();
+	qDebug() << "Sending bug report" << description << includeLog << copyString;
+
+	if (includeLog)
+		description += "\n\n Subsurface-mobil log:\n" + copyString;
+
+	QNetworkAccessManager networkManager;
+
+	// Use better URL...
+//	QUrl url("https://thetheoreticaldiver.org/rch-cgi-bin/bugreporter.pl");
+	QUrl url("http://localhost/rch-cgi-bin/bugreporter.pl");
+	QUrlQuery params;
+	params.addQueryItem("email", email);
+	params.addQueryItem("report", description);
+	qDebug() << url << params.query();
+	QNetworkRequest request;
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+	connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(onResult(QNetworkReply*)));
+
+	QNetworkReply *reply = networkManager.post(request, params.query().toUtf8());
 }
 
 void QMLManager::finishSetup()

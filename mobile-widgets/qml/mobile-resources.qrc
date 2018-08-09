@@ -20,6 +20,7 @@
 		<file>SsrfButton.qml</file>
 		<file>SsrfCheckBox.qml</file>
 		<file>SsrfSwitch.qml</file>
+        	<file>ReportBug.qml</file>
 
 		<!-- ********** pictures ********** -->
 		<file>icons/dive.jpg</file>

@@ -172,6 +172,7 @@ public slots:
 	void cancelDownloadDC();
 	void clearGpsData();
 	void copyAppLogToClipboard();
+	void sendBugReport(QString description, QString email, bool includeLog);
 	void finishSetup();
 	void openLocalThenRemote(QString url);
 	void mergeLocalRepo();
@@ -192,6 +193,9 @@ public slots:
 	void hasLocationSourceChanged();
 	void btRescan();
 	void showDownloadPage(QString deviceString);
+
+private slots:
+	void onResult(QNetworkReply *reply);
 
 private:
 	BuddyCompletionModel buddyModel;
@@ -226,6 +230,7 @@ private:
 	bool m_btEnabled;
 	void updateAllGlobalLists();
 	QString m_pluggedInDeviceName;
+	QString logMessage();
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
 	QString appLogFileName;
