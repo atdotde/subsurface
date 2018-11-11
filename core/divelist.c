@@ -157,30 +157,58 @@ static int active_o2(const struct dive *dive, const struct divecomputer *dc, dur
 	return get_o2(gas);
 }
 
-/* calculate OTU for a dive - this only takes the first divecomputer into account */
+/* Calculate OTU for a dive - this only takes the first divecomputer into account.
+   Implement the protocol in Erik Baker's document "Oxygen Toxicity Calculations". Different
+   formulae are used, depending on whether a dive segment is constant depth or ascending/descending
+   and depending on the PO2 at the start and at the end of the dive segment, assuming a constant
+   rate of descent or ascent. */
 static int calculate_otu(const struct dive *dive)
 {
 	int i;
 	double otu = 0.0;
 	const struct divecomputer *dc = &dive->dc;
-
 	for (i = 1; i < dc->samples; i++) {
 		int t;
-		int po2;
+		int po2i, po2f, trueo2 = 0;
 		struct sample *sample = dc->sample + i;
 		struct sample *psample = sample - 1;
-		t = sample->time.seconds - psample->time.seconds;
-		if (sample->setpoint.mbar) {
-			po2 = sample->setpoint.mbar;
-		} else {
-			int o2 = active_o2(dive, dc, psample->time);
-			po2 = lrint(o2 * depth_to_atm(sample->depth.mm, dive));
+		t = (sample->time.seconds - psample->time.seconds);
+		if (sample->o2sensor[0].mbar) {			// if dive computer has o2 sensor(s) (CCR & PSCR)
+			po2i = psample->o2sensor[0].mbar;
+			po2f = sample->o2sensor[0].mbar;	// then use data from the first o2 sensor
+			trueo2 = 1;
 		}
-		if (po2 >= 500)
-			otu += pow((po2 - 500) / 1000.0, 0.83) * t / 30.0;
+		if ((dc->divemode == CCR) && (!trueo2)) {
+			po2i = psample->setpoint.mbar;		// if CCR has no o2 sensors then use setpoint
+			po2f = sample->setpoint.mbar;
+			trueo2 = 1;
+			}
+		if (!trueo2) {
+			int o2 = active_o2(dive, dc, psample->time);			// For OC and rebreather without o2 sensor:
+			po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));	// (initial) po2 at start of segment
+			po2f = lrint(o2 * depth_to_atm(sample->depth.mm, dive));	// (final) po2 at end of segment
+		}
+		if ((po2i > 500) || (po2f > 500)) {			// If PO2 in segment is above 500 mbar then calculate otu
+			if (po2i <= 500) {				// For descent segment with po2i <= 500 mbar ..
+				t = t * (po2f - 500) / (po2f - po2i);	// .. only consider part with PO2 > 500 mbar
+				po2i = 501;				// Mostly important for the dive planner with long segments
+			} else {
+				if (po2f <= 500){ 
+					t = t * (po2i - 500) / (po2i - po2f);	// For ascent segment with po2f <= 500 mbar ..
+					po2f = 501;				// .. only consider part with PO2 > 500 mbar
+				}
+			}
+			if (po2i == po2f) {			// 1) For constant depth segment: use po2 as measure of depth to avoid divide by zero
+				otu += t * pow(500.0 / ((double)po2i - 500.0), -0.833333333) / 60.0; // otu if time is minutes. (Baker's Eq. 1)
+			} else {					// 2) For dive segments that ascend or descend: (Baker's Eq. 2)
+				otu += 50.0 * t * (pow(((double)po2f - 500.0) / 500.0, 1.833333333) - pow(((double)po2i - 500.0) / 500.0, 1.833333333))
+					 / (11.0 * (double)(po2f - po2i));	// (if po2 is bar and time is minutes, then (3/11) * (1000/60) = 50/11)
+			}
+		}
 	}
 	return lrint(otu);
 }
+
 /* calculate CNS for a dive - this only takes the first divecomputer into account */
 int const cns_table[][3] = {
 	/* po2, Maximum Single Exposure, Maximum 24 hour Exposure */
