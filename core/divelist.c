@@ -165,11 +165,12 @@ static int active_o2(const struct dive *dive, const struct divecomputer *dc, dur
 static int calculate_otu(const struct dive *dive)
 {
 	int i;
-	double otu = 0.0;
+	double otu = 0.0, delta, delta_old;
 	const struct divecomputer *dc = &dive->dc;
 	for (i = 1; i < dc->samples; i++) {
 		int t;
 		int po2i, po2f, trueo2 = 0;
+		double pm;
 		struct sample *sample = dc->sample + i;
 		struct sample *psample = sample - 1;
 		t = (sample->time.seconds - psample->time.seconds);
@@ -199,11 +200,15 @@ static int calculate_otu(const struct dive *dive)
 				}
 			}
 			if (po2i == po2f) {			// 1) For constant depth segment: use po2 as measure of depth to avoid divide by zero
-				otu += t * pow(500.0 / ((double)po2i - 500.0), -0.833333333) / 60.0; // otu if time is minutes. (Baker's Eq. 1)
+				delta_old = t * pow(500.0 / ((double)po2i - 500.0), -0.833333333) / 60.0; // otu if time is minutes. (Baker's Eq. 1)
 			} else {					// 2) For dive segments that ascend or descend: (Baker's Eq. 2)
-				otu += 50.0 * t * (pow(((double)po2f - 500.0) / 500.0, 1.833333333) - pow(((double)po2i - 500.0) / 500.0, 1.833333333))
+				delta_old = 50.0 * t * (pow(((double)po2f - 500.0) / 500.0, 1.833333333) - pow(((double)po2i - 500.0) / 500.0, 1.833333333))
 					 / (11.0 * (double)(po2f - po2i));	// (if po2 is bar and time is minutes, then (3/11) * (1000/60) = 50/11)
 			}
+			pm = (po2f + po2i)/1000.0 - 1.0;
+			delta = t / 60.0 * pow(pm, 5.0/6.0) * (1.0 - 5.0 * (po2f - po2i) * (po2f - po2i) / 216000000.0 / (pm * pm));
+			otu += delta;
+			printf("OTU: %f delta: %f delta_old: %f po2i: %d po2f %d\n", otu, delta, delta_old, po2i, po2f);
 		}
 	}
 	return lrint(otu);
