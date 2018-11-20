@@ -13,6 +13,7 @@
 #include "core/settings/qPrefTechnicalDetails.h"
 #include "libdivecomputer/parser.h"
 #include "profile-widget/profilewidget2.h"
+#include <qdebug.h>
 
 AbstractProfilePolygonItem::AbstractProfilePolygonItem() : QObject(), QGraphicsPolygonItem(), hAxis(NULL), vAxis(NULL), dataModel(NULL), hDataColumn(-1), vDataColumn(-1)
 {
@@ -524,7 +525,7 @@ DiveTemperatureItem::DiveTemperatureItem()
 
 void DiveTemperatureItem::modelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-	int last = -300, last_printed_temp = 0, sec = 0, last_valid_temp = 0;
+	int last = -300, last_printed_temp = 0, depth = 0, last_valid_temp = 0;
 	// We don't have enougth data to calculate things, quit.
 	if (!shouldCalculateStuff(topLeft, bottomRight))
 		return;
@@ -534,38 +535,40 @@ void DiveTemperatureItem::modelDataChanged(const QModelIndex &topLeft, const QMo
 	// Ignore empty values. things do not look good with '0' as temperature in kelvin...
 	QPolygonF poly;
 	for (int i = 0, modelDataCount = dataModel->rowCount(); i < modelDataCount; i++) {
-		int mkelvin = dataModel->index(i, vDataColumn).data().toInt();
+		int mkelvin = (dataModel->index(i, hDataColumn).data().toInt()/100 -2730);
 		if (!mkelvin)
 			continue;
 		last_valid_temp = mkelvin;
-		sec = dataModel->index(i, hDataColumn).data().toInt();
-		QPointF point(hAxis->posAtValue(sec), vAxis->posAtValue(mkelvin));
-		poly.append(point);
+		depth = dataModel->index(i, vDataColumn).data().toInt();
+		qDebug() << "depth" << depth/1000.0 << "temp" << mkelvin;
+		QPointF point(hAxis->posAtValue(mkelvin * 6), vAxis->posAtValue(depth));
+		if (mkelvin >= -100)
+			poly.append(point);
 
-		/* don't print a temperature
-		 * if it's been less than 5min and less than a 2K change OR
-		 * if it's been less than 2min OR if the change from the
-		 * last print is less than .4K (and therefore less than 1F) */
-		if (((sec < last + 300) && (abs(mkelvin - last_printed_temp) < 2000)) ||
-		    (sec < last + 120) ||
-		    (abs(mkelvin - last_printed_temp) < 400))
-			continue;
-		last = sec;
-		if (mkelvin > 200000)
-			createTextItem(sec, mkelvin);
-		last_printed_temp = mkelvin;
+//		/* don't print a temperature
+//		 * if it's been less than 5min and less than a 2K change OR
+//		 * if it's been less than 2min OR if the change from the
+//		 * last print is less than .4K (and therefore less than 1F) */
+//		if (((sec < last + 300) && (abs(mkelvin - last_printed_temp) < 2000)) ||
+//		    (sec < last + 120) ||
+//		    (abs(mkelvin - last_printed_temp) < 400))
+//			continue;
+//		last = sec;
+//		if (mkelvin > 200000)
+//			createTextItem(sec, mkelvin);
+//		last_printed_temp = mkelvin;
 	}
 	setPolygon(poly);
 
-	/* it would be nice to print the end temperature, if it's
-	* different or if the last temperature print has been more
-	* than a quarter of the dive back */
-	if (last_valid_temp > 200000 &&
-	    ((abs(last_valid_temp - last_printed_temp) > 500) || ((double)last / (double)sec < 0.75))) {
-		createTextItem(sec, last_valid_temp);
-	}
-	if (texts.count())
-		texts.last()->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+//	/* it would be nice to print the end temperature, if it's
+//	* different or if the last temperature print has been more
+//	* than a quarter of the dive back */
+//	if (last_valid_temp > 200000 &&
+//	    ((abs(last_valid_temp - last_printed_temp) > 500) || ((double)last / (double)sec < 0.75))) {
+//		createTextItem(sec, last_valid_temp);
+//	}
+//	if (texts.count())
+//		texts.last()->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
 }
 
 void DiveTemperatureItem::createTextItem(int sec, int mkelvin)

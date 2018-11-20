@@ -326,7 +326,7 @@ void ProfileWidget2::setupItemOnScene()
 #endif
 	setupItem(reportedCeiling, profileYAxis, DivePlotDataModel::CEILING, DivePlotDataModel::TIME, 1);
 	setupItem(gasPressureItem, cylinderPressureAxis, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
-	setupItem(temperatureItem, temperatureAxis, DivePlotDataModel::TEMPERATURE, DivePlotDataModel::TIME, 1);
+	setupItem(temperatureItem, profileYAxis, DivePlotDataModel::DEPTH, DivePlotDataModel::TEMPERATURE, 1);
 	setupItem(diveProfileItem, profileYAxis, DivePlotDataModel::DEPTH, DivePlotDataModel::TIME, 0);
 	setupItem(meanDepthItem, profileYAxis, DivePlotDataModel::INSTANT_MEANDEPTH, DivePlotDataModel::TIME, 1);
 
