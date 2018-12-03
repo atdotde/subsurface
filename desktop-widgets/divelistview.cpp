@@ -25,6 +25,7 @@
 #include "qt-models/divepicturemodel.h"
 #include "core/metrics.h"
 #include "core/subsurface-qt/DiveListNotifier.h"
+#include "core/dive.h"
 
 DiveListView::DiveListView(QWidget *parent) : QTreeView(parent), mouseClickSelection(false),
 	currentLayout(DiveTripModel::TREE), dontEmitDiveChangedSignal(false), selectionSaved(false),
@@ -748,8 +749,10 @@ void DiveListView::removeFromTrip()
 	struct dive *d;
 	QVector<dive *> divesToRemove;
 	for_each_dive (i, d) {
-		if (d->selected && d->divetrip)
+		if (d->selected && d->divetrip) {
 			divesToRemove.append(d);
+			invalidate_dive_cache(d);
+		}
 	}
 	Command::removeDivesFromTrip(divesToRemove);
 }
