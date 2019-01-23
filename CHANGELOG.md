@@ -1,3 +1,4 @@
+- Show surface gradient factor in infobox
 - Planner: Add UI element for bailout planning for rebreather dives
 - Allow to filter for logged/planned dives
 - Core, Windows: fix a bug related to non-ASCII characters in user names
