@@ -136,9 +136,14 @@ void FilterWidget2::clearFilter()
 	ui.toDate->setDate(filterData.toDate.date());
 	ui.toTime->setTime(filterData.toTime);
 	ui.tagsNegate->setChecked(filterData.tagsNegate);
+	ui.tagsNegate->setText(filterData.tagsNegate ? tr("None of") : tr("All of"));
 	ui.peopleNegate->setChecked(filterData.peopleNegate);
+	ui.peopleNegate->setText(filterData.peopleNegate ? tr("None of") : tr("All of"));
 	ui.locationNegate->setChecked(filterData.locationNegate);
+	ui.locationNegate->setText(filterData.locationNegate ? tr("Doesn't match") : tr("Matches"));
 	ui.equipmentNegate->setChecked(filterData.equipmentNegate);
+	ui.equipmentNegate->setText(filterData.equipmentNegate ? tr("Doesn't match") : tr("Matches"));
+
 	ignoreSignal = false;
 
 	filterDataChanged(filterData);
@@ -181,9 +186,13 @@ void FilterWidget2::updateFilter()
 	filterData.location = ui.location->text().split(",", QString::SkipEmptyParts);
 	filterData.equipment = ui.equipment->text().split(",", QString::SkipEmptyParts);
 	filterData.tagsNegate = ui.tagsNegate->isChecked();
+	ui.tagsNegate->setText(filterData.tagsNegate ? tr("None of") : tr("All of"));
 	filterData.peopleNegate = ui.peopleNegate->isChecked();
+	ui.peopleNegate->setText(filterData.peopleNegate ? tr("None of") : tr("All of"));
 	filterData.locationNegate = ui.locationNegate->isChecked();
+	ui.locationNegate->setText(filterData.locationNegate ? tr("Doesn't match") : tr("Matches"));
 	filterData.equipmentNegate = ui.equipmentNegate->isChecked();
+	ui.equipmentNegate->setText(filterData.equipmentNegate ? tr("Doesn't match") : tr("Matches"));
 	filterData.logged = ui.logged->isChecked();
 	filterData.planned = ui.planned->isChecked();
 
