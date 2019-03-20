@@ -1093,6 +1093,7 @@ void calculate_deco_information(struct deco_state *ds, const struct deco_state *
 				}
 			}
 			entry->surface_gf = 0.0;
+			printf("time: %d depth: %d\n", entry->sec, entry->depth);
 			for (j = 0; j < 16; j++) {
 				double m_value = ds->buehlmann_inertgas_a[j] + entry->ambpressure / ds->buehlmann_inertgas_b[j];
 				double surface_m_value = ds->buehlmann_inertgas_a[j] + surface_pressure / ds->buehlmann_inertgas_b[j];

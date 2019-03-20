@@ -193,6 +193,8 @@ void add_plan_to_notes(struct diveplan *diveplan, struct dive *dive, bool show_d
 		    !rebreatherchange_before &&
 		    !rebreatherchange_after)
 			continue;
+		if (lastdepth == 0 && dp->depth.mm == 0 && !dp->next)
+			continue;
 		if ((dp->time - lasttime < 10 && lastdepth == dp->depth.mm) && !(gaschange_after && dp->next && dp->depth.mm != dp->next->depth.mm))
 			continue;
 

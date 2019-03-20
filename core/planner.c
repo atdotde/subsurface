@@ -289,6 +289,7 @@ static void create_dive_from_plan(struct diveplan *diveplan, struct dive *dive, 
 		int po2 = dp->setpoint;
 		int time = dp->time;
 		depth_t depth = dp->depth;
+		printf("preparing sample depth %d time %d\n", dp->depth.mm, dp->time);
 
 		if (time == 0) {
 			/* special entries that just inform the algorithm about
@@ -401,6 +402,7 @@ void add_to_end_of_diveplan(struct diveplan *diveplan, struct divedatapoint *dp)
 struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, int depth, int cylinderid, int po2, bool entered, enum divemode_t divemode)
 {
 	struct divedatapoint *dp = create_dp(duration, depth, cylinderid, divemode == CCR ? po2 : 0);
+	printf("add segement of %d sec.\n", duration);
 	dp->entered = entered;
 	dp->divemode = divemode;
 	add_to_end_of_diveplan(diveplan, dp);
@@ -1080,6 +1082,18 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		diveplan->eff_gflow = lrint(100.0 * (regressiona() * first_stop_depth + regressionb()));
 	}
 
+	for (int i = 0; i < MAX_CYLINDERS; i++)
+		if (cylinder_nodata(&dive->cylinder[i])) {
+			// Switch to an empty air cylinder for breathing air at the surface
+			current_cylinder = i;
+			break;
+		}
+	add_segment(ds, dive->surface_pressure.mbar, dive->cylinder[current_cylinder].gasmix, 300, 0, OC, prefs.decosac);
+	plan_add_segment(diveplan, 300, 1000, current_cylinder, 0, false, OC);
+	add_segment(ds, dive->surface_pressure.mbar, dive->cylinder[current_cylinder].gasmix, 300, 0, OC, prefs.decosac);
+	plan_add_segment(diveplan, 300, 500, current_cylinder, 0, false, OC);
+	add_segment(ds, dive->surface_pressure.mbar, dive->cylinder[current_cylinder].gasmix, 300, 0, OC, prefs.decosac);
+	plan_add_segment(diveplan, 300, 1000, current_cylinder, 0, false, OC);
 	create_dive_from_plan(diveplan, dive, is_planner);
 	add_plan_to_notes(diveplan, dive, show_disclaimer, error);
 	fixup_dc_duration(&dive->dc);
