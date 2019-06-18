@@ -525,6 +525,36 @@ void dump_tissues(struct deco_state *ds)
 }
 #endif
 
+void dump_one_tissue_state(struct deco_state *ds, int tissue)
+{
+	printf("Tissue %d\n", tissue);
+	printf("N2s:%6.3e\t", ds->tissue_n2_sat[tissue]);
+	printf("HEs:%6.3e\t", ds->tissue_he_sat[tissue]);
+	printf("IGs:%6.3e\t", ds->tissue_inertgas_saturation[tissue]);
+	printf("TbT:%6.3e\t", ds->tolerated_by_tissue[tissue]);
+	printf("a:%6.3e\t", ds->buehlmann_inertgas_a[tissue]);
+	printf("b:%6.3e\t", ds->buehlmann_inertgas_b[tissue]);
+	printf("COt:%6.3e\t", ds->crushing_onset_tension[tissue]);
+	printf("N2r:%6.3e\t", ds->n2_regen_radius[tissue]);
+	printf("Her:%6.3e\t", ds->he_regen_radius[tissue]);
+	printf("N2b:%6.3e\t", ds->bottom_n2_gradient[tissue]);
+	printf("HEb:%6.3e\t", ds->bottom_he_gradient[tissue]);
+	printf("N2i:%6.3e\t", ds->initial_n2_gradient[tissue]);
+	printf("Hei:%6.3e\n", ds->initial_he_gradient[tissue]);
+}
+
+void dump_ds(struct deco_state *ds)
+{
+	dump_one_tissue_state(ds, 2);
+	printf("map:%6.3e\t", ds->max_ambient_pressure);
+	printf("fcp:%d\t", ds->first_ceiling_pressure.mbar);
+	printf("mcp:%d\t", ds->max_bottom_ceiling_pressure.mbar);
+	printf("GT:%d\t", ds->ci_pointing_to_guiding_tissue);
+	printf("GFl:%6.3e\t", ds->gf_low_pressure_this_dive);
+	printf("Dt:%d\t", ds->deco_time);
+	printf("ICD:%d\n\n", ds->icd_warning ? 1 : 0);
+}
+
 void clear_vpmb_state(struct deco_state *ds)
 {
 	int ci;

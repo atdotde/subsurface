@@ -12,6 +12,8 @@ extern int deco_allowed_depth(double tissues_tolerance, double surface_pressure,
 
 double get_gf(struct deco_state *ds, double ambpressure_bar, const struct dive *dive);
 
+void dump_ds(struct deco_state *ds);
+
 #ifdef __cplusplus
 }
 #endif

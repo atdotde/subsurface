@@ -1015,8 +1015,10 @@ void calculate_deco_information(struct deco_state *ds, const struct deco_state *
 	}
 	/* For VPM-B outside the planner, iterate until deco time converges (usually one or two iterations after the initial)
 	 * Set maximum number of iterations to 10 just in case */
-
+	printf("Starting profile\n");
+	dump_ds(ds);
 	while ((abs(prev_deco_time - ds->deco_time) >= 30) && (count_iteration < 10)) {
+		printf("deco_time: %d\n", ds->deco_time);
 		int last_ndl_tts_calc_time = 0, first_ceiling = 0, current_ceiling, last_ceiling = 0, final_tts = 0 , time_clear_ceiling = 0;
 		if (decoMode() == VPMB)
 			ds->first_ceiling_pressure.mbar = depth_to_mbar(first_ceiling, dive);
@@ -1508,7 +1510,7 @@ static void plot_string(struct plot_info *pi, struct plot_data *entry, struct me
 			put_format(b, translate("gettextFromC", "Surface GF %.0f%%\n"), entry->surface_gf);
 		if (entry->ceiling) {
 			depthvalue = get_depth_units(entry->ceiling, NULL, &depth_unit);
-			put_format_loc(b, translate("gettextFromC", "Calculated ceiling %.0f%s\n"), depthvalue, depth_unit);
+			put_format_loc(b, translate("gettextFromC", "Calculated ceiling %.2f%s\n"), depthvalue, depth_unit);
 			if (prefs.calcalltissues) {
 				int k;
 				for (k = 0; k < 16; k++) {

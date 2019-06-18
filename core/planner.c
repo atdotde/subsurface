@@ -174,6 +174,8 @@ int tissue_at_end(struct deco_state *ds, struct dive *dive, struct deco_state **
 			if (ceiling_pressure.mbar > ds->max_bottom_ceiling_pressure.mbar)
 				ds->max_bottom_ceiling_pressure.mbar = ceiling_pressure.mbar;
 		}
+		printf("After ceiling correction\n");
+		dump_ds(ds);
 
 		divemode = get_current_divemode(&dive->dc, t0.seconds + 1, &evdm, &divemode);
 		interpolate_transition(ds, dive, t0, t1, lastdepth, sample->depth, gas, setpoint, divemode);
@@ -841,6 +843,8 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 	previous_deco_time = 100000000;
 	ds->deco_time = 10000000;
 	cache_deco_state(ds, &bottom_cache);  // Lets us make several iterations
+	printf("Starting planning\n");
+	dump_ds(ds);
 	bottom_depth = depth;
 	bottom_gi = gi;
 	bottom_gas = gas;
@@ -1079,7 +1083,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		diveplan->eff_gfhigh = lrint(100.0 * regressionb());
 		diveplan->eff_gflow = lrint(100.0 * (regressiona() * first_stop_depth + regressionb()));
 	}
-
+	printf("Planner deco_time: %d\n", ds->deco_time);
 	for (int i = 0; i < MAX_CYLINDERS; i++)
 		if (cylinder_nodata(&dive->cylinder[i])) {
 			// Switch to an empty air cylinder for breathing air at the surface

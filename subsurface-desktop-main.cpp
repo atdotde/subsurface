@@ -109,7 +109,7 @@ int main(int argc, char **argv)
 		qDebug() << "importing dive data from" << importedFiles;
 	m->importFiles(importedFiles);
 
-	if (verbose > 0)
+	if (1 || verbose > 0)
 		print_files();
 	if (!quit)
 		run_ui();

@@ -20,6 +20,8 @@
 #include "git-access.h"
 #include "table.h"
 
+extern void dump_ds(struct deco_state *ds);
+
 /* This flag is set to true by operations that are not implemented in the
  * undo system. It is therefore only cleared on save and load. */
 static bool dive_list_changed = false;
@@ -430,6 +432,7 @@ static int calculate_sac(const struct dive *dive)
 /* for now we do this based on the first divecomputer */
 static void add_dive_to_deco(struct deco_state *ds, struct dive *dive)
 {
+	printf("Adding dive %d\n", dive->number);
 	struct divecomputer *dc = &dive->dc;
 	struct gasmix gasmix = gasmix_air;
 	int i;
@@ -596,7 +599,6 @@ int init_decompression(struct deco_state *ds, struct dive *dive)
 			dump_tissues(ds);
 #endif
 		}
-
 		add_dive_to_deco(ds, pdive);
 
 		last_starttime = pdive->when;
@@ -627,7 +629,9 @@ int init_decompression(struct deco_state *ds, struct dive *dive)
 #endif
 			return surface_time;
 		}
+		printf("Adding %d surface time\n", surface_time);
 		add_segment(ds, surface_pressure, air, surface_time, 0, dive->dc.divemode, prefs.decosac);
+		dump_ds(ds);
 #if DECO_CALC_DEBUG & 2
 		printf("Tissues after surface intervall of %d:%02u:\n", FRACTION(surface_time, 60));
 		dump_tissues(ds);
