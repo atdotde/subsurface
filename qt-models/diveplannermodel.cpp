@@ -945,9 +945,12 @@ void DivePlannerPointsModel::createTemporaryPlan()
 	// what does the cache do???
 	struct deco_state *cache = NULL;
 	struct divedatapoint *dp = NULL;
+	printf("Filling gases in diveplan\n");
 	for (int i = 0; i < displayed_dive.cylinders.nr; i++) {
 		cylinder_t *cyl = get_cylinder(&displayed_dive, i);
+		printf("%d:\to2=%d\the=%d\tuse=%d\n", i, cyl->gasmix.o2.permille, cyl->gasmix.he.permille, cyl->cylinder_use);
 		if (cyl->depth.mm && cyl->cylinder_use != NOT_USED) {
+			printf("added\n");
 			dp = create_dp(0, cyl->depth.mm, i, 0);
 			if (diveplan.dp) {
 				dp->next = diveplan.dp;
