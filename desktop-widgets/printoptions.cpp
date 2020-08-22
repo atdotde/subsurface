@@ -44,6 +44,7 @@ void PrintOptions::setup()
 
 	connect(ui.printInColor, SIGNAL(clicked(bool)), this, SLOT(printInColorClicked(bool)));
 	connect(ui.printSelected, SIGNAL(clicked(bool)), this, SLOT(printSelectedClicked(bool)));
+	connect(ui.resolution, SIGNAL(valueChanged(int)), this, SLOT(on_resolution_edited(int)));
 
 	hasSetupSlots = true;
 }
@@ -67,6 +68,11 @@ void PrintOptions::setupTemplates()
 	}
 	ui.printTemplate->setCurrentIndex(current_index);
 	lastImportExportTemplate = "";
+}
+
+void PrintOptions::on_resolution_edited(int value)
+{
+	printOptions->resolution = value;
 }
 
 // print type radio buttons

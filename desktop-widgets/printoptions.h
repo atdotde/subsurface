@@ -15,6 +15,7 @@ struct print_options {
 	bool print_selected;
 	bool color_selected;
 	bool landscape;
+	int resolution;
 };
 
 struct template_options {
@@ -86,6 +87,7 @@ slots:
 	void on_importButton_clicked();
 	void on_exportButton_clicked();
 	void on_deleteButton_clicked();
+	void on_resolution_edited(int value);
 };
 
 #endif // PRINTOPTIONS_H
