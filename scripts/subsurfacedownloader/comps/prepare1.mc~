@@ -1,0 +1,50 @@
+<%init>
+use Git::Repository;
+my $downloader = "/home/robert/src/subsurface/buid-downloader/subsurface-downloader";
+my %dcs;
+
+
+sub load_supported_dcs {
+  open IN, "$downloader --list-dc|" || die "Cannot run $downloader: $!";
+  
+  while(<IN>) {
+    last if /Supported dive computers:/;
+  }
+  while(<IN>) {
+    last unless /\S/;
+
+    my ($manufacturer, $products) = /"([^:]+):\s+([^"]+)"/;
+
+    next unless defined $products;
+    $products =~ s/\([^\)]*\)//g;
+    my @products  = split /,\s*/, $products;
+    $dcs{$manufacturer} = \@products;
+
+  }
+  close IN;
+}
+1;
+</%init>
+
+
+<html>
+	<head>
+		<link rel="stylesheet" href="/static/css/subsurface-downloader.css">
+		<title>Subsurface Downloader</title>
+	</head>
+
+	<body>
+		<h1>Here are my dive computers</h1>
+		 foreach my $company(keys %dcs} {
+		  <h3> <% $company %> </h3>
+		  <ul>
+		  
+		   foreach my $model(@{$dcs{$company}}) {
+		    <li> <% $model %> </li>
+		   }
+
+		  </ul>
+		 }
+
+	</body>
+</html>

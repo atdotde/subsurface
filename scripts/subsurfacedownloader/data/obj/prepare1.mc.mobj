@@ -1,0 +1,112 @@
+our ($_class_cmeta, $m, $_m_buffer, $_interp);
+BEGIN { 
+local $_interp = Mason::Interp->current_load_interp;
+$_interp->component_moose_class->import;
+$_interp->component_import_class->import;
+}
+*m = \$Mason::Request::current_request;
+*_m_buffer = \$Mason::Request::current_buffer;
+sub _inner { inner() }
+use Poet qw($conf $poet :web);
+method _set_class_cmeta ($interp) {
+$_class_cmeta = $interp->component_class_meta_class->new(
+'class' => CLASS,
+'dir_path' => '/',
+'interp' => $interp,
+'is_top_level' => '1',
+'object_file' => __FILE__,
+'path' => '/prepare1.mc',
+'source_file' => '/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc',
+);
+}
+sub _unset_class_cmeta { undef $_class_cmeta }
+sub _class_cmeta { $_class_cmeta }
+#line 1 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+
+use Git::Repository;
+my $downloader = "/home/robert/src/subsurface/build-downloader/subsurface-downloader";
+my %dcs;
+my $vendor;
+my $product;
+my $device;
+
+&load_supported_dcs;
+
+sub load_supported_dcs {
+  open IN, "$downloader --list-dc|" || die "Cannot run $downloader: $!";
+  
+  while(<IN>) {
+    last if /Supported dive computers:/;
+  }
+  while(<IN>) {
+    last unless /\S/;
+
+    my ($manufacturer, $products) = /"([^:]+):\s+([^"]+)"/;
+
+    next unless defined $products;
+    $products =~ s/\([^\)]*\)//g;
+    my @products  = split /,\s*/, $products;
+    $dcs{$manufacturer} = \@products;
+    print STDERR "$manufacturer\n";
+  }
+  close IN;
+}
+
+
+1;
+method main  {
+#line 35 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+$$_m_buffer .= '
+<html>
+	<head>
+		<link rel="stylesheet" href="/static/css/style.css">
+		<title>Subsurface Downloader</title>
+	</head>
+
+	<body>
+		<select id="Manufacturer" onchange="loadProducts()">
+';
+#line 44 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+ foreach $vendor (sort keys %dcs) {
+$$_m_buffer .= '  	 	       <option>';
+#line 45 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+for (scalar($vendor)) { $$_m_buffer .= $_ if defined }
+#line 45 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+$$_m_buffer .= '
+';
+#line 46 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+ }
+$$_m_buffer .= '		</select>
+		<select id="Product">
+		</select>
+ <script>
+ function loadProducts() {
+   var selected = document.getElementById("Manufacturer").value
+   var vendorproducts = {
+';
+#line 54 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+ foreach $vendor (sort keys %dcs) {
+$$_m_buffer .= '  	  "';
+#line 55 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+for (scalar($vendor)) { $$_m_buffer .= $_ if defined }
+#line 55 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+$$_m_buffer .= '": "<option>';
+#line 55 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+for (scalar(join "</option><option>",@{$dcs{$vendor}})) { $$_m_buffer .= $_ if defined }
+#line 55 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+$$_m_buffer .= '</option>",
+';
+#line 56 "/home/robert/src/subsurface/scripts/subsurfacedownloader/comps/prepare1.mc"
+       }
+$$_m_buffer .= '  }
+   document.getElementById("Product").innerHTML = vendorproducts[selected]
+   }
+   </script>
+
+
+	</body>
+</html>
+';
+
+;return;
+}
