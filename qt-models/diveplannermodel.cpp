@@ -1237,6 +1237,12 @@ void DivePlannerPointsModel::computeVariations(std::unique_ptr<struct diveplan> 
 	}
 
 	plan_copy = *original_plan;
+
+	std::vector<divedatapoint> manualdps;
+	for(auto dp : plan_copy.dp)
+		if (!dp.time || dp.entered)
+			manualdps.push_back(dp);
+	plan_copy.dp = manualdps;
 	if (plan_copy.dp.size() < 2)
 		return;
 	if (my_instance != instanceCounter)
@@ -1245,6 +1251,8 @@ void DivePlannerPointsModel::computeVariations(std::unique_ptr<struct diveplan> 
 	save.restore(&ds, false);
 
 	plan_copy = *original_plan;
+	plan_copy.dp = manualdps;
+
 	second_to_last(plan_copy.dp).depth.mm += delta_depth.mm;
 	plan_copy.dp.back().depth.mm += delta_depth.mm;
 	if (my_instance != instanceCounter)
@@ -1252,6 +1260,7 @@ void DivePlannerPointsModel::computeVariations(std::unique_ptr<struct diveplan> 
 	auto deeper = plan(&ds, plan_copy, dive.get(), dcNr, 1, cache, true, false);
 	save.restore(&ds, false);
 
+	plan_copy.dp = manualdps;
 	second_to_last(plan_copy.dp).depth.mm -= delta_depth.mm;
 	plan_copy.dp.back().depth.mm -= delta_depth.mm;
 	if (my_instance != instanceCounter)
@@ -1260,12 +1269,14 @@ void DivePlannerPointsModel::computeVariations(std::unique_ptr<struct diveplan> 
 	save.restore(&ds, false);
 
 	plan_copy = *original_plan;
+	plan_copy.dp = manualdps;
 	plan_copy.dp.back().time += delta_time.seconds;
 	if (my_instance != instanceCounter)
 		return;
 	auto longer = plan(&ds, plan_copy, dive.get(), dcNr, 1, cache, true, false);
 	save.restore(&ds, false);
 
+	plan_copy.dp = manualdps;
 	plan_copy.dp.back().time -= delta_time.seconds;
 	if (my_instance != instanceCounter)
 		return;
@@ -1275,7 +1286,6 @@ void DivePlannerPointsModel::computeVariations(std::unique_ptr<struct diveplan> 
 	std::string buf = format_string_std(", %s: %c %d:%02d /%s %c %d:%02d /min", qPrintable(tr("Stop times")),
 		SIGNED_FRAC_TRIPLET(analyzeVariations(shallower, original, deeper, qPrintable(depth_units)), 60), qPrintable(depth_units),
 		SIGNED_FRAC_TRIPLET(analyzeVariations(shorter, original, longer, qPrintable(time_units)), 60));
-
 	// By using a signal, we can transport the variations to the main thread.
 	emit variationsComputed(QString::fromStdString(buf));
 #ifdef DEBUG_STOPVAR
