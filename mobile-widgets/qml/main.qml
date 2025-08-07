@@ -310,22 +310,6 @@ Kirigami.ApplicationWindow {
 				}
 			},
 			Kirigami.Action {
-				icon.name: ":/icons/document-edit-sign.svg" // Using an existing icon for now
-				text: qsTr("Dive Planner")
-				onTriggered: {
-					globalDrawer.close()
-					showPage(divePlannerEditWindow)
-				}
-			},
-			Kirigami.Action {
-				icon.name: ":/icons/measure.svg" // Using an existing icon for now
-				text: qsTr("Gas Calculator")
-				onTriggered: {
-					globalDrawer.close()
-					showPage(divePlannerCalculatorWindow)
-				}
-			},
-			Kirigami.Action {
 				icon {
 					name: ":/icons/ic_sync.svg"
 				}
@@ -447,7 +431,23 @@ if you have network connectivity and want to sync your data to cloud storage."),
 					showPage(statistics)
 				}
 			},
-			Kirigami.Action {
+            Kirigami.Action {
+                icon.name: ":/icons/document-edit-sign.svg" // Using an existing icon for now
+                text: qsTr("Dive Planner")
+                onTriggered: {
+                    globalDrawer.close()
+                    showPage(divePlannerEditWindow)
+                }
+            },
+            Kirigami.Action {
+                icon.name: ":/icons/measure.svg" // Using an existing icon for now
+                text: qsTr("Gas Calculator")
+                onTriggered: {
+                    globalDrawer.close()
+                    showPage(divePlannerCalculatorWindow)
+                }
+            },
+            Kirigami.Action {
 				icon {
 					name: ":/icons/ic_settings.svg"
 				}

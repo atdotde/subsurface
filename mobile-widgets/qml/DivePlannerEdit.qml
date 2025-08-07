@@ -163,7 +163,7 @@ Kirigami.ScrollablePage {
 		Canvas {
 			id: profileCanvas
 			Layout.fillWidth: true
-			Layout.preferredHeight: Kirigami.Units.gridUnit * 20
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 10
 
 			onPaint: {
 				if (profileData.length < 2) return;
@@ -247,7 +247,12 @@ Kirigami.ScrollablePage {
 				font.pixelSize: Kirigami.Units.gridUnit * 1.2
 			}
 			TemplateButton {
-					text: "+"
+                    contentItem: Text {
+                        text: "+"
+                        horizontalAlignment: Text.AlignHCenter
+                        color: subsurfaceTheme.primaryTextColor
+                    }
+
 					font.bold: true
 					Layout.preferredWidth: Kirigami.Units.gridUnit * 2
 					onClicked: {
@@ -315,17 +320,21 @@ Kirigami.ScrollablePage {
 					currentIndex: use
 					onCurrentIndexChanged: if (currentIndex !== -1) cylinderListModel.setProperty(index, "use", currentIndex)
 				}
-				TemplateTextField {
-					id: pressureField
-					Layout.fillWidth: true
-					text: pressure.toString()
-					validator: IntValidator { bottom: 0; top: 10000 }
-					onEditingFinished: {
-						cylinderListModel.setProperty(index, "pressure", Number(text));
-						updateLivePlanInfo();
-					}
-					onActiveFocusChanged: cylinderListView.interactive = !activeFocus
-				}
+                Controls.Tumbler {
+                    id: pressureTumbler
+                    model: 10000
+                    delegate: delegateComponent
+                    Layout.fillWidth: true
+                    implicitHeight: Kirigami.Units.gridUnit * 3
+                    visibleItemCount: 3
+                    currentIndex: 300
+                    wrap: false
+                    onCurrentIndexChanged: {
+                        cylinderListModel.setProperty(index, "pressure", currentIndex);
+                        updateLivePlanInfo();
+                    }
+                }
+
 				TemplateButton {
 					text: "X"
 					font.bold: true
@@ -391,27 +400,33 @@ Kirigami.ScrollablePage {
 				width: segmentListView.width
 				spacing: Kirigami.Units.gridUnit
 
-				TemplateTextField {
-					Layout.fillWidth: true
-					text: depth.toString()
-					validator: IntValidator { bottom: 0; top: 300 }
-					onEditingFinished: {
-						segmentListModel.setProperty(index, "depth", Number(text));
-						updateLivePlanInfo();
-					}
-					onActiveFocusChanged: segmentListView.interactive = !activeFocus
-				}
+                Controls.Tumbler {
+                    model: 300
+                    Layout.fillWidth: true
+                    implicitHeight: Kirigami.Units.gridUnit * 3
+                    visibleItemCount: 3
+                    delegate: delegateComponent
+                    currentIndex: depth
+                    wrap: false
+                    onCurrentIndexChanged: {
+                        segmentListModel.setProperty(index, "depth", currentIndex);
+                        updateLivePlanInfo();
+                    }
+                }
 
-				TemplateTextField {
-					Layout.fillWidth: true
-					text: duration.toString()
-					validator: IntValidator { bottom: 1; top: 999 }
-					onEditingFinished: {
-						segmentListModel.setProperty(index, "duration", Number(text));
-						updateLivePlanInfo();
-					}
-					onActiveFocusChanged: segmentListView.interactive = !activeFocus
-				}
+                Controls.Tumbler {
+                    model: 600
+                    Layout.fillWidth: true
+                    implicitHeight: Kirigami.Units.gridUnit * 3
+                    visibleItemCount: 3
+                    delegate: delegateComponent
+                    currentIndex: duration
+                    wrap: false
+                    onCurrentIndexChanged: {
+                        segmentListModel.setProperty(index, "duration", currentIndex);
+                        updateLivePlanInfo();
+                    }
+                }
 
 				TemplateComboBox {
 					Layout.fillWidth: true
